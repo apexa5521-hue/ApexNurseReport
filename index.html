@@ -1,0 +1,1635 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ApexCare Nursing</title>
+<meta name="description" content="نظام التقرير الأسبوعي للتمريض — ApexCare">
+<meta name="theme-color" content="#0E6B66">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+<style>
+/* ══════════ TOKENS ══════════ */
+:root{
+  color-scheme:light;
+  --bg:#F5F4F0;--surface:#FFFFFF;--surface-2:#FAF9F6;--sunken:#EFEDE7;
+  --line:#E6E3DB;--line-strong:#D3CFC4;
+  --ink:#14171A;--ink-2:#474B51;--ink-3:#7A7E85;
+  --accent:#0E6B66;--accent-hover:#0B5A56;--accent-ink:#FFFFFF;--accent-soft:#E2EFEC;--accent-line:#B9D8D3;
+  --good:#0ca30c;--warn:#fab219;--serious:#ec835a;--crit:#d03b3b;
+  --good-soft:#E5F3E3;--warn-soft:#FCF1D8;--serious-soft:#FBE8DF;--crit-soft:#FAE3E3;--na-soft:#EDEBE5;
+  --s1:#2a78d6;--s2:#eb6834;
+  --grid:#ECEAE4;
+  --r-sm:8px;--r:12px;--r-lg:18px;--r-xl:24px;
+  --sh-1:0 1px 0 rgba(20,23,26,.04),0 1px 2px rgba(20,23,26,.04);
+  --sh-2:0 1px 2px rgba(20,23,26,.05),0 10px 30px -14px rgba(20,23,26,.18);
+  --sh-3:0 2px 6px rgba(20,23,26,.06),0 30px 60px -20px rgba(20,23,26,.28);
+  --ease:cubic-bezier(.2,.8,.2,1);--ease-in-out:cubic-bezier(.65,0,.35,1);
+  --font:'IBM Plex Sans Arabic','Inter',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0D0F11;--surface:#15181B;--surface-2:#1A1E22;--sunken:#101214;
+    --line:#252A2F;--line-strong:#343A41;
+    --ink:#F1F2F3;--ink-2:#B7BCC2;--ink-3:#838990;
+    --accent:#3DB5AB;--accent-hover:#52C4BA;--accent-ink:#04201D;--accent-soft:#11302D;--accent-line:#1F4E49;
+    --good-soft:#132717;--warn-soft:#2D2410;--serious-soft:#2E1D15;--crit-soft:#2F1617;--na-soft:#1E2226;
+    --s1:#3987e5;--s2:#d95926;--grid:#22272C;
+    --sh-1:0 1px 0 rgba(0,0,0,.3);--sh-2:0 1px 2px rgba(0,0,0,.4),0 12px 30px -14px rgba(0,0,0,.6);--sh-3:0 30px 60px -20px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0D0F11;--surface:#15181B;--surface-2:#1A1E22;--sunken:#101214;
+  --line:#252A2F;--line-strong:#343A41;
+  --ink:#F1F2F3;--ink-2:#B7BCC2;--ink-3:#838990;
+  --accent:#3DB5AB;--accent-hover:#52C4BA;--accent-ink:#04201D;--accent-soft:#11302D;--accent-line:#1F4E49;
+  --good-soft:#132717;--warn-soft:#2D2410;--serious-soft:#2E1D15;--crit-soft:#2F1617;--na-soft:#1E2226;
+  --s1:#3987e5;--s2:#d95926;--grid:#22272C;
+  --sh-1:0 1px 0 rgba(0,0,0,.3);--sh-2:0 1px 2px rgba(0,0,0,.4),0 12px 30px -14px rgba(0,0,0,.6);--sh-3:0 30px 60px -20px rgba(0,0,0,.7);
+}
+
+/* ══════════ BASE ══════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.55;min-height:100vh;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.num{font-family:'Inter',var(--font);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.muted{color:var(--ink-3)}
+.hidden{display:none!important}
+.ico{width:16px;height:16px;flex:none;display:inline-block;vertical-align:middle}
+.icon-btn .ico{width:19px;height:19px}
+.logo .ico{width:20px;height:20px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* ══════════ MOTION ══════════ */
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.06);opacity:1}100%{transform:scale(1)}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes sheet{from{opacity:0;transform:translateY(24px) scale(.985)}to{opacity:1;transform:none}}
+.rise{animation:rise .55s var(--ease) both;animation-delay:calc(var(--i,0) * 55ms)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0ms!important;transition-duration:.01ms!important}}
+
+/* ══════════ LOGIN ══════════ */
+#login{min-height:100vh;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr)}
+.login-art{position:relative;overflow:hidden;background:#0B3F3C;color:#E8F3F1;padding:48px;display:flex;flex-direction:column;justify-content:space-between}
+.login-art::before{content:"";position:absolute;inset:0;background:
+  radial-gradient(900px 500px at 85% 10%,rgba(94,208,196,.28),transparent 60%),
+  radial-gradient(700px 500px at 0% 100%,rgba(255,196,120,.14),transparent 60%);}
+.login-art svg.grid{position:absolute;inset:0;width:100%;height:100%;opacity:.12}
+.login-art>*{position:relative}
+.brandmark{display:flex;align-items:center;gap:12px;font-weight:600;letter-spacing:.2px}
+.brandmark .logo{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,#5FD0C4,#128277);color:#062624;box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 8px 20px -8px rgba(0,0,0,.5)}
+.login-art h1{font-size:clamp(28px,3.4vw,44px);line-height:1.2;font-weight:700;max-width:14ch;letter-spacing:-.01em}
+.login-art p.lead{color:#B8D6D1;max-width:40ch;margin-top:14px;font-size:15px}
+.cycle{display:flex;gap:10px;margin-top:34px;flex-wrap:wrap}
+.cycle div{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);backdrop-filter:blur(6px);border-radius:12px;padding:10px 14px;font-size:12.5px;color:#D5E9E6}
+.cycle b{display:block;font-size:13px;color:#fff;font-weight:600}
+.login-foot{font-size:12px;color:#8FB8B1}
+.login-pane{display:flex;align-items:center;justify-content:center;padding:40px 24px}
+.login-box{width:100%;max-width:380px;animation:rise .7s var(--ease) both}
+.login-box h2{font-size:24px;font-weight:700;letter-spacing:-.01em}
+.login-box .sub{color:var(--ink-3);margin:6px 0 28px}
+.lang-switch{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--surface);margin-bottom:28px}
+.lang-switch button{padding:5px 12px;border-radius:999px;font-size:12.5px;color:var(--ink-2);transition:all .2s var(--ease)}
+.lang-switch button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+
+/* ══════════ FORMS ══════════ */
+.field{margin-bottom:16px}
+.field>label,.label{display:block;font-size:12.5px;font-weight:500;color:var(--ink-2);margin-bottom:7px}
+.input,select.input,textarea.input{width:100%;height:44px;padding:0 14px;border:1px solid var(--line-strong);border-radius:var(--r);background:var(--surface);transition:border-color .2s,box-shadow .2s;outline:none}
+textarea.input{height:auto;min-height:84px;padding:12px 14px;resize:vertical}
+.input:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.input[dir="ltr"]{text-align:left}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:var(--r);font-weight:600;font-size:13.5px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);transition:transform .15s var(--ease),background .2s,border-color .2s,box-shadow .2s;white-space:nowrap}
+.btn:hover{border-color:var(--ink-3)}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);box-shadow:0 1px 0 rgba(255,255,255,.2) inset,0 6px 16px -8px var(--accent)}
+.btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+.btn.lg{height:48px;padding:0 22px;font-size:15px;border-radius:14px}
+.btn.block{width:100%}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--ink-2)}
+.btn.ghost:hover{background:var(--sunken)}
+.btn.sm{height:32px;padding:0 11px;font-size:12.5px;border-radius:10px}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.btn .spin{width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
+.icon-btn{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:var(--ink-2);transition:background .2s}
+.icon-btn:hover{background:var(--sunken);color:var(--ink)}
+.form-error{background:var(--crit-soft);color:var(--ink);border-radius:10px;padding:10px 12px;font-size:13px;margin-top:12px;display:flex;gap:8px;align-items:flex-start;animation:rise .3s var(--ease)}
+.form-error::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--crit);margin-top:6px}
+
+/* segmented choice */
+.seg{display:inline-flex;flex-wrap:wrap;gap:8px}
+.seg button{min-width:88px;height:42px;padding:0 16px;border-radius:12px;border:1px solid var(--line-strong);background:var(--surface);font-weight:500;color:var(--ink-2);display:inline-flex;align-items:center;gap:8px;justify-content:center;transition:all .2s var(--ease)}
+.seg button:hover{border-color:var(--ink-3);color:var(--ink)}
+.seg button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--ink);box-shadow:0 0 0 1px var(--accent) inset}
+.seg button[aria-pressed="true"].neg{border-color:var(--crit);background:var(--crit-soft);box-shadow:0 0 0 1px var(--crit) inset}
+.seg button .dot{width:8px;height:8px;border-radius:50%;background:var(--line-strong);transition:background .2s}
+.seg button[aria-pressed="true"] .dot{background:var(--accent)}
+.seg button[aria-pressed="true"].neg .dot{background:var(--crit)}
+.rating{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;max-width:420px}
+.rating button{height:58px;border-radius:12px;border:1px solid var(--line-strong);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:all .2s var(--ease)}
+.rating button b{font-size:17px;font-family:Inter}
+.rating button span{font-size:10.5px;color:var(--ink-3)}
+.rating button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 1px var(--accent) inset;transform:translateY(-1px)}
+
+/* ══════════ SHELL ══════════ */
+.topbar{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line)}
+.topbar-in{max-width:1320px;margin:0 auto;height:64px;padding:0 24px;display:flex;align-items:center;gap:16px}
+.topbar .brandmark{color:var(--ink);font-size:14.5px}
+.topbar .brandmark .logo{width:34px;height:34px;border-radius:10px}
+.topbar .brandmark small{display:block;font-size:11px;color:var(--ink-3);font-weight:500;margin-top:1px}
+.nav{display:flex;gap:2px;background:var(--sunken);border:1px solid var(--line);padding:3px;border-radius:12px;position:relative;margin-inline-start:12px}
+.nav a{position:relative;z-index:1;padding:6px 14px;border-radius:9px;font-size:13px;font-weight:500;color:var(--ink-2);text-decoration:none;transition:color .2s;white-space:nowrap}
+.nav a[aria-current="page"]{color:var(--ink)}
+.nav .ind{position:absolute;top:3px;bottom:3px;border-radius:9px;background:var(--surface);box-shadow:var(--sh-1);transition:all .35s var(--ease)}
+.spacer{flex:1}
+.who{display:flex;align-items:center;gap:10px;padding:4px 4px 4px 12px;border-radius:12px}
+[dir="ltr"] .who{padding:4px 12px 4px 4px}
+.avatar{width:32px;height:32px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700;font-size:13px}
+.who .meta{line-height:1.25}
+.who .meta b{font-size:13px;font-weight:600;display:block}
+.who .meta span{font-size:11.5px;color:var(--ink-3)}
+main{max-width:1320px;margin:0 auto;padding:28px 24px 96px}
+.page-head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.page-head h1{font-size:26px;font-weight:700;letter-spacing:-.015em;line-height:1.2}
+.page-head p{color:var(--ink-3);margin-top:4px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toolbar .input{height:38px;width:auto;min-width:130px;font-size:13px}
+
+/* ══════════ CARDS & KPI ══════════ */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-1)}
+.card-h{display:flex;align-items:center;gap:10px;padding:16px 18px 0}
+.card-h h3{font-size:14.5px;font-weight:600}
+.card-h .sub{font-size:12px;color:var(--ink-3)}
+.card-b{padding:16px 18px 18px}
+.grid{display:grid;gap:16px}
+.g-kpi{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.g-2{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}
+.g-2e{grid-template-columns:repeat(2,minmax(0,1fr))}
+.kpi{padding:16px 18px;position:relative;overflow:hidden}
+.kpi .k-label{font-size:12.5px;color:var(--ink-2);font-weight:500;display:flex;align-items:center;gap:6px}
+.kpi .k-val{font-size:32px;font-weight:600;letter-spacing:-.03em;margin-top:6px;line-height:1.1}
+.kpi .k-val small{font-size:15px;color:var(--ink-3);font-weight:500;margin-inline-start:2px}
+.kpi .k-sub{font-size:12px;color:var(--ink-3);margin-top:6px}
+.kpi.hero{background:linear-gradient(160deg,var(--accent-soft),var(--surface) 70%);border-color:var(--accent-line)}
+.meter{height:6px;border-radius:99px;background:var(--sunken);overflow:hidden;margin-top:12px}
+.meter i{display:block;height:100%;border-radius:99px;background:var(--accent);transform-origin:right;animation:grow .9s var(--ease) both}
+[dir="ltr"] .meter i{transform-origin:left}
+@keyframes grow{from{transform:scaleX(0)}}
+.chart-box{position:relative;height:260px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+/* ══════════ PILLS ══════════ */
+.pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:500;background:var(--na-soft);color:var(--ink);white-space:nowrap}
+.pill svg{width:12px;height:12px;flex:none}
+.pill.good{background:var(--good-soft)}.pill.good svg{color:var(--good)}
+.pill.warn{background:var(--warn-soft)}.pill.warn svg{color:#C98500}
+.pill.serious{background:var(--serious-soft)}.pill.serious svg{color:var(--serious)}
+.pill.crit{background:var(--crit-soft)}.pill.crit svg{color:var(--crit)}
+.pill.accent{background:var(--accent-soft)}
+.tag{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:7px;font-size:11.5px;background:var(--sunken);color:var(--ink-2);border:1px solid var(--line)}
+
+/* ══════════ TABLE ══════════ */
+.tbl-wrap{overflow:auto;border-top:1px solid var(--line);margin-top:14px;max-height:560px}
+table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+.tbl th{position:sticky;top:0;background:var(--surface-2);font-weight:500;color:var(--ink-3);font-size:12px;text-align:start;padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:1}
+.tbl td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tbody tr{transition:background .15s}
+.tbl tbody tr:hover{background:var(--surface-2)}
+.tbl tr.click{cursor:pointer}
+.tbl .strong{font-weight:600}
+.empty{padding:36px 18px;text-align:center;color:var(--ink-3);font-size:13px}
+.empty b{display:block;color:var(--ink-2);font-size:14px;margin-bottom:2px}
+
+/* heat strip */
+.heat{display:flex;gap:3px}
+.heat i{width:14px;height:14px;border-radius:4px;background:var(--na-soft);display:block;transition:transform .15s}
+.heat i:hover{transform:scale(1.35)}
+.heat i.on_time,.heat i.early{background:var(--good)}
+.heat i.late{background:var(--warn)}
+.heat i.very_late{background:var(--serious)}
+.heat i.missing{background:var(--crit);opacity:.85}
+.heat i.na{background:transparent;border:1px dashed var(--line-strong)}
+
+/* ══════════ ISSUES ══════════ */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
+.tabs button{padding:10px 14px;font-weight:500;color:var(--ink-3);position:relative;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--ink)}
+.tabs button[aria-selected="true"]::after{content:"";position:absolute;inset-inline:10px;bottom:-1px;height:2px;border-radius:2px;background:var(--accent);animation:fade .3s}
+.tabs .count{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;margin-inline-start:6px;border-radius:99px;background:var(--sunken);font-size:11px;font-family:Inter}
+.issues{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
+.issue{padding:16px;display:flex;flex-direction:column;gap:10px;transition:transform .25s var(--ease),box-shadow .25s var(--ease)}
+.issue:hover{transform:translateY(-2px);box-shadow:var(--sh-2)}
+.issue .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.issue h4{font-size:15px;font-weight:600;line-height:1.35}
+.issue .desc{color:var(--ink-2);font-size:13px}
+.issue .meta{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-3)}
+.issue .meta b{color:var(--ink-2);font-weight:500}
+.issue .act{display:flex;gap:8px;margin-top:auto;padding-top:4px}
+.issue.sev-high{box-shadow:inset 3px 0 0 var(--crit),var(--sh-1)}
+[dir="rtl"] .issue.sev-high{box-shadow:inset -3px 0 0 var(--crit),var(--sh-1)}
+.repeat{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--ink);background:var(--serious-soft);padding:2px 8px;border-radius:99px}
+
+/* ══════════ NURSE ══════════ */
+.n-wrap{max-width:860px;margin:0 auto}
+.week-card{padding:22px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;background:linear-gradient(135deg,#0E4F4B,#0B3F3C);color:#E9F4F2;border:0;overflow:hidden;position:relative}
+.week-card::after{content:"";position:absolute;inset:auto -60px -80px auto;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(95,208,196,.35),transparent 65%)}
+[dir="rtl"] .week-card::after{inset:auto auto -80px -60px}
+.week-card h2{font-size:22px;font-weight:700;letter-spacing:-.01em}
+.week-card p{color:#A9CEC8;font-size:13px;margin-top:4px}
+.week-card .ring{width:84px;height:84px;position:relative;z-index:1}
+.week-card .ring svg{transform:rotate(-90deg)}
+.week-card .ring b{position:absolute;inset:0;display:grid;place-items:center;font:600 18px Inter}
+.week-card .ring-alt{position:relative;z-index:1;text-align:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:10px 16px}
+.week-card .ring-alt b{display:block;font-size:28px;font-weight:600;line-height:1.1}
+.week-card .ring-alt span{font-size:11.5px;color:#A9CEC8}
+.week-card .pill{background:rgba(255,255,255,.12);color:#fff;margin-top:12px}
+.step{padding:20px;display:grid;grid-template-columns:34px 1fr;gap:14px;transition:border-color .3s,box-shadow .3s}
+.step .no{width:30px;height:30px;border-radius:10px;background:var(--sunken);display:grid;place-items:center;font:600 13px Inter;color:var(--ink-3);transition:all .3s var(--ease)}
+.step.done .no{background:var(--accent);color:var(--accent-ink)}
+.step h3{font-size:15.5px;font-weight:600;line-height:1.4}
+.step .hint{color:var(--ink-3);font-size:12.5px;margin:2px 0 14px}
+.step .more{margin-top:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;animation:rise .35s var(--ease)}
+.clinics{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px}
+.clinics button{min-height:52px;padding:8px 12px;border-radius:12px;border:1px solid var(--line-strong);background:var(--surface);text-align:start;font-weight:500;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:6px;transition:all .2s var(--ease)}
+.clinics button:hover{border-color:var(--ink-3)}
+.clinics button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 1px var(--accent) inset}
+.clinics button[disabled]{opacity:.55;cursor:not-allowed;background:var(--sunken);border-style:dashed}
+.clinics button svg{width:16px;height:16px;color:var(--good);flex:none}
+.tool-row{display:grid;grid-template-columns:minmax(0,1fr) 84px 150px 36px;gap:8px;align-items:center;margin-bottom:8px;animation:rise .3s var(--ease)}
+.submit-bar{position:fixed;inset-inline:0;bottom:0;z-index:40;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line)}
+.submit-bar .in{max-width:860px;margin:0 auto;display:flex;align-items:center;gap:16px}
+.progress{flex:1}
+.progress .bar{height:6px;background:var(--sunken);border-radius:99px;overflow:hidden;margin-top:6px}
+.progress .bar i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .5s var(--ease)}
+.progress span{font-size:12.5px;color:var(--ink-2)}
+.hist{display:flex;gap:6px;align-items:flex-end;overflow-x:auto;padding-bottom:4px}
+.hist div{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:38px}
+.hist i{width:26px;height:26px;border-radius:8px;background:var(--na-soft);display:grid;place-items:center;color:#fff}
+.hist i svg{width:13px;height:13px}
+.hist i.on_time,.hist i.early{background:var(--good)}
+.hist i.late{background:var(--warn)}
+.hist i.very_late{background:var(--serious)}
+.hist i.missing{background:transparent;border:1.5px dashed var(--crit)}
+.hist span{font-size:10.5px;color:var(--ink-3);font-family:Inter}
+.done-view{text-align:center;padding:48px 24px}
+.done-view .check{width:88px;height:88px;margin:0 auto 18px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;animation:pop .6s var(--ease) both}
+.done-view .check path{stroke:var(--accent);stroke-width:3.5;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:40;stroke-dashoffset:40;animation:draw .5s .35s var(--ease) forwards}
+.done-view h2{font-size:24px;font-weight:700}
+.done-view p{color:var(--ink-2);margin-top:6px}
+
+/* ══════════ MODAL / TOAST ══════════ */
+.scrim{position:fixed;inset:0;z-index:100;background:rgba(10,12,14,.42);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:20px;animation:fade .2s}
+.modal{width:100%;max-width:560px;max-height:calc(100vh - 40px);overflow:auto;background:var(--surface);border-radius:var(--r-xl);box-shadow:var(--sh-3);animation:sheet .35s var(--ease)}
+.modal.wide{max-width:760px}
+.modal-h{display:flex;align-items:center;gap:12px;padding:20px 22px 0}
+.modal-h h3{font-size:17px;font-weight:600;flex:1}
+.modal-b{padding:18px 22px}
+.modal-f{display:flex;gap:8px;justify-content:flex-end;padding:0 22px 20px}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:10px 16px;font-size:13.5px}
+.kv dt{color:var(--ink-3)}
+.toasts{position:fixed;bottom:24px;inset-inline-start:50%;transform:translateX(50%);z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center}
+[dir="ltr"] .toasts{transform:translateX(-50%)}
+.toast{background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:12px;box-shadow:var(--sh-3);font-size:13px;font-weight:500;animation:sheet .35s var(--ease);display:flex;gap:10px;align-items:center}
+.toast.err::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--crit)}
+.toast.ok::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--good)}
+.skel{background:linear-gradient(90deg,var(--sunken) 25%,var(--surface-2) 50%,var(--sunken) 75%);background-size:200% 100%;animation:shimmer 1.4s linear infinite;border-radius:var(--r-lg)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips label{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line-strong);border-radius:10px;font-size:12.5px;cursor:pointer;transition:all .15s}
+.chips input{accent-color:var(--accent)}
+.chips label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.temp-pass{font:600 22px Inter;letter-spacing:.12em;background:var(--sunken);border:1px dashed var(--line-strong);border-radius:12px;padding:14px;text-align:center;direction:ltr}
+.notice{background:var(--warn-soft);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--ink)}
+
+/* ══════════ RESPONSIVE / PRINT ══════════ */
+@media (max-width:1000px){.g-2,.g-2e{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:860px){
+  #login{grid-template-columns:1fr}
+  .login-art{padding:28px 20px;min-height:auto}
+  .login-art h1{font-size:26px}
+  .cycle,.login-foot{display:none}
+  .topbar-in{padding:0 16px;height:auto;min-height:60px;flex-wrap:wrap;padding-top:8px;padding-bottom:8px}
+  .nav{order:5;width:100%;margin:0;overflow-x:auto}
+  .who .meta{display:none}
+  main{padding:20px 16px 110px}
+  .page-head h1{font-size:22px}
+  .kpi .k-val{font-size:26px}
+  .tool-row{grid-template-columns:1fr 70px 36px}
+  .tool-row select{grid-column:1/3}
+  .week-card{grid-template-columns:1fr}
+  .week-card .ring{display:none}
+  .kv{grid-template-columns:1fr}
+  .kv dt{margin-top:6px}
+}
+@media print{
+  .topbar,.submit-bar,.toolbar,.btn,.icon-btn,.tabs{display:none!important}
+  body{background:#fff}
+  main{padding:0;max-width:none}
+  .card{box-shadow:none;break-inside:avoid}
+  .tbl-wrap{max-height:none;overflow:visible}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 16 16"><path d="M4.5 4.5l7 7m0-7l-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 5v3.2l2 1.3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 16 16"><path d="M8 2.2L14.5 13.5h-13z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 6.5v3M8 11.6v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 16 16"><path d="M4.5 8h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.3 4.3l1.4 1.4M14.3 14.3l1.4 1.4M4.3 15.7l1.4-1.4M14.3 5.7l1.4-1.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 20 20"><path d="M16 12.5A6.5 6.5 0 017.5 4a6.5 6.5 0 108.5 8.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="i-out" viewBox="0 0 20 20"><path d="M8 4H5a1 1 0 00-1 1v10a1 1 0 001 1h3M12 6l4 4-4 4M16 10H8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 20 20"><path d="M5 6h10M8 6V4.5h4V6M6.5 6l.6 9.5h5.8l.6-9.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 20 20"><path d="M8 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 20 20"><path d="M10 3.5v9M6 9l4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-print" viewBox="0 0 20 20"><path d="M6 8V3.5h8V8M6 14H4.5A1 1 0 013.5 13V9a1 1 0 011-1h11a1 1 0 011 1v4a1 1 0 01-1 1H14M6 11.5h8V16.5H6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 20 20"><rect x="7" y="7" width="9" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13 7V5a1 1 0 00-1-1H5a1 1 0 00-1 1v7a1 1 0 001 1h2" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-logo" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></symbol>
+</svg>
+
+<div id="app"></div>
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* ════════════════════════════════════════════════════════════
+   الإعداد: ضع رابط Web App بعد نشر Code.gs
+   (أو افتح الصفحة مرة واحدة بـ ?api=الرابط وسيُحفظ في المتصفح)
+   ════════════════════════════════════════════════════════════ */
+const CONFIG = {
+  API_URL: '',
+};
+
+/* ══════════ STORAGE (آمن عند منع التخزين) ══════════ */
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} },
+};
+(function () {
+  const q = new URLSearchParams(location.search).get('api');
+  if (q) { store.set('apex.api', q); history.replaceState(null, '', location.pathname + location.hash); }
+})();
+const API = () => CONFIG.API_URL || store.get('apex.api') || '';
+
+const state = {
+  token: store.get('apex.token'),
+  user: null,
+  lang: store.get('apex.lang') || 'ar',
+  charts: [],
+};
+
+/* ══════════ I18N (صفحة الممرضة ثنائية اللغة) ══════════ */
+const T = {
+  ar: {
+    signin: 'تسجيل الدخول', signinSub: 'استخدم بريدك الإلكتروني أو اسم المستخدم', user: 'البريد الإلكتروني أو اسم المستخدم',
+    pass: 'كلمة المرور', enter: 'دخول', noApi: 'لم يتم ربط الصفحة بالخادم بعد. ضع رابط Web App في CONFIG.API_URL.',
+    changeTitle: 'تعيين كلمة مرور جديدة', changeSub: 'هذا أول دخول لك، اختر كلمة مرور خاصة بك.', oldPass: 'كلمة المرور المؤقتة',
+    newPass: 'كلمة المرور الجديدة (6 أحرف على الأقل)', confirmPass: 'تأكيد كلمة المرور', save: 'حفظ', mismatch: 'كلمتا المرور غير متطابقتين',
+    hello: 'مرحباً', weekOf: 'تقرير أسبوع', dueToday: 'موعد التسليم اليوم', onTimeNow: 'التسليم الآن يُحسب في الوقت',
+    lateNow: 'التسليم الآن يُحسب متأخراً', veryLateNow: 'فات موعد التسليم — التقرير سيُسجّل متأخراً جداً', earlyNow: 'التسليم الآن يُحسب مبكراً لأسبوع',
+    submittedOf: 'عيادات تم رفعها', q1: 'العيادة', q1h: 'اختر العيادة التي تكتب تقريرها', submitted: 'تم الرفع',
+    q2: 'هل تم فحص تواريخ انتهاء الأدوية والمواد داخل العيادة؟', q2h: 'سجّل أقرب تاريخ انتهاء بين المواد والأدوية',
+    earliest: 'أقرب تاريخ انتهاء', earliestItem: 'اسم المادة أو الدواء', earliestItemPh: 'مثال: Adrenaline',
+    q3: 'هل التعقيم سليم والأكياس جافة ومغلقة بشكل صحيح؟', q3h: '',
+    q4: 'هل المواد داخل الثلاجة سليمة؟', q4h: 'إذا كانت العيادة بدون ثلاجة اختر «لا توجد ثلاجة»', fridgeOk: 'سليمة', fridgeBad: 'يوجد مشكلة', fridgeNone: 'لا توجد ثلاجة',
+    temp: 'حرارة الثلاجة °C (اختياري)', tempHint: 'النطاق المقبول',
+    q5: 'هل بطاقات الموظفين موجودة؟', q5h: '',
+    q6: 'تقييم نظافة العيادة', q6h: '1 = سيئة، 5 = ممتازة', r1: 'سيئة', r2: 'ضعيفة', r3: 'مقبولة', r4: 'جيدة', r5: 'ممتازة',
+    q7: 'هل توجد أدوات ناقصة؟', q7h: 'أضف كل أداة ناقصة في سطر مستقل مع الكمية',
+    toolItem: 'اسم الأداة', qty: 'الكمية', sevHigh: 'توقف العمل', sevMed: 'تؤثر على العمل', sevLow: 'بسيطة', addTool: 'إضافة أداة',
+    q8: 'مشكلة تحتاج تدخل الإدارة (اختياري)', q8ph: 'اكتب المشكلة باختصار', notes: 'ملاحظات (اختياري)',
+    yes: 'نعم', no: 'لا', progress: 'اكتمل', of: 'من', submit: 'رفع التقرير', sending: 'جارٍ الرفع…',
+    doneTitle: 'تم رفع التقرير', doneIssues: 'بنود أُرسلت للمتابعة مع الأقسام المختصة', doneNone: 'لا توجد ملاحظات تحتاج متابعة. شكراً لك.',
+    another: 'رفع تقرير لعيادة أخرى', finish: 'تم', history: 'سجل التسليم — آخر 12 أسبوع', followUp: 'متابعة مشاكل عياداتك',
+    noFollow: 'لا توجد مشاكل مفتوحة في عياداتك.', allDone: 'تم رفع تقارير كل عياداتك لهذا الأسبوع', allDoneSub: 'شكراً لك، نراك السبت القادم.',
+    st_on_time: 'في الوقت', st_early: 'مبكر', st_late: 'متأخر', st_very_late: 'متأخر جداً', st_missing: 'لم تُسلّم', st_na: '—',
+    is_open: 'مفتوحة', is_in_progress: 'قيد المعالجة', is_resolved: 'تم الحل', is_archived: 'مؤرشفة',
+    logout: 'خروج', theme: 'تبديل المظهر', required: 'أكمل الأسئلة المطلوبة', fillTools: 'أدخل اسم كل أداة ناقصة',
+    netErr: 'تعذر الاتصال بالخادم. تحقق من الإنترنت وحاول مجدداً.',
+  },
+  en: {
+    signin: 'Sign in', signinSub: 'Use your email or username', user: 'Email or username',
+    pass: 'Password', enter: 'Sign in', noApi: 'This page is not connected to the server yet (CONFIG.API_URL is empty).',
+    changeTitle: 'Set a new password', changeSub: 'This is your first sign-in. Choose your own password.', oldPass: 'Temporary password',
+    newPass: 'New password (min. 6 characters)', confirmPass: 'Confirm password', save: 'Save', mismatch: 'Passwords do not match',
+    hello: 'Hello', weekOf: 'Weekly report', dueToday: 'Due today', onTimeNow: 'Submitting now counts as on time',
+    lateNow: 'Submitting now counts as late', veryLateNow: 'Deadline passed — this report will be marked very late', earlyNow: 'Submitting now counts as early for the week of',
+    submittedOf: 'clinics submitted', q1: 'Clinic', q1h: 'Choose the clinic you are reporting on', submitted: 'Submitted',
+    q2: 'Have expiry dates of drugs and materials in the clinic been checked?', q2h: 'Record the earliest expiry date you found',
+    earliest: 'Earliest expiry date', earliestItem: 'Drug / material name', earliestItemPh: 'e.g. Adrenaline',
+    q3: 'Is sterilization safe and are pouches dry and sealed correctly?', q3h: '',
+    q4: 'Are the materials inside the refrigerator safe?', q4h: 'If the clinic has no refrigerator choose “No fridge”', fridgeOk: 'Safe', fridgeBad: 'Problem', fridgeNone: 'No fridge',
+    temp: 'Fridge temperature °C (optional)', tempHint: 'Accepted range',
+    q5: 'Are employee cards present?', q5h: '',
+    q6: 'Clinic cleanliness', q6h: '1 = poor, 5 = excellent', r1: 'Poor', r2: 'Weak', r3: 'Fair', r4: 'Good', r5: 'Excellent',
+    q7: 'Are any tools missing?', q7h: 'Add each missing tool on its own line with the quantity',
+    toolItem: 'Tool name', qty: 'Qty', sevHigh: 'Stops work', sevMed: 'Affects work', sevLow: 'Minor', addTool: 'Add tool',
+    q8: 'Problem that needs management (optional)', q8ph: 'Describe the problem briefly', notes: 'Notes (optional)',
+    yes: 'Yes', no: 'No', progress: 'Completed', of: 'of', submit: 'Submit report', sending: 'Submitting…',
+    doneTitle: 'Report submitted', doneIssues: 'items were sent to the responsible departments for follow-up', doneNone: 'Nothing needs follow-up. Thank you!',
+    another: 'Report another clinic', finish: 'Done', history: 'Submission history — last 12 weeks', followUp: 'Follow-up on your clinics',
+    noFollow: 'No open issues in your clinics.', allDone: 'All your clinics are reported for this week', allDoneSub: 'Thank you — see you next Saturday.',
+    st_on_time: 'On time', st_early: 'Early', st_late: 'Late', st_very_late: 'Very late', st_missing: 'Missed', st_na: '—',
+    is_open: 'Open', is_in_progress: 'In progress', is_resolved: 'Resolved', is_archived: 'Archived',
+    logout: 'Sign out', theme: 'Toggle theme', required: 'Please answer the required questions', fillTools: 'Enter the name of each missing tool',
+    netErr: 'Could not reach the server. Check your connection and try again.',
+  },
+};
+const t = k => (T[state.lang] && T[state.lang][k]) || T.ar[k] || k;
+
+function applyLang(lang) {
+  state.lang = lang;
+  store.set('apex.lang', lang);
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === 'en' ? 'ltr' : 'rtl';
+}
+
+/* ══════════ HELPERS ══════════ */
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const icon = (id, cls = '') => `<svg class="ico ${cls}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
+const BR = { BURIDAH: 'بريدة', ONIZAH: 'عنيزة', ALL: 'كل الفروع' };
+const br = b => BR[b] || b || '—';
+const parseD = s => { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; };
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const addDays = (s, n) => { const d = parseD(s); d.setDate(d.getDate() + n); return ymd(d); };
+const locale = () => state.lang === 'en' ? 'en-GB' : 'ar-SA-u-ca-gregory-nu-latn';
+const fmtDate = (s, opt = { day: 'numeric', month: 'long' }) => { const d = parseD(s); return d ? new Intl.DateTimeFormat(locale(), opt).format(d) : '—'; };
+const fmtShort = s => { const d = parseD(s); return d ? `${d.getDate()}/${d.getMonth() + 1}` : ''; };
+const fmtDT = s => s ? fmtDate(s, { day: 'numeric', month: 'short' }) + ' · ' + String(s).slice(11, 16) : '—';
+const clinicLabel = c => { const m = state.lang === 'en' && String(c.clinic_id || '').match(/-C(\d+)$/); return m ? 'Clinic ' + m[1] : (c.name || c.clinic_name); };
+const CAT_EN = { tools: 'Missing tools', expiry: 'Expiry', expiry_check: 'Expiry not checked', sterilization: 'Sterilization', fridge: 'Refrigerator', card: 'Employee card', cleanliness: 'Cleanliness', other: 'Other' };
+const catLabel = i => state.lang === 'en' ? (CAT_EN[i.category] || i.categoryLabel) : i.categoryLabel;
+const pct = v => v == null ? '—' : v + '%';
+const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w.replace(/^ال(?=..)/, '')[0]).join('').toUpperCase();
+
+const TIMING = {
+  on_time: ['good', 'check'], early: ['good', 'check'], late: ['warn', 'clock'],
+  very_late: ['serious', 'alert'], missing: ['crit', 'x'], na: ['', 'dash'],
+};
+const timingPill = s => { const m = TIMING[s] || TIMING.na; return `<span class="pill ${m[0]}">${icon(m[1])}${t('st_' + (s || 'na'))}</span>`; };
+const SEV = { high: ['crit', 'alert', 'عالية'], medium: ['warn', 'clock', 'متوسطة'], low: ['', 'dash', 'منخفضة'] };
+const sevPill = s => { const m = SEV[s] || SEV.low; return `<span class="pill ${m[0]}">${icon(m[1])}${m[2]}</span>`; };
+const STATUS = { open: ['crit', 'alert'], in_progress: ['warn', 'clock'], resolved: ['good', 'check'], archived: ['', 'dash'] };
+const statusPill = s => { const m = STATUS[s] || STATUS.archived; return `<span class="pill ${m[0]}">${icon(m[1])}${t('is_' + s)}</span>`; };
+
+function toast(msg, kind = 'ok') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + kind;
+  el.textContent = msg;
+  $('#toasts').appendChild(el);
+  setTimeout(() => { el.style.transition = 'opacity .3s, transform .3s'; el.style.opacity = '0'; el.style.transform = 'translateY(8px)'; }, 3200);
+  setTimeout(() => el.remove(), 3600);
+}
+
+function modal({ title, body, foot = '', wide = false, onMount }) {
+  const scrim = document.createElement('div');
+  scrim.className = 'scrim';
+  scrim.innerHTML = `<div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+    <div class="modal-h"><h3>${esc(title)}</h3><button class="icon-btn" data-close aria-label="إغلاق">${icon('x')}</button></div>
+    <div class="modal-b">${body}</div>${foot ? `<div class="modal-f">${foot}</div>` : ''}</div>`;
+  const close = () => { scrim.style.transition = 'opacity .18s'; scrim.style.opacity = '0'; setTimeout(() => scrim.remove(), 180); document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  scrim.addEventListener('click', e => { if (e.target === scrim || e.target.closest('[data-close]')) close(); });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(scrim);
+  const first = scrim.querySelector('input,select,textarea');
+  if (first) setTimeout(() => first.focus(), 60);
+  if (onMount) onMount(scrim, close);
+  return { el: scrim, close };
+}
+
+function busy(btn, on, label) {
+  if (!btn) return;
+  if (on) { btn.dataset.label = btn.innerHTML; btn.innerHTML = `<span class="spin"></span>${label ? esc(label) : ''}`; btn.disabled = true; }
+  else { btn.innerHTML = btn.dataset.label || btn.innerHTML; btn.disabled = false; }
+}
+
+function countUp(root = document) {
+  $$('[data-count]', root).forEach(el => {
+    const target = Number(el.dataset.count);
+    if (!isFinite(target)) return;
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) { el.textContent = target; return; }
+    const t0 = performance.now(), dur = 900;
+    const step = now => {
+      const p = Math.min(1, (now - t0) / dur);
+      el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+function downloadCSV(name, headers, rows) {
+  const q = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const csv = '﻿' + [headers, ...rows].map(r => r.map(q).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = name + '.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); toast('تم النسخ'); }
+  catch (e) { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('تم النسخ'); }
+}
+
+/* ══════════ API ══════════ */
+async function api(action, payload = {}) {
+  if (!API()) throw new Error(t('noApi'));
+  let res;
+  try {
+    res = await fetch(API(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // يتجنب طلب preflight مع Apps Script
+      body: JSON.stringify(Object.assign({ action, token: state.token }, payload)),
+    });
+  } catch (e) { throw new Error(t('netErr')); }
+  let j;
+  try { j = await res.json(); } catch (e) { throw new Error(t('netErr')); }
+  if (!j.ok) {
+    if (j.code === 'AUTH') { logout(true); }
+    if (j.code === 'MUST_CHANGE') { renderChangePassword(); }
+    const err = new Error(j.error || 'خطأ');
+    err.code = j.code;
+    throw err;
+  }
+  return j.data;
+}
+
+/* ══════════ THEME ══════════ */
+function setTheme(mode) {
+  if (mode === 'auto') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', mode);
+  store.set('apex.theme', mode);
+}
+function isDark() {
+  const a = document.documentElement.getAttribute('data-theme');
+  return a ? a === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+}
+function toggleTheme() { setTheme(isDark() ? 'light' : 'dark'); rerender(); }
+setTheme(store.get('apex.theme') || 'auto');
+
+/* ══════════ AUTH SCREENS ══════════ */
+function renderLogin(error) {
+  destroyCharts();
+  $('#app').innerHTML = `
+  <div id="login">
+    <aside class="login-art">
+      <svg class="grid" aria-hidden="true"><defs><pattern id="g" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#fff" stroke-width=".6"/></pattern></defs><rect width="100%" height="100%" fill="url(#g)"/></svg>
+      <div class="brandmark"><span class="logo">${icon('logo')}</span><span>ApexCare Nursing</span></div>
+      <div>
+        <h1>${state.lang === 'en' ? 'Weekly clinic report, in one place.' : 'التقرير الأسبوعي للعيادات في مكان واحد'}</h1>
+        <p class="lead">${state.lang === 'en'
+          ? 'Nurses submit every Saturday. HR tracks commitment, Quality reads the trends, and Supply closes the gaps.'
+          : 'الممرضات يرفعن التقرير كل سبت، والموارد البشرية تتابع الالتزام، والجودة تقرأ المؤشرات، والتموين يغلق النواقص.'}</p>
+        <div class="cycle">
+          <div><b>${state.lang === 'en' ? 'Saturday' : 'السبت'}</b>${state.lang === 'en' ? 'on time' : 'في الوقت'}</div>
+          <div><b>${state.lang === 'en' ? 'Sunday' : 'الأحد'}</b>${state.lang === 'en' ? 'late' : 'متأخر'}</div>
+          <div><b>${state.lang === 'en' ? 'After' : 'بعدها'}</b>${state.lang === 'en' ? 'very late' : 'متأخر جداً'}</div>
+        </div>
+      </div>
+      <div class="login-foot">ApexCare Clinics · ${state.lang === 'en' ? 'Buraydah & Unaizah' : 'بريدة وعنيزة'}</div>
+    </aside>
+    <section class="login-pane">
+      <form class="login-box" id="login-form" novalidate>
+        <div class="lang-switch" role="group" aria-label="Language">
+          <button type="button" data-lang="ar" aria-pressed="${state.lang === 'ar'}">العربية</button>
+          <button type="button" data-lang="en" aria-pressed="${state.lang === 'en'}">English</button>
+        </div>
+        <h2>${t('signin')}</h2>
+        <p class="sub">${t('signinSub')}</p>
+        <div class="field"><label for="lu">${t('user')}</label><input class="input" id="lu" dir="ltr" autocomplete="username" autocapitalize="off" spellcheck="false" required></div>
+        <div class="field"><label for="lp">${t('pass')}</label><input class="input" id="lp" type="password" dir="ltr" autocomplete="current-password" required></div>
+        <button class="btn primary lg block" type="submit" id="lb">${t('enter')}</button>
+        ${!API() ? `<div class="form-error">${esc(t('noApi'))}</div>` : ''}
+        ${error ? `<div class="form-error">${esc(error)}</div>` : '<div id="le"></div>'}
+      </form>
+    </section>
+  </div>`;
+  $$('[data-lang]').forEach(b => b.onclick = () => { applyLang(b.dataset.lang); renderLogin(); });
+  $('#login-form').onsubmit = async e => {
+    e.preventDefault();
+    const btn = $('#lb');
+    const u = $('#lu').value.trim(), p = $('#lp').value;
+    if (!u || !p) return;
+    busy(btn, true);
+    try {
+      const d = await api('login', { username: u, password: p });
+      state.token = d.token; store.set('apex.token', d.token);
+      state.user = d.user;
+      if (d.user.role !== 'nurse' && state.lang !== 'ar') applyLang('ar');
+      d.user.mustChange ? renderChangePassword() : boot();
+    } catch (err) {
+      busy(btn, false);
+      const box = $('#login-form .form-error:last-child') || $('#le');
+      box.outerHTML = `<div class="form-error">${esc(err.message)}</div>`;
+    }
+  };
+  setTimeout(() => $('#lu') && $('#lu').focus(), 50);
+}
+
+function renderChangePassword() {
+  $('#app').innerHTML = `
+  <div class="login-pane" style="min-height:100vh">
+    <form class="login-box card" style="padding:28px" id="cp-form" novalidate>
+      <div class="brandmark" style="margin-bottom:22px"><span class="logo">${icon('logo')}</span><span>ApexCare</span></div>
+      <h2>${t('changeTitle')}</h2>
+      <p class="sub">${t('changeSub')}</p>
+      <div class="field"><label for="c0">${t('oldPass')}</label><input class="input" id="c0" type="password" dir="ltr" autocomplete="current-password"></div>
+      <div class="field"><label for="c1">${t('newPass')}</label><input class="input" id="c1" type="password" dir="ltr" autocomplete="new-password"></div>
+      <div class="field"><label for="c2">${t('confirmPass')}</label><input class="input" id="c2" type="password" dir="ltr" autocomplete="new-password"></div>
+      <button class="btn primary lg block" id="cb">${t('save')}</button>
+      <div id="ce"></div>
+      <button type="button" class="btn ghost block" style="margin-top:8px" id="cx">${t('logout')}</button>
+    </form>
+  </div>`;
+  $('#cx').onclick = () => logout();
+  $('#cp-form').onsubmit = async e => {
+    e.preventDefault();
+    const a = $('#c0').value, b = $('#c1').value, c = $('#c2').value;
+    const showErr = m => { $('#ce').innerHTML = `<div class="form-error">${esc(m)}</div>`; };
+    if (b !== c) return showErr(t('mismatch'));
+    busy($('#cb'), true);
+    try {
+      const d = await api('changePassword', { oldPassword: a, newPassword: b });
+      state.user = d.user;
+      boot();
+    } catch (err) { busy($('#cb'), false); showErr(err.message); }
+  };
+}
+
+async function logout(expired) {
+  const tok = state.token;
+  state.token = null; state.user = null;
+  store.del('apex.token');
+  if (tok && !expired) { try { await fetch(API(), { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'logout', token: tok }) }); } catch (e) {} }
+  location.hash = '';
+  renderLogin(expired ? (state.lang === 'en' ? 'Session expired, please sign in again.' : 'انتهت الجلسة، سجّل الدخول مرة أخرى') : '');
+}
+
+/* ══════════ ROUTER / SHELL ══════════ */
+const PAGES = {
+  nurse:   { label: 'تقريري', roles: ['nurse'], render: renderNurse },
+  hr:      { label: 'الموارد البشرية', roles: ['hr', 'admin'], render: renderHR },
+  quality: { label: 'الجودة والإحصائيات', roles: ['quality', 'admin', 'hr'], render: renderQuality },
+  supply:  { label: u => u.role === 'supply' ? 'طلبات التموين' : 'متابعة المشاكل', roles: ['supply', 'quality', 'admin'], render: renderIssues },
+  reports: { label: 'التقارير', roles: ['quality', 'admin', 'hr'], render: renderReports },
+  users:   { label: 'المستخدمون', roles: ['hr', 'admin'], render: renderUsers },
+};
+const HOME = { nurse: 'nurse', hr: 'hr', quality: 'quality', supply: 'supply', admin: 'quality' };
+const allowedPages = u => Object.keys(PAGES).filter(k => PAGES[k].roles.includes(u.role));
+
+async function boot() {
+  if (!state.token) return renderLogin();
+  if (!state.user) {
+    try { state.user = (await api('me')).user; }
+    catch (e) { if (e.code !== 'AUTH') renderLogin(e.message); return; }
+  }
+  if (state.user.mustChange) return renderChangePassword();
+  if (state.user.role !== 'nurse') applyLang('ar');
+  else applyLang(state.lang);
+  route();
+}
+
+function currentPage() {
+  const h = location.hash.replace(/^#\/?/, '').split('?')[0];
+  const ok = allowedPages(state.user);
+  return ok.includes(h) ? h : HOME[state.user.role] || ok[0];
+}
+
+function route() {
+  if (!state.user) return;
+  const page = currentPage();
+  renderShell(page);
+  destroyCharts();
+  PAGES[page].render($('#view'));
+}
+window.addEventListener('hashchange', () => state.user && route());
+function rerender() { if (state.user) route(); else renderLogin(); }
+
+function renderShell(page) {
+  const u = state.user;
+  const pages = allowedPages(u);
+  const nurse = u.role === 'nurse';
+  $('#app').innerHTML = `
+  <header class="topbar"><div class="topbar-in">
+    <div class="brandmark"><span class="logo">${icon('logo')}</span><span>ApexCare<small>${nurse ? (state.lang === 'en' ? 'Nursing weekly report' : 'التقرير الأسبوعي للتمريض') : 'منصة متابعة التمريض'}</small></span></div>
+    ${pages.length > 1 ? `<nav class="nav" aria-label="الأقسام"><span class="ind"></span>${pages.map(p => {
+      const l = PAGES[p].label; return `<a href="#/${p}" ${p === page ? 'aria-current="page"' : ''}>${esc(typeof l === 'function' ? l(u) : l)}</a>`; }).join('')}</nav>` : ''}
+    <div class="spacer"></div>
+    ${nurse ? `<div class="lang-switch" style="margin:0" role="group" aria-label="Language"><button type="button" data-lang="ar" aria-pressed="${state.lang === 'ar'}">ع</button><button type="button" data-lang="en" aria-pressed="${state.lang === 'en'}">EN</button></div>` : ''}
+    <button class="icon-btn" id="theme-btn" title="${t('theme')}" aria-label="${t('theme')}">${icon(isDark() ? 'sun' : 'moon')}</button>
+    <div class="who"><span class="avatar">${esc(initials(u.name))}</span><span class="meta"><b>${esc(u.name)}</b><span>${esc(nurse ? br(u.branch) : u.roleLabel + (u.branch && u.branch !== 'ALL' ? ' · ' + br(u.branch) : ''))}</span></span></div>
+    <button class="icon-btn" id="logout-btn" title="${t('logout')}" aria-label="${t('logout')}">${icon('out')}</button>
+  </div></header>
+  <main id="view"></main>`;
+  $('#theme-btn').onclick = toggleTheme;
+  $('#logout-btn').onclick = () => logout();
+  $$('.topbar [data-lang]').forEach(b => b.onclick = () => { applyLang(b.dataset.lang); route(); });
+  moveNavIndicator();
+}
+
+function moveNavIndicator() {
+  const nav = $('.nav'); if (!nav) return;
+  const cur = $('a[aria-current="page"]', nav), ind = $('.ind', nav);
+  if (!cur) return;
+  requestAnimationFrame(() => {
+    ind.style.left = cur.offsetLeft + 'px';
+    ind.style.width = cur.offsetWidth + 'px';
+  });
+}
+window.addEventListener('resize', moveNavIndicator);
+
+function skeleton(view, blocks = [96, 280, 360]) {
+  view.innerHTML = `<div class="grid" style="gap:16px">${blocks.map(h => `<div class="skel" style="height:${h}px"></div>`).join('')}</div>`;
+}
+function errorBlock(view, err, retry) {
+  view.innerHTML = `<div class="card empty rise"><b>تعذر تحميل البيانات</b>${esc(err.message)}<div style="margin-top:14px"><button class="btn sm" id="retry">إعادة المحاولة</button></div></div>`;
+  $('#retry').onclick = retry;
+}
+
+/* ══════════ CHARTS ══════════ */
+function destroyCharts() { state.charts.forEach(c => { try { c.destroy(); } catch (e) {} }); state.charts = []; }
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function chartReady() {
+  return new Promise(res => { if (window.Chart) return res(); const i = setInterval(() => { if (window.Chart) { clearInterval(i); res(); } }, 50); });
+}
+function chartBase() {
+  const ink3 = cssVar('--ink-3'), grid = cssVar('--grid');
+  return {
+    responsive: true, maintainAspectRatio: false,
+    animation: { duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 700, easing: 'easeOutQuart' },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        rtl: document.dir === 'rtl', textDirection: document.dir,
+        backgroundColor: cssVar('--ink'), titleColor: cssVar('--bg'), bodyColor: cssVar('--bg'),
+        padding: 10, cornerRadius: 10, boxPadding: 4, usePointStyle: true,
+        titleFont: { family: 'IBM Plex Sans Arabic', weight: '600' }, bodyFont: { family: 'IBM Plex Sans Arabic' },
+      },
+    },
+    scales: {
+      x: { grid: { display: false }, border: { color: grid }, ticks: { color: ink3, font: { family: 'Inter', size: 11 } } },
+      y: { grid: { color: grid }, border: { display: false }, ticks: { color: ink3, font: { family: 'Inter', size: 11 }, padding: 6 } },
+    },
+    font: { family: 'IBM Plex Sans Arabic' },
+  };
+}
+async function lineChart(canvas, labels, series, { max = 100, suffix = '%' } = {}) {
+  await chartReady();
+  const o = chartBase();
+  o.scales.y.min = 0; if (max) o.scales.y.max = max;
+  o.scales.y.ticks.callback = v => v + suffix;
+  o.scales.x.reverse = document.dir === 'rtl';
+  o.plugins.tooltip.callbacks = { label: c => ` ${c.dataset.label}: ${c.parsed.y == null ? '—' : c.parsed.y + suffix}` };
+  const surface = cssVar('--surface');
+  const c = new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets: series.map(s => ({
+      label: s.label, data: s.data, borderColor: s.color, backgroundColor: s.color, borderWidth: 2, tension: .32,
+      pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 2, pointHoverBorderColor: surface, spanGaps: true,
+      fill: s.fill ? { target: 'origin', above: s.color + '14' } : false,
+    })) },
+    options: o,
+  });
+  state.charts.push(c);
+  return c;
+}
+async function barChart(canvas, labels, series, { horizontal = false, max = null, suffix = '' } = {}) {
+  await chartReady();
+  const o = chartBase();
+  const val = horizontal ? 'x' : 'y', cat = horizontal ? 'y' : 'x';
+  o.indexAxis = horizontal ? 'y' : 'x';
+  o.scales[val].min = 0; if (max) o.scales[val].max = max;
+  o.scales[val].ticks.callback = v => v + suffix;
+  o.scales[val].grid = { color: cssVar('--grid') };
+  o.scales[cat].grid = { display: false };
+  o.scales[cat].ticks = { color: cssVar('--ink-2'), font: { family: 'IBM Plex Sans Arabic', size: 12 } };
+  if (horizontal) { o.scales.x.reverse = document.dir === 'rtl'; o.scales.y.position = document.dir === 'rtl' ? 'right' : 'left'; }
+  else o.scales.x.reverse = document.dir === 'rtl';
+  o.interaction = { mode: 'nearest', axis: cat, intersect: false };
+  o.plugins.tooltip.callbacks = { label: c => ` ${c.dataset.label}: ${c.parsed[val]}${suffix}` };
+  const c = new Chart(canvas, {
+    type: 'bar',
+    data: { labels, datasets: series.map(s => ({
+      label: s.label, data: s.data, backgroundColor: s.color, borderRadius: 4, borderSkipped: false,
+      borderColor: cssVar('--surface'), borderWidth: 1, maxBarThickness: 22, categoryPercentage: .7, barPercentage: .9,
+    })) },
+    options: o,
+  });
+  state.charts.push(c);
+  return c;
+}
+const legendHTML = items => `<div class="legend">${items.map(i => `<span><i style="background:${i.color}"></i>${esc(i.label)}</span>`).join('')}</div>`;
+
+/* ══════════ TABLE HELPER ══════════ */
+function tableHTML(cols, rows, { empty = 'لا توجد بيانات', rowAttr } = {}) {
+  if (!rows.length) return `<div class="empty">${esc(empty)}</div>`;
+  return `<div class="tbl-wrap"><table class="tbl"><thead><tr>${cols.map(c => `<th>${esc(c.label)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map((r, i) => `<tr ${rowAttr ? rowAttr(r, i) : ''}>${cols.map(c => `<td class="${c.cls || ''}">${c.html ? c.html(r) : esc(c.get ? c.get(r) : r[c.key])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+function exportTable(name, cols, rows) {
+  downloadCSV(name, cols.map(c => c.label), rows.map(r => cols.map(c => c.csv ? c.csv(r) : c.get ? c.get(r) : r[c.key])));
+}
+
+/* ══════════════════════════════════════════════════════════
+   NURSE
+   ══════════════════════════════════════════════════════════ */
+async function renderNurse(view) {
+  skeleton(view, [150, 200, 200, 200]);
+  view.classList.add('n-wrap');
+  let ctx;
+  try { ctx = await api('nurse.context'); }
+  catch (e) { return errorBlock(view, e, () => renderNurse(view)); }
+
+  const pending = ctx.clinics.filter(c => !c.submitted);
+  const done = ctx.clinics.length - pending.length;
+  const f = { clinic_id: pending.length === 1 ? pending[0].clinic_id : '', tools: [] };
+
+  const nowText = {
+    on_time: t('onTimeNow'), late: t('lateNow'), very_late: t('veryLateNow'),
+    early: t('earlyNow') + ' ' + fmtDate(ctx.week),
+  }[ctx.timingIfNow];
+  const ratio = ctx.clinics.length ? done / ctx.clinics.length : 0;
+  const R = 36, C = 2 * Math.PI * R;
+
+  const yesNo = (name) => `<div class="seg" role="group" data-name="${name}">
+      <button type="button" data-v="yes"><span class="dot"></span>${t('yes')}</button>
+      <button type="button" data-v="no" class="neg"><span class="dot"></span>${t('no')}</button></div>`;
+
+  view.innerHTML = `
+    <section class="card week-card rise">
+      <div>
+        <p>${t('hello')}، ${esc(ctx.user.name)}</p>
+        <h2>${t('weekOf')} · ${fmtDate(ctx.week, { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
+        <span class="pill">${icon(TIMING[ctx.timingIfNow][1])}${esc(nowText)}</span>
+      </div>
+      ${ctx.user.clinics.length ? '' : `<div class="ring-alt"><b class="num">${done}</b><span>${t('submittedOf')}</span></div>`}
+      <div class="ring ${ctx.user.clinics.length ? '' : 'hidden'}" aria-label="${done} ${t('of')} ${ctx.clinics.length}">
+        <svg width="84" height="84"><circle cx="42" cy="42" r="${R}" stroke="rgba(255,255,255,.15)" stroke-width="7" fill="none"/>
+        <circle cx="42" cy="42" r="${R}" stroke="#5FD0C4" stroke-width="7" fill="none" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - ratio)}" style="transition:stroke-dashoffset 1s var(--ease)"/></svg>
+        <b>${done}/${ctx.clinics.length}</b>
+      </div>
+    </section>
+
+    ${pending.length ? `
+    <form id="nform" novalidate style="display:grid;gap:12px;margin-top:16px">
+      <section class="card step rise" style="--i:1" data-step="clinic"><span class="no">1</span><div>
+        <h3>${t('q1')}</h3><p class="hint">${t('q1h')}</p>
+        <div class="clinics">${ctx.clinics.map(c => `<button type="button" data-clinic="${esc(c.clinic_id)}" ${c.submitted ? `disabled title="${t('submitted')}: ${esc(c.submittedBy)}"` : ''} aria-pressed="${f.clinic_id === c.clinic_id}">
+          <span>${esc(clinicLabel(c))}</span>${c.submitted ? icon('check') : ''}</button>`).join('')}</div>
+      </div></section>
+
+      <section class="card step rise" style="--i:2" data-step="expiry"><span class="no">2</span><div>
+        <h3>${t('q2')}</h3><p class="hint">${t('q2h')}</p>${yesNo('expiry_checked')}
+        <div class="more hidden" id="exp-more">
+          <div><label class="label" for="f-exp">${t('earliest')}</label><input class="input" type="date" id="f-exp"></div>
+          <div><label class="label" for="f-expi">${t('earliestItem')}</label><input class="input" id="f-expi" placeholder="${t('earliestItemPh')}"></div>
+        </div>
+      </div></section>
+
+      <section class="card step rise" style="--i:3" data-step="steril"><span class="no">3</span><div>
+        <h3>${t('q3')}</h3><p class="hint"></p>${yesNo('sterilization_ok')}
+      </div></section>
+
+      <section class="card step rise" style="--i:4" data-step="fridge"><span class="no">4</span><div>
+        <h3>${t('q4')}</h3><p class="hint">${t('q4h')}</p>
+        <div class="seg" role="group" data-name="fridge">
+          <button type="button" data-v="ok"><span class="dot"></span>${t('fridgeOk')}</button>
+          <button type="button" data-v="problem" class="neg"><span class="dot"></span>${t('fridgeBad')}</button>
+          <button type="button" data-v="none"><span class="dot"></span>${t('fridgeNone')}</button>
+        </div>
+        <div class="more hidden" id="fridge-more">
+          <div><label class="label" for="f-temp">${t('temp')}</label><input class="input" id="f-temp" type="number" inputmode="decimal" step="0.1" min="-10" max="30" placeholder="${t('tempHint')}: ${ctx.fridgeRange[0]}–${ctx.fridgeRange[1]}°"></div>
+        </div>
+      </div></section>
+
+      <section class="card step rise" style="--i:5" data-step="card"><span class="no">5</span><div>
+        <h3>${t('q5')}</h3><p class="hint"></p>${yesNo('employee_card')}
+      </div></section>
+
+      <section class="card step rise" style="--i:6" data-step="clean"><span class="no">6</span><div>
+        <h3>${t('q6')}</h3><p class="hint">${t('q6h')}</p>
+        <div class="rating" role="group" data-name="cleanliness">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-v="${n}"><b>${n}</b><span>${t('r' + n)}</span></button>`).join('')}</div>
+      </div></section>
+
+      <section class="card step rise" style="--i:7" data-step="tools"><span class="no">7</span><div>
+        <h3>${t('q7')}</h3><p class="hint">${t('q7h')}</p>${yesNo('missing_tools')}
+        <div class="hidden" id="tools-more" style="margin-top:14px">
+          <div id="tool-rows"></div>
+          <button type="button" class="btn sm" id="add-tool">${icon('plus')}${t('addTool')}</button>
+        </div>
+      </div></section>
+
+      <section class="card step rise done" style="--i:8"><span class="no">8</span><div>
+        <h3>${t('q8')}</h3><p class="hint"></p>
+        <textarea class="input" id="f-other" placeholder="${t('q8ph')}" maxlength="500"></textarea>
+        <label class="label" for="f-notes" style="margin-top:14px">${t('notes')}</label>
+        <textarea class="input" id="f-notes" maxlength="500" style="min-height:64px"></textarea>
+      </div></section>
+      <div id="nerr"></div>
+    </form>
+    <div class="submit-bar"><div class="in">
+      <div class="progress"><span id="prog-t"></span><div class="bar"><i id="prog-b" style="width:0"></i></div></div>
+      <button class="btn primary lg" id="nsubmit" form="nform" type="submit">${t('submit')}</button>
+    </div></div>` : `
+    <section class="card done-view rise" style="margin-top:16px">
+      <div class="check"><svg width="44" height="44" viewBox="0 0 44 44"><path d="M12 23l7 7 14-15"/></svg></div>
+      <h2>${t('allDone')}</h2><p>${t('allDoneSub')}</p>
+    </section>`}
+
+    <section class="card rise" style="--i:9;margin-top:16px"><div class="card-h"><h3>${t('history')}</h3></div>
+      <div class="card-b"><div class="hist">${ctx.history.map(h => `<div title="${fmtDate(h.week)} — ${t('st_' + h.timing)}">
+        <i class="${h.timing}">${h.timing === 'missing' ? '' : icon(TIMING[h.timing][1])}</i><span>${fmtShort(h.week)}</span></div>`).join('')}</div>
+        <div class="legend" style="margin-top:12px">${['on_time', 'late', 'very_late', 'missing'].map(s => `<span>${timingPill(s)}</span>`).join('')}</div>
+      </div></section>
+
+    <section class="card rise" style="--i:10;margin-top:16px"><div class="card-h"><h3>${t('followUp')}</h3></div>
+      ${ctx.openIssues.length ? tableHTML([
+        { label: t('q1'), get: r => clinicLabel(r) },
+        { label: '', html: r => `<b>${esc(r.item || catLabel(r))}</b><div class="muted" style="font-size:12px">${esc(catLabel(r))}${r.item ? '' : ' · ' + esc(r.description)}</div>` },
+        { label: '', html: r => statusPill(r.status) },
+      ], ctx.openIssues.slice(0, 10)) : `<div class="empty">${t('noFollow')}</div>`}
+    </section>`;
+
+  const hist = $('.hist', view);
+  if (hist) hist.scrollLeft = document.dir === 'rtl' ? -hist.scrollWidth : hist.scrollWidth;
+  if (!pending.length) return;
+  const form = $('#nform');
+  const set = (k, v) => { f[k] = v; update(); };
+
+  $$('.clinics button', form).forEach(b => b.onclick = () => {
+    $$('.clinics button', form).forEach(x => x.setAttribute('aria-pressed', x === b));
+    set('clinic_id', b.dataset.clinic);
+    const c = ctx.clinics.find(x => x.clinic_id === b.dataset.clinic);
+    if (c && !c.has_fridge && !f.fridge) { const nb = $('[data-name="fridge"] [data-v="none"]', form); nb && nb.click(); }
+  });
+  $$('.seg, .rating', form).forEach(g => $$('button', g).forEach(b => b.onclick = () => {
+    $$('button', g).forEach(x => x.setAttribute('aria-pressed', x === b));
+    set(g.dataset.name, g.dataset.name === 'cleanliness' ? Number(b.dataset.v) : b.dataset.v);
+  }));
+  ['f-exp', 'f-expi', 'f-temp', 'f-other', 'f-notes'].forEach(id => $('#' + id).addEventListener('input', update));
+
+  const toolRow = (tool, i) => `<div class="tool-row" data-i="${i}">
+      <input class="input" data-k="item" placeholder="${t('toolItem')}" value="${esc(tool.item)}" maxlength="120">
+      <input class="input num" data-k="qty" type="number" min="1" max="999" inputmode="numeric" value="${tool.qty}" aria-label="${t('qty')}">
+      <select class="input" data-k="severity" aria-label="severity">
+        <option value="high" ${tool.severity === 'high' ? 'selected' : ''}>${t('sevHigh')}</option>
+        <option value="medium" ${tool.severity === 'medium' ? 'selected' : ''}>${t('sevMed')}</option>
+        <option value="low" ${tool.severity === 'low' ? 'selected' : ''}>${t('sevLow')}</option>
+      </select>
+      <button type="button" class="icon-btn" data-del aria-label="delete">${icon('trash')}</button></div>`;
+  const drawTools = () => {
+    $('#tool-rows').innerHTML = f.tools.map(toolRow).join('');
+    $$('.tool-row').forEach(row => {
+      const i = +row.dataset.i;
+      $$('[data-k]', row).forEach(inp => inp.oninput = inp.onchange = () => { f.tools[i][inp.dataset.k] = inp.value; update(); });
+      $('[data-del]', row).onclick = () => { f.tools.splice(i, 1); drawTools(); update(); };
+    });
+  };
+  $('#add-tool').onclick = () => { f.tools.push({ item: '', qty: 1, severity: 'medium' }); drawTools(); update(); $$('.tool-row [data-k="item"]').pop().focus(); };
+
+  function checks() {
+    const expOk = f.expiry_checked === 'no' || (f.expiry_checked === 'yes' && $('#f-exp').value);
+    const toolsOk = f.missing_tools === 'no' || (f.missing_tools === 'yes' && f.tools.length && f.tools.every(x => String(x.item).trim()));
+    return { clinic: !!f.clinic_id, expiry: !!expOk, steril: !!f.sterilization_ok, fridge: !!f.fridge, card: !!f.employee_card, clean: !!f.cleanliness, tools: !!toolsOk };
+  }
+  function update() {
+    $('#exp-more').classList.toggle('hidden', f.expiry_checked !== 'yes');
+    $('#fridge-more').classList.toggle('hidden', f.fridge !== 'ok');
+    const showTools = f.missing_tools === 'yes';
+    const tm = $('#tools-more');
+    if (showTools && tm.classList.contains('hidden')) { tm.classList.remove('hidden'); if (!f.tools.length) { f.tools.push({ item: '', qty: 1, severity: 'medium' }); drawTools(); } }
+    if (!showTools) tm.classList.add('hidden');
+    const c = checks();
+    Object.keys(c).forEach(k => { const s = $(`[data-step="${k}"]`, form); s && s.classList.toggle('done', c[k]); });
+    const n = Object.values(c).filter(Boolean).length, total = Object.keys(c).length;
+    $('#prog-t').textContent = `${t('progress')} ${n} ${t('of')} ${total}`;
+    $('#prog-b').style.width = (n / total * 100) + '%';
+  }
+  update();
+
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const c = checks();
+    const firstMissing = Object.keys(c).find(k => !c[k]);
+    if (firstMissing) {
+      const s = $(`[data-step="${firstMissing}"]`, form);
+      s.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      s.animate([{ boxShadow: '0 0 0 0 var(--crit)' }, { boxShadow: '0 0 0 4px var(--crit-soft)' }, { boxShadow: '0 0 0 0 transparent' }], { duration: 900 });
+      toast(firstMissing === 'tools' && f.missing_tools === 'yes' ? t('fillTools') : t('required'), 'err');
+      return;
+    }
+    const btn = $('#nsubmit');
+    busy(btn, true, t('sending'));
+    const report = {
+      clinic_id: f.clinic_id, expiry_checked: f.expiry_checked, earliest_expiry: f.expiry_checked === 'yes' ? $('#f-exp').value : '',
+      expiry_item: $('#f-expi').value, sterilization_ok: f.sterilization_ok, fridge: f.fridge,
+      fridge_temp: f.fridge === 'ok' ? $('#f-temp').value : '', employee_card: f.employee_card, cleanliness: f.cleanliness,
+      missing_tools: f.missing_tools, tools: f.missing_tools === 'yes' ? f.tools : [],
+      other_issue: $('#f-other').value, notes: $('#f-notes').value,
+    };
+    try {
+      const d = await api('nurse.submit', { report });
+      showNurseDone(view, d, pending.length > 1);
+    } catch (err) {
+      busy(btn, false);
+      $('#nerr').innerHTML = `<div class="form-error">${esc(err.message)}</div>`;
+    }
+  };
+}
+
+function showNurseDone(view, d, more) {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  const bar = $('.submit-bar'); bar && bar.remove();
+  view.innerHTML = `<section class="card done-view rise">
+    <div class="check"><svg width="44" height="44" viewBox="0 0 44 44"><path d="M12 23l7 7 14-15"/></svg></div>
+    <h2>${t('doneTitle')}</h2>
+    <p>${esc(clinicLabel(d.report))} · ${timingPill(d.report.timing)}</p>
+    <p class="muted" style="margin-top:14px">${d.issues ? `<b class="num">${d.issues}</b> ${t('doneIssues')}` : t('doneNone')}</p>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:24px;flex-wrap:wrap">
+      ${more ? `<button class="btn primary lg" id="again">${t('another')}</button>` : ''}
+      <button class="btn lg" id="fin">${t('finish')}</button>
+    </div></section>`;
+  $('#again') && ($('#again').onclick = () => renderNurse(view));
+  $('#fin').onclick = () => renderNurse(view);
+}
+
+/* ══════════════════════════════════════════════════════════
+   HR — الموارد البشرية
+   ══════════════════════════════════════════════════════════ */
+const hrState = { week: '', weeks: 12, branch: 'ALL', filter: 'all', q: '' };
+
+async function renderHR(view) {
+  skeleton(view);
+  let d;
+  try { d = await api('hr.overview', { week: hrState.week, weeks: hrState.weeks }); }
+  catch (e) { return errorBlock(view, e, () => renderHR(view)); }
+  hrState.week = d.week;
+  const s = d.summary;
+  const isCurrent = !hrState.week || d.week >= addDays(ymd(new Date()), -6);
+
+  view.innerHTML = `
+  <div class="page-head rise">
+    <div><h1>التزام الممرضات بالتقرير الأسبوعي</h1><p>أسبوع السبت ${fmtDate(d.week, { day: 'numeric', month: 'long', year: 'numeric' })}</p></div>
+    <div class="spacer"></div>
+    <div class="toolbar">
+      <button class="icon-btn" id="wk-prev" aria-label="الأسبوع السابق">${icon('chev')}</button>
+      <input class="input" type="date" id="wk" value="${d.week}" aria-label="الأسبوع">
+      <button class="icon-btn" id="wk-next" aria-label="الأسبوع التالي" style="transform:scaleX(-1)">${icon('chev')}</button>
+      <select class="input" id="wk-n" aria-label="الفترة">${[4, 8, 12, 26].map(n => `<option value="${n}" ${hrState.weeks === n ? 'selected' : ''}>آخر ${n} أسبوع</option>`).join('')}</select>
+      <button class="btn sm" onclick="window.print()">${icon('print')}طباعة</button>
+    </div>
+  </div>
+
+  <div class="grid g-kpi">
+    <div class="card kpi hero rise" style="--i:1"><div class="k-label">نسبة الالتزام هذا الأسبوع</div>
+      <div class="k-val num"><span data-count="${s.rate}">0</span><small>%</small></div>
+      <div class="meter"><i style="width:${s.rate}%"></i></div>
+      <div class="k-sub">${s.expected - s.missing} من ${s.expected} ممرضة سلّمن</div></div>
+    <div class="card kpi rise" style="--i:2"><div class="k-label">${timingPill('on_time')}</div><div class="k-val num" data-count="${s.onTime}">0</div><div class="k-sub">سلّمن يوم السبت</div></div>
+    <div class="card kpi rise" style="--i:3"><div class="k-label">${timingPill('late')}</div><div class="k-val num" data-count="${s.late}">0</div><div class="k-sub">بعد موعد السبت</div></div>
+    <div class="card kpi rise" style="--i:4"><div class="k-label">${timingPill('missing')}</div><div class="k-val num" data-count="${s.missing}">0</div><div class="k-sub">${isCurrent ? 'حتى الآن' : 'لم يسلّمن'}</div></div>
+  </div>
+
+  <div class="grid g-2" style="margin-top:16px">
+    <section class="card rise" style="--i:5"><div class="card-h"><h3>الالتزام الأسبوعي</h3><div class="spacer"></div>
+      ${legendHTML([{ label: 'سلّمن', color: cssVar('--s1') }, { label: 'في الوقت', color: cssVar('--s2') }])}</div>
+      <div class="card-b"><div class="chart-box"><canvas id="hr-trend" role="img" aria-label="نسبة الالتزام الأسبوعية"></canvas></div></div></section>
+    <section class="card rise" style="--i:6"><div class="card-h"><h3>لم يسلّمن هذا الأسبوع</h3><span class="sub num">${s.missing}</span><div class="spacer"></div>
+      ${s.missing ? `<button class="btn sm" id="copy-remind">${icon('copy')}نسخ رسالة تذكير</button>` : ''}</div>
+      <div class="card-b" style="padding-top:8px">${d.roster.filter(r => r.thisWeek === 'missing').length ? `<div style="display:grid;gap:2px;max-height:250px;overflow:auto">${d.roster.filter(r => r.thisWeek === 'missing').map(r => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
+          <span class="avatar" style="width:28px;height:28px;font-size:11px">${esc(initials(r.name))}</span>
+          <div style="flex:1;min-width:0"><b style="font-weight:500">${esc(r.name)}</b><div class="muted" style="font-size:11.5px">${br(r.branch)}${r.missedStreak > 1 ? ` · <span style="color:var(--ink)">${r.missedStreak} أسابيع متتالية</span>` : ''}</div></div>
+          ${r.missedStreak >= 3 ? `<span class="repeat">${icon('alert')}متكرر</span>` : ''}
+        </div>`).join('')}</div>` : `<div class="empty"><b>الجميع سلّمن</b>لا توجد ممرضة متأخرة هذا الأسبوع</div>`}</div></section>
+  </div>
+
+  <section class="card rise" style="--i:7;margin-top:16px">
+    <div class="card-h" style="flex-wrap:wrap"><h3>سجل الممرضات</h3><span class="sub">آخر ${d.weeks.length} أسبوع</span><div class="spacer"></div>
+      <div class="toolbar">
+        <input class="input" id="r-q" placeholder="بحث بالاسم" value="${esc(hrState.q)}" style="min-width:160px">
+        <select class="input" id="r-br"><option value="ALL">كل الفروع</option><option value="BURIDAH">بريدة</option><option value="ONIZAH">عنيزة</option></select>
+        <select class="input" id="r-f"><option value="all">كل الحالات</option><option value="missing">لم تُسلّم</option><option value="late">متأخرة</option><option value="on_time">في الوقت</option><option value="inactive">غير نشطة</option></select>
+        <button class="btn sm" id="r-csv">${icon('dl')}CSV</button>
+      </div></div>
+    <div id="roster"></div>
+    <div class="card-b legend" style="padding-top:10px">
+      <span><span class="heat"><i class="on_time"></i></span>في الوقت</span><span><span class="heat"><i class="late"></i></span>متأخر</span>
+      <span><span class="heat"><i class="very_late"></i></span>متأخر جداً</span><span><span class="heat"><i class="missing"></i></span>لم تُسلّم</span><span><span class="heat"><i class="na"></i></span>غير مطلوب</span>
+    </div>
+  </section>
+
+  <section class="card rise" style="--i:8;margin-top:16px"><div class="card-h"><h3>بطاقات الموظفين غير الموجودة</h3><span class="sub">مشاكل مفتوحة من اختصاص الموارد البشرية</span></div>
+    <div id="cards"></div></section>`;
+
+  countUp(view);
+  $('#r-br').value = hrState.branch; $('#r-f').value = hrState.filter;
+  const go = w => { hrState.week = w; renderHR(view); };
+  $('#wk').onchange = e => e.target.value && go(e.target.value);
+  $('#wk-prev').onclick = () => go(addDays(d.week, -7));
+  $('#wk-next').onclick = () => go(addDays(d.week, 7));
+  $('#wk-n').onchange = e => { hrState.weeks = +e.target.value; renderHR(view); };
+
+  const missing = d.roster.filter(r => r.thisWeek === 'missing');
+  $('#copy-remind') && ($('#copy-remind').onclick = () => copyText(
+    `Reminder — ApexCare weekly clinic report (week of ${fmtShort(d.week)}).\nPlease submit your report today:\n` +
+    missing.map(r => '• ' + r.name).join('\n') + `\n\nتذكير: نرجو رفع التقرير الأسبوعي للعيادة اليوم.`));
+
+  const cols = [
+    { label: 'الممرضة', html: r => `<div style="display:flex;align-items:center;gap:10px"><span class="avatar" style="width:28px;height:28px;font-size:11px">${esc(initials(r.name))}</span><div><b style="font-weight:600">${esc(r.name)}</b>${r.status !== 'active' ? ' <span class="tag">غير نشطة</span>' : ''}<div class="muted" style="font-size:11.5px" dir="ltr">${esc(r.email || '')}</div></div></div>`, csv: r => r.name },
+    { label: 'الفرع', get: r => br(r.branch) },
+    { label: 'هذا الأسبوع', html: r => timingPill(r.thisWeek), csv: r => t('st_' + r.thisWeek) },
+    { label: 'آخر الأسابيع', html: r => `<div class="heat">${r.cells.map((c, i) => `<i class="${c}" title="${fmtShort(d.weeks[i])} — ${t('st_' + c)}"></i>`).join('')}</div>`, csv: r => r.cells.map(c => t('st_' + c)).join(' | ') },
+    { label: 'الالتزام', html: r => `<span class="num strong">${pct(r.compliance)}</span>`, csv: r => pct(r.compliance) },
+    { label: 'في الوقت', html: r => `<span class="num">${pct(r.onTimeRate)}</span>`, csv: r => pct(r.onTimeRate) },
+    { label: 'آخر تسليم', get: r => r.lastSubmission ? fmtDT(r.lastSubmission) : '—' },
+  ];
+  const filtered = () => d.roster.filter(r =>
+    (hrState.branch === 'ALL' || r.branch === hrState.branch) &&
+    (hrState.filter === 'all' ? r.status === 'active' || r.thisWeek !== 'na'
+      : hrState.filter === 'inactive' ? r.status !== 'active'
+      : hrState.filter === 'late' ? ['late', 'very_late'].includes(r.thisWeek)
+      : hrState.filter === 'on_time' ? ['on_time', 'early'].includes(r.thisWeek) : r.thisWeek === hrState.filter) &&
+    (!hrState.q || (r.name + ' ' + r.email).toLowerCase().includes(hrState.q.toLowerCase())));
+  const draw = () => { $('#roster').innerHTML = tableHTML(cols, filtered(), { empty: 'لا توجد نتائج' }); };
+  draw();
+  $('#r-q').oninput = e => { hrState.q = e.target.value; draw(); };
+  $('#r-br').onchange = e => { hrState.branch = e.target.value; draw(); };
+  $('#r-f').onchange = e => { hrState.filter = e.target.value; draw(); };
+  $('#r-csv').onclick = () => exportTable('التزام-الممرضات-' + d.week, cols, filtered());
+
+  $('#cards').innerHTML = tableHTML([
+    { label: 'العيادة', get: r => r.clinic_name + ' — ' + br(r.branch) },
+    { label: 'آخر من أبلغ', key: 'nurse_name' },
+    { label: 'منذ', html: r => `<span class="num">${r.ageDays}</span> يوم` },
+    { label: 'التكرار', html: r => r.occurrences > 1 ? `<span class="repeat">${r.occurrences} أسابيع</span>` : '—' },
+    { label: 'الحالة', html: r => statusPill(r.status) },
+    { label: '', html: r => `<button class="btn sm" data-issue="${esc(r.issue_id)}">تحديث</button>` },
+  ], d.cardIssues, { empty: 'كل البطاقات موجودة' });
+  $$('#cards [data-issue]').forEach(b => b.onclick = () => issueDialog(d.cardIssues.find(i => i.issue_id === b.dataset.issue), () => renderHR(view)));
+
+  lineChart($('#hr-trend'), d.weekly.map(w => fmtShort(w.week)), [
+    { label: 'سلّمن', data: d.weekly.map(w => w.rate), color: cssVar('--s1'), fill: true },
+    { label: 'في الوقت', data: d.weekly.map(w => w.expected ? Math.round(w.onTime / w.expected * 100) : null), color: cssVar('--s2') },
+  ]);
+}
+
+/* ══════════════════════════════════════════════════════════
+   QUALITY — الجودة والإحصائيات
+   ══════════════════════════════════════════════════════════ */
+const qState = { period: '12w', month: '', branch: 'ALL' };
+
+function thisSaturday() {
+  const d = new Date(); d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() - 6 + 7) % 7));
+  return ymd(d);
+}
+function periodRange(p, month) {
+  const to = thisSaturday();
+  if (p === 'week') return { from: to, to, label: 'هذا الأسبوع' };
+  if (p === '4w') return { from: addDays(to, -21), to, label: 'آخر 4 أسابيع' };
+  if (p === '12w') return { from: addDays(to, -77), to, label: 'آخر 12 أسبوع' };
+  if (p === '26w') return { from: addDays(to, -175), to, label: 'آخر 6 أشهر' };
+  // شهر محدد: كل أسابيع السبت التي تقع داخل الشهر
+  const [y, m] = (month || to.slice(0, 7)).split('-').map(Number);
+  const first = new Date(y, m - 1, 1); first.setDate(first.getDate() + ((6 - first.getDay() + 7) % 7));
+  const last = new Date(y, m, 0); last.setDate(last.getDate() - ((last.getDay() - 6 + 7) % 7));
+  return { from: ymd(first), to: ymd(last), label: new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn', { month: 'long', year: 'numeric' }).format(first) };
+}
+
+async function renderQuality(view) {
+  skeleton(view, [96, 120, 320, 320]);
+  const range = periodRange(qState.period, qState.month);
+  let d;
+  try { d = await api('quality.stats', { from: range.from, to: range.to, branch: qState.branch }); }
+  catch (e) { return errorBlock(view, e, () => renderQuality(view)); }
+  const k = d.kpi;
+  const colors = { BURIDAH: cssVar('--s1'), ONIZAH: cssVar('--s2') };
+  const uncovered = d.coverage.filter(c => !c.covered);
+
+  view.innerHTML = `
+  <div class="page-head rise">
+    <div><h1>مؤشرات الجودة</h1><p>${esc(range.label)} · ${fmtDate(d.from)} – ${fmtDate(d.to)}</p></div>
+    <div class="spacer"></div>
+    <div class="toolbar">
+      <select class="input" id="q-p">
+        <option value="week">هذا الأسبوع</option><option value="4w">آخر 4 أسابيع</option><option value="12w">آخر 12 أسبوع</option>
+        <option value="26w">آخر 6 أشهر</option><option value="month">شهر محدد</option></select>
+      <input class="input ${qState.period === 'month' ? '' : 'hidden'}" type="month" id="q-m" value="${qState.month || thisSaturday().slice(0, 7)}">
+      <select class="input" id="q-b"><option value="ALL">كل الفروع</option><option value="BURIDAH">بريدة</option><option value="ONIZAH">عنيزة</option></select>
+      <button class="btn sm" onclick="window.print()">${icon('print')}طباعة التقرير</button>
+    </div>
+  </div>
+
+  <div class="grid g-kpi">
+    ${kpiCard('الالتزام بالتسليم', k.compliance, '%', 'تقارير مستلمة ÷ المطلوبة', true, 1)}
+    ${kpiCard('التسليم في الوقت', k.onTime, '%', `من ${k.reports} تقرير`, false, 2)}
+    ${kpiCard('تغطية العيادات', k.coverage, '%', `${uncovered.length} عيادة بدون تقرير آخر أسبوع`, false, 3)}
+    ${kpiCard('مشاكل مفتوحة', k.openIssues, '', `${k.highOpen} منها عالية الخطورة`, false, 4)}
+    ${kpiCard('مواد تنتهي خلال 30 يوم', k.expiringSoon, '', 'حسب آخر تقرير لكل عيادة', false, 5)}
+    ${kpiCard('متوسط أيام الحل', k.avgResolveDays, '', 'للمشاكل المغلقة في الفترة', false, 6)}
+  </div>
+
+  <div class="grid g-2" style="margin-top:16px">
+    <section class="card rise" style="--i:7"><div class="card-h"><h3>نسبة الالتزام الأسبوعية حسب الفرع</h3><div class="spacer"></div>
+      ${legendHTML(d.branches.map(b => ({ label: br(b), color: colors[b] })))}</div>
+      <div class="card-b"><div class="chart-box"><canvas id="q-trend" role="img" aria-label="الالتزام الأسبوعي حسب الفرع"></canvas></div></div></section>
+    <section class="card rise" style="--i:8"><div class="card-h"><h3>نسبة المطابقة لكل بند</h3></div>
+      <div class="card-b">${d.checks.map(c => `
+        <div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:13px"><span>${esc(c.label)}</span><b class="num">${pct(c.rate)}</b></div>
+        <div class="meter" style="margin-top:6px"><i style="width:${c.rate || 0}%;background:${c.rate >= 95 ? 'var(--good)' : c.rate >= 85 ? 'var(--warn)' : 'var(--crit)'}"></i></div></div>`).join('')}
+        <p class="muted" style="font-size:11.5px">الأخضر ≥ 95% · الأصفر ≥ 85% · الأحمر أقل من 85%</p></div></section>
+  </div>
+
+  <div class="grid g-2e" style="margin-top:16px">
+    <section class="card rise" style="--i:9"><div class="card-h"><h3>المشاكل حسب النوع</h3><div class="spacer"></div>
+      ${legendHTML([{ label: 'أُبلغ عنها في الفترة', color: cssVar('--s1') }, { label: 'ما زالت مفتوحة', color: cssVar('--s2') }])}</div>
+      <div class="card-b">${d.byCategory.length ? `<div class="chart-box" style="height:${Math.max(160, d.byCategory.length * 46)}px"><canvas id="q-cat" role="img" aria-label="المشاكل حسب النوع"></canvas></div>` : '<div class="empty">لا توجد مشاكل في هذه الفترة</div>'}</div></section>
+    <section class="card rise" style="--i:10"><div class="card-h"><h3>عيادات بدون تقرير</h3><span class="sub">أسبوع ${fmtDate(d.to)}</span></div>
+      ${tableHTML([
+        { label: 'العيادة', html: r => `<b style="font-weight:500">${esc(r.name)}</b>` },
+        { label: 'الفرع', get: r => br(r.branch) },
+        { label: 'آخر تقرير', get: r => r.lastWeek ? fmtDate(r.lastWeek) : 'لا يوجد في الفترة' },
+      ], uncovered, { empty: 'كل العيادات مغطاة' })}</section>
+  </div>
+
+  <div class="grid g-2e" style="margin-top:16px">
+    <section class="card rise" style="--i:11"><div class="card-h"><h3>تواريخ انتهاء قريبة</h3><span class="sub">خلال 90 يوم</span><div class="spacer"></div><button class="btn sm" id="exp-csv">${icon('dl')}CSV</button></div>
+      <div id="exp-t"></div></section>
+    <section class="card rise" style="--i:12"><div class="card-h"><h3>مشاكل متكررة</h3><span class="sub">مفتوحة وتكررت أسبوعين أو أكثر</span></div>
+      ${tableHTML([
+        { label: 'العيادة', get: r => r.clinic_name + ' — ' + br(r.branch) },
+        { label: 'المشكلة', html: r => `<b style="font-weight:500">${esc(r.item || r.categoryLabel)}</b><div class="muted" style="font-size:11.5px">${esc(r.categoryLabel)}</div>` },
+        { label: 'التكرار', html: r => `<span class="repeat">${r.occurrences}×</span>` },
+        { label: 'منذ', html: r => `<span class="num">${r.ageDays}</span> يوم` },
+      ], d.recurring, { empty: 'لا توجد مشاكل متكررة' })}</section>
+  </div>
+
+  <section class="card rise" style="--i:13;margin-top:16px"><div class="card-h"><h3>ترتيب الممرضات في الفترة</h3><div class="spacer"></div><button class="btn sm" id="n-csv">${icon('dl')}CSV</button></div>
+    <div id="nurse-t"></div></section>`;
+
+  $('#q-p').value = qState.period; $('#q-b').value = qState.branch;
+  $('#q-p').onchange = e => { qState.period = e.target.value; renderQuality(view); };
+  $('#q-m').onchange = e => { qState.month = e.target.value; renderQuality(view); };
+  $('#q-b').onchange = e => { qState.branch = e.target.value; renderQuality(view); };
+  countUp(view);
+
+  const expCols = [
+    { label: 'العيادة', get: r => r.clinic_name + ' — ' + br(r.branch) },
+    { label: 'المادة', get: r => r.item || '—' },
+    { label: 'التاريخ', get: r => fmtDate(r.date, { day: 'numeric', month: 'short', year: 'numeric' }) },
+    { label: 'المتبقي', html: r => r.days < 0 ? `<span class="pill crit">${icon('alert')}منتهية منذ ${-r.days} يوم</span>` : r.days <= 30 ? `<span class="pill warn">${icon('clock')}${r.days} يوم</span>` : `<span class="num">${r.days}</span> يوم`, csv: r => r.days },
+    { label: 'أبلغت', key: 'nurse' },
+  ];
+  $('#exp-t').innerHTML = tableHTML(expCols, d.expiry, { empty: 'لا توجد مواد قريبة الانتهاء' });
+  $('#exp-csv').onclick = () => exportTable('صلاحيات-قريبة', expCols, d.expiry);
+
+  const nCols = [
+    { label: '#', get: (r) => d.nurses.indexOf(r) + 1 },
+    { label: 'الممرضة', html: r => `<b style="font-weight:500">${esc(r.name)}</b>`, csv: r => r.name },
+    { label: 'الفرع', get: r => br(r.branch) },
+    { label: 'أسابيع مطلوبة', key: 'expected' },
+    { label: 'سلّمت', key: 'submitted' },
+    { label: 'الالتزام', html: r => `<div style="display:flex;align-items:center;gap:8px;min-width:140px"><div class="meter" style="flex:1;margin:0"><i style="width:${r.rate || 0}%"></i></div><b class="num">${pct(r.rate)}</b></div>`, csv: r => pct(r.rate) },
+    { label: 'في الوقت', get: r => pct(r.onTime) },
+    { label: 'التقارير', key: 'reports' },
+    { label: 'بنود أُبلغ عنها', key: 'issues' },
+  ];
+  $('#nurse-t').innerHTML = tableHTML(nCols, d.nurses);
+  $('#n-csv').onclick = () => exportTable('ترتيب-الممرضات-' + d.from + '_' + d.to, nCols, d.nurses);
+
+  lineChart($('#q-trend'), d.trend.map(w => fmtShort(w.week)), d.branches.map(b => ({ label: br(b), data: d.trend.map(w => w[b]), color: colors[b] })));
+  if (d.byCategory.length) barChart($('#q-cat'), d.byCategory.map(c => c.label), [
+    { label: 'أُبلغ عنها', data: d.byCategory.map(c => c.raised), color: cssVar('--s1') },
+    { label: 'مفتوحة', data: d.byCategory.map(c => c.open), color: cssVar('--s2') },
+  ], { horizontal: true });
+}
+
+function kpiCard(label, val, unit, sub, hero, i) {
+  const v = val == null ? '—' : `<span data-count="${val}">0</span>`;
+  const isInt = val != null && Number.isInteger(val);
+  return `<div class="card kpi ${hero ? 'hero' : ''} rise" style="--i:${i}"><div class="k-label">${esc(label)}</div>
+    <div class="k-val num">${isInt ? v : (val == null ? '—' : val)}${val != null && unit ? `<small>${unit}</small>` : ''}</div>
+    ${hero && val != null ? `<div class="meter"><i style="width:${val}%"></i></div>` : ''}<div class="k-sub">${esc(sub)}</div></div>`;
+}
+
+/* ══════════════════════════════════════════════════════════
+   ISSUES — التموين / متابعة المشاكل
+   ══════════════════════════════════════════════════════════ */
+const iState = { status: 'open', dept: '', branch: 'ALL', cat: 'all', q: '' };
+const DEPT = { supply: 'التموين', quality: 'الجودة', hr: 'الموارد البشرية' };
+
+async function renderIssues(view) {
+  skeleton(view, [80, 200, 400]);
+  const role = state.user.role;
+  if (!iState.dept) iState.dept = role === 'supply' ? 'supply' : 'all';
+  const statuses = iState.status === 'open' ? ['open', 'in_progress'] : [iState.status];
+  let d, counts;
+  try {
+    [d, counts] = await Promise.all([
+      api('issues.list', { status: statuses, department: iState.dept }),
+      api('issues.list', { status: ['open', 'in_progress', 'resolved'], department: iState.dept }),
+    ]);
+  } catch (e) { return errorBlock(view, e, () => renderIssues(view)); }
+  const cnt = s => counts.issues.filter(i => s.includes(i.status)).length;
+  const supply = role === 'supply';
+
+  view.innerHTML = `
+  <div class="page-head rise">
+    <div><h1>${supply ? 'طلبات التموين' : 'متابعة المشاكل'}</h1><p>${supply ? 'الأدوات الناقصة والمواد قريبة الانتهاء من تقارير العيادات' : 'كل المشاكل المرفوعة من تقارير العيادات حسب القسم المسؤول'}</p></div>
+    <div class="spacer"></div>
+    <div class="toolbar">
+      <input class="input" id="i-q" placeholder="بحث: عيادة، أداة، ممرضة" value="${esc(iState.q)}">
+      ${!supply ? `<select class="input" id="i-d"><option value="all">كل الأقسام</option>${Object.keys(DEPT).map(k => `<option value="${k}">${DEPT[k]}</option>`).join('')}</select>` : ''}
+      <select class="input" id="i-b"><option value="ALL">كل الفروع</option><option value="BURIDAH">بريدة</option><option value="ONIZAH">عنيزة</option></select>
+      <select class="input" id="i-c"><option value="all">كل الأنواع</option>${Object.keys(d.categories).filter(c => iState.dept === 'all' || d.categories[c].dept === iState.dept).map(c => `<option value="${c}">${d.categories[c].label}</option>`).join('')}</select>
+    </div>
+  </div>
+  <div class="tabs" role="tablist">
+    <button role="tab" data-s="open" aria-selected="${iState.status === 'open'}">مفتوحة<span class="count">${cnt(['open', 'in_progress'])}</span></button>
+    <button role="tab" data-s="in_progress" aria-selected="${iState.status === 'in_progress'}">قيد المعالجة<span class="count">${cnt(['in_progress'])}</span></button>
+    <button role="tab" data-s="resolved" aria-selected="${iState.status === 'resolved'}">تم الحل<span class="count">${cnt(['resolved'])}</span></button>
+  </div>
+  ${d.shortage.length && iState.status !== 'resolved' ? `
+  <section class="card rise" style="margin-bottom:16px"><div class="card-h"><h3>قائمة النواقص المجمّعة</h3><span class="sub">جاهزة لطلب الشراء أو الصرف</span><div class="spacer"></div><button class="btn sm" id="s-csv">${icon('dl')}CSV</button></div>
+    <div id="short-t"></div></section>` : ''}
+  <div class="issues" id="issue-list"></div>`;
+
+  if ($('#i-d')) $('#i-d').value = iState.dept;
+  $('#i-b').value = iState.branch;
+  $('#i-c').value = iState.cat;
+  $$('.tabs [data-s]').forEach(b => b.onclick = () => { iState.status = b.dataset.s; renderIssues(view); });
+  $('#i-d') && ($('#i-d').onchange = e => { iState.dept = e.target.value; iState.cat = 'all'; renderIssues(view); });
+
+  const sCols = [
+    { label: 'الصنف', html: r => `<b style="font-weight:600">${esc(r.item)}</b>`, csv: r => r.item },
+    { label: 'الكمية', html: r => `<span class="num strong">${r.qty}</span>`, csv: r => r.qty },
+    { label: 'العيادات', get: r => r.clinics.join('، ') },
+    { label: 'الأولوية', html: r => r.high ? sevPill('high') : sevPill('medium'), csv: r => r.high ? 'عالية' : 'عادية' },
+  ];
+  if ($('#short-t')) {
+    $('#short-t').innerHTML = tableHTML(sCols, d.shortage);
+    $('#s-csv').onclick = () => exportTable('قائمة-النواقص-' + ymd(new Date()), sCols, d.shortage);
+  }
+
+  const draw = () => {
+    const q = iState.q.toLowerCase();
+    const list = d.issues.filter(i =>
+      (iState.branch === 'ALL' || i.branch === iState.branch) && (iState.cat === 'all' || i.category === iState.cat) &&
+      (!q || [i.clinic_name, i.item, i.nurse_name, i.description, i.categoryLabel].join(' ').toLowerCase().includes(q)));
+    $('#issue-list').innerHTML = list.length ? list.map((i, n) => `
+      <article class="card issue rise sev-${i.severity}" style="--i:${Math.min(n, 12)}">
+        <div class="top">${sevPill(i.severity)}${statusPill(i.status)}<span class="tag">${esc(i.categoryLabel)}</span>${i.occurrences > 1 ? `<span class="repeat">${icon('alert')}تكرر ${i.occurrences} أسابيع</span>` : ''}</div>
+        <h4>${esc(i.item || i.categoryLabel)}${i.qty ? ` <span class="muted num" style="font-weight:500">× ${esc(i.qty)}</span>` : ''}</h4>
+        <p class="desc">${esc(i.description)}</p>
+        <div class="meta"><span><b>${esc(i.clinic_name)}</b> · ${br(i.branch)}</span><span>${esc(i.nurse_name)}</span><span>منذ <b class="num">${i.ageDays}</b> يوم</span>${!supply ? `<span>${DEPT[i.department] || ''}</span>` : ''}</div>
+        ${i.assigned_to ? `<div class="meta"><span>المسؤول: <b>${esc(i.assigned_to)}</b></span></div>` : ''}
+        ${i.resolution ? `<div class="meta"><span>الإجراء: <b>${esc(i.resolution)}</b></span></div>` : ''}
+        <div class="act">${i.status !== 'resolved' ? `
+          ${i.status === 'open' ? `<button class="btn sm" data-start="${esc(i.issue_id)}">بدء المعالجة</button>` : ''}
+          <button class="btn sm primary" data-edit="${esc(i.issue_id)}">${icon('check')}إغلاق</button>` : `<button class="btn sm" data-edit="${esc(i.issue_id)}">تفاصيل</button>`}</div>
+      </article>`).join('') : `<div class="card empty" style="grid-column:1/-1"><b>لا توجد عناصر</b>${iState.status === 'resolved' ? 'لم يتم إغلاق أي مشكلة بعد' : 'كل شيء تحت السيطرة'}</div>`;
+    $$('#issue-list [data-start]').forEach(b => b.onclick = async () => {
+      busy(b, true);
+      try { await api('issues.update', { issue_id: b.dataset.start, status: 'in_progress', assigned_to: state.user.name }); toast('تم تحويلها إلى قيد المعالجة'); renderIssues(view); }
+      catch (e) { busy(b, false); toast(e.message, 'err'); }
+    });
+    $$('#issue-list [data-edit]').forEach(b => b.onclick = () => issueDialog(d.issues.find(i => i.issue_id === b.dataset.edit), () => renderIssues(view)));
+  };
+  draw();
+  $('#i-q').oninput = e => { iState.q = e.target.value; draw(); };
+  $('#i-b').onchange = e => { iState.branch = e.target.value; draw(); };
+  $('#i-c').onchange = e => { iState.cat = e.target.value; draw(); };
+}
+
+function issueDialog(i, done) {
+  if (!i) return;
+  const closed = i.status === 'resolved';
+  modal({
+    title: i.item || i.categoryLabel,
+    body: `<dl class="kv">
+      <dt>النوع</dt><dd>${esc(i.categoryLabel)} · ${sevPill(i.severity)}</dd>
+      <dt>العيادة</dt><dd>${esc(i.clinic_name)} — ${br(i.branch)}</dd>
+      <dt>الوصف</dt><dd>${esc(i.description)}</dd>
+      <dt>أبلغت</dt><dd>${esc(i.nurse_name)} · ${fmtDT(i.created_at)}</dd>
+      ${i.occurrences > 1 ? `<dt>التكرار</dt><dd>${i.occurrences} أسابيع · آخرها ${fmtDate(i.last_seen)}</dd>` : ''}
+      ${i.updated_by ? `<dt>آخر تحديث</dt><dd>${esc(i.updated_by)} · ${fmtDT(i.updated_at)}</dd>` : ''}
+      </dl>
+      <div style="margin-top:18px">
+        <div class="field"><label for="d-as">المسؤول عن المعالجة</label><input class="input" id="d-as" value="${esc(i.assigned_to || state.user.name)}"></div>
+        <div class="field"><label for="d-res">الإجراء المتخذ ${closed ? '' : '(مطلوب للإغلاق)'}</label><textarea class="input" id="d-res" placeholder="مثال: تم صرف 2 من المستودع بتاريخ …">${esc(i.resolution || '')}</textarea></div>
+        <div id="d-err"></div>
+      </div>`,
+    foot: closed
+      ? `<button class="btn" data-st="open">إعادة فتح</button><button class="btn primary" data-st="resolved">حفظ</button>`
+      : `<button class="btn" data-st="in_progress">حفظ كقيد المعالجة</button><button class="btn primary" data-st="resolved">${icon('check')}تم الحل</button>`,
+    onMount(el, close) {
+      $$('[data-st]', el).forEach(b => b.onclick = async () => {
+        busy(b, true);
+        try {
+          await api('issues.update', { issue_id: i.issue_id, status: b.dataset.st, assigned_to: $('#d-as', el).value, resolution: $('#d-res', el).value });
+          close(); toast(b.dataset.st === 'resolved' ? 'تم إغلاق المشكلة' : 'تم الحفظ'); done && done();
+        } catch (e) { busy(b, false); $('#d-err', el).innerHTML = `<div class="form-error">${esc(e.message)}</div>`; }
+      });
+    },
+  });
+}
+
+/* ══════════════════════════════════════════════════════════
+   REPORTS — سجل التقارير
+   ══════════════════════════════════════════════════════════ */
+const rState = { period: 'week', month: '', branch: 'ALL', q: '' };
+async function renderReports(view) {
+  skeleton(view, [80, 460]);
+  const range = periodRange(rState.period, rState.month);
+  let d;
+  try { d = await api('reports.list', { from: range.from, to: range.to, branch: rState.branch }); }
+  catch (e) { return errorBlock(view, e, () => renderReports(view)); }
+  view.innerHTML = `
+  <div class="page-head rise"><div><h1>سجل التقارير</h1><p>${esc(range.label)} · <span class="num">${d.reports.length}</span> تقرير</p></div><div class="spacer"></div>
+    <div class="toolbar">
+      <input class="input" id="rp-q" placeholder="بحث" value="${esc(rState.q)}">
+      <select class="input" id="rp-p"><option value="week">هذا الأسبوع</option><option value="4w">آخر 4 أسابيع</option><option value="12w">آخر 12 أسبوع</option><option value="month">شهر محدد</option></select>
+      <input class="input ${rState.period === 'month' ? '' : 'hidden'}" type="month" id="rp-m" value="${rState.month || thisSaturday().slice(0, 7)}">
+      <select class="input" id="rp-b"><option value="ALL">كل الفروع</option><option value="BURIDAH">بريدة</option><option value="ONIZAH">عنيزة</option></select>
+      <button class="btn sm" id="rp-csv">${icon('dl')}CSV</button>
+    </div></div>
+  <section class="card rise" id="rp-t"></section>`;
+  $('#rp-p').value = rState.period; $('#rp-b').value = rState.branch;
+  $('#rp-p').onchange = e => { rState.period = e.target.value; renderReports(view); };
+  $('#rp-m').onchange = e => { rState.month = e.target.value; renderReports(view); };
+  $('#rp-b').onchange = e => { rState.branch = e.target.value; renderReports(view); };
+  const yn = v => v === 'yes' ? 'نعم' : v === 'no' ? 'لا' : '—';
+  const cols = [
+    { label: 'التاريخ', get: r => fmtDT(r.submitted_at) },
+    { label: 'الممرضة', html: r => `<b style="font-weight:500">${esc(r.nurse_name)}</b>`, csv: r => r.nurse_name },
+    { label: 'العيادة', get: r => r.clinic_name + ' — ' + br(r.branch) },
+    { label: 'التوقيت', html: r => timingPill(r.timing), csv: r => t('st_' + r.timing) },
+    { label: 'أقرب انتهاء', get: r => r.earliest_expiry ? fmtDate(r.earliest_expiry, { day: 'numeric', month: 'short', year: 'numeric' }) : '—' },
+    { label: 'بنود للمتابعة', html: r => r.issues_count ? `<span class="pill warn">${icon('alert')}${r.issues_count}</span>` : '<span class="muted">—</span>', csv: r => r.issues_count },
+    { label: 'فحص الصلاحية', get: r => yn(r.expiry_checked), hide: true },
+    { label: 'التعقيم', get: r => yn(r.sterilization_ok), hide: true },
+    { label: 'الثلاجة', get: r => ({ ok: 'سليمة', problem: 'مشكلة', none: 'لا توجد' }[r.fridge] || '—'), hide: true },
+    { label: 'بطاقة الموظف', get: r => yn(r.employee_card), hide: true },
+    { label: 'النظافة', get: r => r.cleanliness || '—', hide: true },
+    { label: 'الأدوات الناقصة', get: r => r.tools.map(x => `${x.item} ×${x.qty}`).join('، ') || '—', hide: true },
+    { label: 'ملاحظات', get: r => [r.other_issue, r.notes].filter(Boolean).join(' / ') || '—', hide: true },
+  ];
+  const list = () => d.reports.filter(r => !rState.q || [r.nurse_name, r.clinic_name].join(' ').toLowerCase().includes(rState.q.toLowerCase()));
+  const draw = () => {
+    $('#rp-t').innerHTML = tableHTML(cols.filter(c => !c.hide), list(), { empty: 'لا توجد تقارير في هذه الفترة', rowAttr: r => `class="click" data-id="${esc(r.report_id)}" tabindex="0"` });
+    $$('#rp-t tr[data-id]').forEach(tr => tr.onclick = tr.onkeydown = e => {
+      if (e.type === 'keydown' && e.key !== 'Enter') return;
+      const r = d.reports.find(x => x.report_id === tr.dataset.id);
+      modal({ title: `${r.clinic_name} — ${r.nurse_name}`, wide: true,
+        body: `<dl class="kv">${cols.map(c => `<dt>${esc(c.label)}</dt><dd>${c.html ? c.html(r) : esc(c.get(r))}</dd>`).join('')}</dl>` });
+    });
+  };
+  draw();
+  $('#rp-q').oninput = e => { rState.q = e.target.value; draw(); };
+  $('#rp-csv').onclick = () => exportTable('التقارير-' + range.from + '_' + range.to, cols, list());
+}
+
+/* ══════════════════════════════════════════════════════════
+   USERS — المستخدمون
+   ══════════════════════════════════════════════════════════ */
+const uState = { q: '', role: 'nurse', status: 'active' };
+async function renderUsers(view) {
+  skeleton(view, [80, 460]);
+  let d;
+  try { d = await api('users.list'); }
+  catch (e) { return errorBlock(view, e, () => renderUsers(view)); }
+  const admin = state.user.role === 'admin';
+  const clinicName = id => { const c = d.clinics.find(x => x.clinic_id === id); return c ? c.name + ' — ' + br(c.branch) : id; };
+  view.innerHTML = `
+  <div class="page-head rise"><div><h1>المستخدمون</h1><p>${admin ? 'إدارة حسابات الممرضات والأقسام' : 'إدارة حسابات الممرضات'}</p></div><div class="spacer"></div>
+    <div class="toolbar">
+      <input class="input" id="u-q" placeholder="بحث بالاسم أو البريد" value="${esc(uState.q)}">
+      ${admin ? `<select class="input" id="u-r"><option value="all">كل الأدوار</option>${Object.keys(d.roles).map(r => `<option value="${r}">${d.roles[r]}</option>`).join('')}</select>` : ''}
+      <select class="input" id="u-s"><option value="all">كل الحالات</option><option value="active">نشط</option><option value="inactive">غير نشط</option></select>
+      <button class="btn primary sm" id="u-new">${icon('plus')}${admin ? 'مستخدم جديد' : 'ممرضة جديدة'}</button>
+    </div></div>
+  <section class="card rise" id="u-t"></section>`;
+  if ($('#u-r')) $('#u-r').value = uState.role;
+  $('#u-s').value = uState.status;
+  const cols = [
+    { label: 'الاسم', html: u => `<div style="display:flex;gap:10px;align-items:center"><span class="avatar" style="width:28px;height:28px;font-size:11px">${esc(initials(u.name))}</span><div><b style="font-weight:600">${esc(u.name)}</b><div class="muted" dir="ltr" style="font-size:11.5px;text-align:start">${esc(u.email || u.username)}</div></div></div>` },
+    { label: 'الدور', get: u => d.roles[u.role] || u.role },
+    { label: 'الفرع', get: u => br(u.branch) },
+    { label: 'العيادات', get: u => u.clinics.length ? u.clinics.length + ' عيادة' : (u.role === 'nurse' ? 'كل عيادات الفرع' : '—') },
+    { label: 'الحالة', html: u => u.status === 'active' ? `<span class="pill good">${icon('check')}نشط</span>` : `<span class="pill">${icon('dash')}غير نشط</span>` },
+    { label: 'آخر دخول', html: u => u.must_change ? '<span class="tag">لم يسجّل بعد</span>' : esc(u.last_login ? fmtDT(u.last_login) : '—') },
+    { label: '', html: u => `<div style="display:flex;gap:6px"><button class="btn sm" data-edit="${esc(u.username)}">تعديل</button><button class="btn sm ghost" data-reset="${esc(u.username)}">كلمة مرور مؤقتة</button></div>` },
+  ];
+  const draw = () => {
+    const q = uState.q.toLowerCase();
+    const list = d.users.filter(u => (!admin || uState.role === 'all' || u.role === uState.role) && (uState.status === 'all' || u.status === uState.status) &&
+      (!q || (u.name + ' ' + u.email + ' ' + u.username).toLowerCase().includes(q)));
+    $('#u-t').innerHTML = tableHTML(cols, list, { empty: 'لا يوجد مستخدمون' });
+    $$('#u-t [data-edit]').forEach(b => b.onclick = () => userDialog(d, d.users.find(u => u.username === b.dataset.edit), () => renderUsers(view)));
+    $$('#u-t [data-reset]').forEach(b => b.onclick = async () => {
+      const u = d.users.find(x => x.username === b.dataset.reset);
+      if (!confirm(`إنشاء كلمة مرور مؤقتة جديدة لـ ${u.name}؟ ستتوقف كلمة المرور الحالية.`)) return;
+      busy(b, true);
+      try { const r = await api('users.reset', { username: u.username }); busy(b, false); showTemp(u.name, r.username, r.tempPassword); }
+      catch (e) { busy(b, false); toast(e.message, 'err'); }
+    });
+  };
+  draw();
+  $('#u-q').oninput = e => { uState.q = e.target.value; draw(); };
+  $('#u-r') && ($('#u-r').onchange = e => { uState.role = e.target.value; draw(); });
+  $('#u-s').onchange = e => { uState.status = e.target.value; draw(); };
+  $('#u-new').onclick = () => userDialog(d, null, () => renderUsers(view));
+}
+
+function userDialog(d, u, done) {
+  const admin = state.user.role === 'admin';
+  const isNew = !u;
+  u = u || { role: 'nurse', branch: state.user.branch !== 'ALL' ? state.user.branch : 'BURIDAH', clinics: [], status: 'active' };
+  const branchOpts = (admin ? ['ALL'] : []).concat(Object.keys(d.branches)).filter(b => state.user.branch === 'ALL' || b === state.user.branch);
+  modal({
+    title: isNew ? 'إضافة مستخدم' : 'تعديل: ' + u.name, wide: true,
+    body: `<div class="grid g-2e" style="gap:0 14px">
+      <div class="field"><label for="uf-n">الاسم</label><input class="input" id="uf-n" value="${esc(u.name || '')}"></div>
+      <div class="field"><label for="uf-e">البريد الإلكتروني (يُستخدم للدخول)</label><input class="input" id="uf-e" dir="ltr" value="${esc(u.email || '')}"></div>
+      ${admin ? `<div class="field"><label for="uf-r">الدور</label><select class="input" id="uf-r">${Object.keys(d.roles).map(r => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${d.roles[r]}</option>`).join('')}</select></div>` : ''}
+      ${admin && isNew ? `<div class="field"><label for="uf-u">اسم المستخدم (اختياري، للأقسام)</label><input class="input" id="uf-u" dir="ltr" placeholder="يُستخدم البريد إذا تُرك فارغاً"></div>` : ''}
+      <div class="field"><label for="uf-b">الفرع</label><select class="input" id="uf-b">${branchOpts.map(b => `<option value="${b}" ${u.branch === b ? 'selected' : ''}>${br(b)}</option>`).join('')}</select></div>
+      <div class="field"><label for="uf-sd">تاريخ بداية المسؤولية</label><input class="input" id="uf-sd" type="date" value="${esc(u.start_date || ymd(new Date()))}"></div>
+      ${!isNew ? `<div class="field"><label for="uf-s">الحالة</label><select class="input" id="uf-s"><option value="active">نشط</option><option value="inactive" ${u.status === 'inactive' ? 'selected' : ''}>غير نشط (انتهاء خدمة / إجازة طويلة)</option></select></div>` : ''}
+    </div>
+    <div class="field" id="uf-cl-wrap"><label>العيادات المسؤولة عنها <span class="muted">(اتركها فارغة لتظهر كل عيادات الفرع)</span></label><div class="chips" id="uf-cl"></div></div>
+    <div id="uf-err"></div>`,
+    foot: `<button class="btn" data-close>إلغاء</button><button class="btn primary" id="uf-save">حفظ</button>`,
+    onMount(el, close) {
+      const drawClinics = () => {
+        const b = $('#uf-b', el).value;
+        const role = $('#uf-r', el) ? $('#uf-r', el).value : 'nurse';
+        $('#uf-cl-wrap', el).classList.toggle('hidden', role !== 'nurse');
+        $('#uf-cl', el).innerHTML = d.clinics.filter(c => c.status === 'active' && (b === 'ALL' || c.branch === b))
+          .map(c => `<label><input type="checkbox" value="${esc(c.clinic_id)}" ${u.clinics.includes(c.clinic_id) ? 'checked' : ''}>${esc(c.name)}</label>`).join('');
+      };
+      drawClinics();
+      $('#uf-b', el).onchange = drawClinics;
+      $('#uf-r', el) && ($('#uf-r', el).onchange = drawClinics);
+      $('#uf-save', el).onclick = async () => {
+        const b = $('#uf-save', el);
+        busy(b, true);
+        const payload = {
+          username: isNew ? '' : u.username, name: $('#uf-n', el).value, email: $('#uf-e', el).value,
+          role: $('#uf-r', el) ? $('#uf-r', el).value : 'nurse', branch: $('#uf-b', el).value,
+          start_date: $('#uf-sd', el).value, status: $('#uf-s', el) ? $('#uf-s', el).value : 'active',
+          clinics: $$('#uf-cl input:checked', el).map(x => x.value), newUsername: $('#uf-u', el) ? $('#uf-u', el).value : '',
+        };
+        try {
+          const r = await api('users.save', { user: payload });
+          close(); done && done();
+          if (r.tempPassword) showTemp(payload.name, r.username, r.tempPassword); else toast('تم الحفظ');
+        } catch (e) { busy(b, false); $('#uf-err', el).innerHTML = `<div class="form-error">${esc(e.message)}</div>`; }
+      };
+    },
+  });
+}
+
+function showTemp(name, username, pass) {
+  const msg = `ApexCare Nursing\nUsername: ${username}\nTemporary password: ${pass}\nYou will be asked to set your own password on first sign-in.\n${location.origin + location.pathname}`;
+  modal({
+    title: 'كلمة المرور المؤقتة',
+    body: `<p style="margin-bottom:12px">أرسل بيانات الدخول إلى <b>${esc(name)}</b>. ستُطلب منها كلمة مرور جديدة عند أول دخول. لن تظهر هذه الكلمة مرة أخرى.</p>
+      <div class="kv" style="margin-bottom:12px"><dt>اسم المستخدم</dt><dd dir="ltr" style="text-align:start">${esc(username)}</dd></div>
+      <div class="temp-pass">${esc(pass)}</div>`,
+    foot: `<button class="btn primary" id="tp-copy">${icon('copy')}نسخ رسالة الدخول</button>`,
+    onMount(el) { $('#tp-copy', el).onclick = () => copyText(msg); },
+  });
+}
+
+/* ══════════ START ══════════ */
+applyLang(state.lang);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!document.documentElement.getAttribute('data-theme')) rerender(); });
+boot();
+</script>
+</body>
+</html>
