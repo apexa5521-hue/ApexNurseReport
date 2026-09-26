@@ -3,9 +3,10 @@
  * Backend: Google Apps Script (Web App API)
  *
  * طريقة التركيب مشروحة في README.md
- *   1) أنشئ Google Sheet جديد  ←  Extensions  ←  Apps Script  ←  الصق هذا الملف + appsscript.json
- *   2) شغّل الدالة setup() مرة واحدة (تنشئ الأوراق والحسابات الأساسية)
- *   3) (اختياري) ضع روابط الشيتات القديمة في ورقة Settings ثم شغّل importLegacyRoster() و importLegacyReports()
+ *   1) أنشئ Google Sheet جديد (خاص، غير مشارك)  ←  Extensions  ←  Apps Script  ←  الصق هذا الملف + appsscript.json
+ *   2) شغّل الدالة setup() مرة واحدة: تنشئ أوراق النظام
+ *   3) ضع رابط الشيت الأساسي في Settings ← FORM_SOURCE، ثم شغّل importFormResponses()
+ *      (يسحب ردود النموذج بدون أي تعديل على الشيت الأساسي، وينشئ حسابات الممرضات منها)
  *   4) Deploy ← New deployment ← Web app ← Execute as: Me ← Who has access: Anyone
  *
  * كل الطلبات تصل عبر doPost بجسم JSON: { action, token, ...payload }
@@ -44,7 +45,7 @@ const S = {
 
 const HEADERS = {
   Users: ['username', 'name', 'email', 'role', 'branch', 'clinics', 'status', 'start_date',
-          'pass_hash', 'salt', 'must_change', 'created_at', 'last_login'],
+          'pass_hash', 'salt', 'must_change', 'created_at', 'last_login', 'aliases'],
   Clinics: ['clinic_id', 'name', 'branch', 'type', 'has_fridge', 'status'],
   Reports: ['report_id', 'submitted_at', 'week_start', 'timing', 'username', 'nurse_name', 'branch',
             'clinic_id', 'clinic_name', 'expiry_checked', 'earliest_expiry', 'expiry_item',
@@ -66,8 +67,8 @@ const DEFAULT_SETTINGS = [
   ['EXPIRY_ALERT_DAYS', 60, 'تنبيه إذا كان أقرب تاريخ انتهاء خلال هذا العدد من الأيام'],
   ['FRIDGE_MIN', 2, 'أقل حرارة مقبولة للثلاجة'],
   ['FRIDGE_MAX', 8, 'أعلى حرارة مقبولة للثلاجة'],
-  ['LEGACY_FORM_SHEET_ID', '', 'معرّف شيت ردود النموذج القديم (للاستيراد فقط)'],
-  ['LEGACY_ANALYSIS_SHEET_ID', '', 'معرّف شيت التحليل القديم (Nurses_Info / Name_Map)'],
+  ['FORM_SOURCE', '', 'رابط الشيت الأساسي (ردود النموذج) لسحب البيانات منه. اتركه فارغاً إذا كان السكربت داخل نفس الشيت'],
+  ['FORM_TAB', 'ردود النموذج 1', 'اسم ورقة ردود Google Form'],
   ['LEGACY_OPEN_WEEKS', 2, 'المشاكل المستوردة من آخر N أسابيع تبقى مفتوحة، والأقدم تُؤرشف'],
 ];
 
@@ -817,50 +818,22 @@ function setup() {
   SpreadsheetApp.getActive().toast('تم التجهيز. راجع ورقة Temp_Passwords', APP.NAME, 8);
 }
 
-/** يستورد قائمة الممرضات من ورقة Nurses_Info في شيت التحليل القديم */
-function importLegacyRoster() {
-  const cfg = settings_();
-  if (!cfg.LEGACY_ANALYSIS_SHEET_ID) throw new Error('ضع LEGACY_ANALYSIS_SHEET_ID في ورقة Settings');
-  const src = SpreadsheetApp.openById(cfg.LEGACY_ANALYSIS_SHEET_ID).getSheetByName('Nurses_Info');
-  const values = src.getDataRange().getValues();
-  const h = values.shift().map(String);
-  const col = k => h.findIndex(x => x.indexOf(k) >= 0);
-  const cName = col('الاسم'), cEmail = col('Email'), cBranch = col('الفرع'), cStart = col('تاريخ'), cStatus = col('الحالة');
-
-  const users = rows_(S.USERS);
-  const created = [];
-  values.forEach(v => {
-    const name = String(v[cName] || '').trim();
-    let email = String(v[cEmail] || '').trim().toLowerCase();
-    let branch = String(v[cBranch] || '').trim().toUpperCase();
-    let status = String(v[cStatus] || '').trim();
-    // صفوف ناقصة (مثل: الاسم ثم الفرع مباشرة) — نصححها
-    if (email && !/@/.test(email) && BRANCHES[email.toUpperCase()]) { status = branch; branch = email.toUpperCase(); email = ''; }
-    if (!name || !BRANCHES[branch]) return;
-    if (users.some(u => (email && u.email === email) || normText_(u.name) === normText_(name))) return;
-    const start = v[cStart] instanceof Date ? dateStr_(v[cStart]) : '';
-    created.push(newUserRow_({
-      username: email || normText_(name), name: name, email: email, role: 'nurse', branch: branch,
-      start_date: start, status: /غير/.test(status) ? 'inactive' : 'active',
-    }));
-  });
-  if (created.length) {
-    appendObjects_(S.USERS, created.map(c => c.row));
-    writeTemp_(created.filter(c => c.row.status === 'active'));
-  }
-  SpreadsheetApp.getActive().toast('تمت إضافة ' + created.length + ' ممرضة', APP.NAME, 8);
-}
-
 /**
- * يستورد التقارير القديمة من شيت ردود النموذج مع توحيد الأسماء والعيادات
- * آمن للتكرار: الصفوف المستوردة سابقاً لا تُكرر.
+ * ينقل ردود Google Form (ورقة «ردود النموذج 1» في نفس الشيت) إلى النظام:
+ * يوحّد الأسماء والعيادات، ينشئ حسابات الممرضات من الإيميلات، ويحوّل الإجابات إلى تقارير ومشاكل.
+ * آمن للتكرار: الصفوف المنقولة سابقاً لا تُكرر، فيمكن تشغيله أكثر من مرة خلال الفترة الانتقالية.
  */
-function importLegacyReports() {
+function importFormResponses() {
   const cfg = settings_();
-  if (!cfg.LEGACY_FORM_SHEET_ID) throw new Error('ضع LEGACY_FORM_SHEET_ID في ورقة Settings');
-  const src = SpreadsheetApp.openById(cfg.LEGACY_FORM_SHEET_ID).getSheets()[0];
+  const srcId = (String(cfg.FORM_SOURCE || '').match(/\/d\/([a-zA-Z0-9-_]+)/) || [])[1] || String(cfg.FORM_SOURCE || '').trim();
+  const ss = srcId ? SpreadsheetApp.openById(srcId) : ss_();
+  const src = ss.getSheetByName(cfg.FORM_TAB) ||
+    ss.getSheets().find(sh => /^(طابع زمني|timestamp)$/i.test(String(sh.getRange(1, 1).getValue()).trim()));
+  if (!src) throw new Error('لم أجد ورقة ردود النموذج. اكتب اسمها في Settings ← FORM_TAB');
   const values = src.getDataRange().getValues();
   const h = values.shift().map(x => String(x).toLowerCase());
+  // بعض الطوابع الزمنية مكتوبة يدوياً كنص — نحولها لتاريخ
+  values.forEach(v => { v[0] = parseTimestamp_(v[0]); });
   const col = (re, from) => h.findIndex((x, i) => i >= (from || 0) && re.test(x));
   const C = {
     ts: 0, name: col(/name/), clinic: col(/clinic number/), expChecked: col(/expiration date of the drugs/),
@@ -871,16 +844,14 @@ function importLegacyReports() {
     toolsText: col(/explain why and how/),
   };
 
-  // خريطة الأسماء: الإيميل أولاً ثم Name_Map ثم مطابقة الاسم
-  const users = rows_(S.USERS).filter(u => u.role === 'nurse');
+  // الحسابات الموجودة (إن وُجدت) تُربط بالإيميل أو الاسم
   const byEmail = {}, byName = {};
-  users.forEach(u => { if (u.email) byEmail[u.email] = u; byName[normText_(u.name)] = u; });
-  if (cfg.LEGACY_ANALYSIS_SHEET_ID) {
-    try {
-      const map = SpreadsheetApp.openById(cfg.LEGACY_ANALYSIS_SHEET_ID).getSheetByName('Name_Map').getDataRange().getValues();
-      map.forEach(m => { const target = byName[normText_(m[1])]; if (target && !byName[normText_(m[0])]) byName[normText_(m[0])] = target; });
-    } catch (e) { console.warn('Name_Map غير متاح', e); }
-  }
+  rows_(S.USERS).filter(u => u.role === 'nurse').forEach(u => {
+    if (u.email) byEmail[u.email] = u;
+    byName[normText_(u.name)] = u;
+    // عمود aliases: أسماء أو إيميلات أخرى لنفس الممرضة (مفصولة بفاصلة)
+    splitList_(u.aliases).forEach(a => { if (/@/.test(a)) byEmail[a.toLowerCase()] = u; else byName[normText_(a)] = u; });
+  });
 
   // توحيد الهوية: نربط كل اسم بكل إيميل ظهر معه (union-find)، فالممرضة التي غيّرت
   // إيميلها أو كتبت اسمها بعدة أشكال تصبح شخصاً واحداً
@@ -1005,10 +976,46 @@ function importLegacyReports() {
     const f = first[u.username];
     if (u.role === 'nurse' && f && (!u.start_date || dateStr_(parseDate_(u.start_date)) > f)) setCell_(S.USERS, u._row, 'start_date', f);
   });
-  SpreadsheetApp.getActive().toast('تم استيراد ' + reports.length + ' تقرير، وإضافة ' + createdUsers.length +
-    ' ممرضة غير موجودة في القائمة (راجع ورقة Users)', APP.NAME, 10);
+  SpreadsheetApp.getActive().toast('تم نقل ' + reports.length + ' تقرير، وإنشاء ' + createdUsers.length +
+    ' حساب ممرضة (راجع ورقة Users وورقة Temp_Passwords)', APP.NAME, 10);
 }
 
+
+/**
+ * يعيد بناء التقارير المنقولة من النموذج من الصفر.
+ * استخدمها بعد دمج حسابات مكررة: اكتب الاسم أو الإيميل المكرر في عمود aliases للحساب الصحيح،
+ * احذف صف الحساب المكرر من Users، ثم شغّل هذه الدالة.
+ * لا تمس التقارير المرفوعة من المنصة الجديدة.
+ */
+function rebuildFromForm() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const legacy = r => String(r.source || '').indexOf('legacy:') === 0;
+    const keepReports = rows_(S.REPORTS).filter(r => !legacy(r));
+    const keepIds = {};
+    keepReports.forEach(r => keepIds[r.report_id] = 1);
+    const keepIssues = rows_(S.ISSUES).filter(i => keepIds[i.report_id]);
+    [S.REPORTS, S.ISSUES].forEach(n => { const sh = sh_(n); if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, HEADERS[n].length).clearContent(); delete ROWS_CACHE_[n]; });
+    if (keepReports.length) appendObjects_(S.REPORTS, keepReports);
+    if (keepIssues.length) appendObjects_(S.ISSUES, keepIssues);
+  } finally {
+    lock.releaseLock();
+  }
+  importFormResponses();
+}
+
+function parseTimestamp_(v) {
+  if (v instanceof Date) return v;
+  const m = String(v || '').match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\D*?(م|ص|pm|am)?\s*(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/i);
+  if (!m) return v;
+  let h = +m[1];
+  const pm = /م|pm/i.test(m[4] || ''), am = /ص|am/i.test(m[4] || '');
+  if (pm && h < 12) h += 12;
+  if (am && h === 12) h = 0;
+  if (!pm && !am && h < 7) h += 12; // النموذج يُعبّأ نهاراً: 1:48 تعني 13:48
+  return new Date(+m[5], +m[6] - 1, +m[7], h, +m[2], +(m[3] || 0));
+}
 
 function legacyClinicId_(raw, branch, forceOnizah) {
   const t = String(raw || '').toLowerCase();
@@ -1119,11 +1126,6 @@ function settings_() {
   rows_(S.SETTINGS).forEach(r => {
     if (r.key === '' || r.value === '' || r.value == null) return;
     out[r.key] = typeof out[r.key] === 'number' ? Number(r.value) : String(r.value).trim();
-  });
-  // يقبل الرابط الكامل للشيت أو المعرّف فقط
-  ['LEGACY_FORM_SHEET_ID', 'LEGACY_ANALYSIS_SHEET_ID'].forEach(k => {
-    const m = String(out[k] || '').match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (m) out[k] = m[1];
   });
   return out;
 }
