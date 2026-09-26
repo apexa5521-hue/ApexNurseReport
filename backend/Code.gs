@@ -920,7 +920,10 @@ function importFormResponses() {
   const yn = v => /^y/i.test(String(v).trim()) ? 'yes' : /^n/i.test(String(v).trim()) ? 'no' : '';
 
   values.forEach((v, idx) => {
-    const source = 'legacy:' + (idx + 2);
+    // المفتاح = وقت الرد + الاسم/الإيميل، فلا يتأثر بترتيب أو حذف صفوف في الشيت الأساسي
+    const source = v[C.ts] instanceof Date
+      ? 'legacy:' + Utilities.formatDate(v[C.ts], APP.TZ, 'yyyyMMddHHmmss') + ':' + normText_(v[C.email] || v[C.name]).slice(0, 24)
+      : 'legacy:row' + (idx + 2);
     if (done[source] || !(v[C.ts] instanceof Date)) return;
     const rawName = String(v[C.name] || '').trim();
     const u = resolveUser(v);
