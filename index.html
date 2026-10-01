@@ -66,6 +66,9 @@ a{color:var(--accent)}
 .ico{width:16px;height:16px;flex:none;display:inline-block;vertical-align:middle}
 .icon-btn .ico{width:19px;height:19px}
 .logo .ico{width:20px;height:20px}
+.demo-box{margin-top:18px;padding:14px;border:1px dashed var(--accent-line);background:var(--accent-soft);border-radius:var(--r)}
+.demo-box b{display:block;font-size:12.5px;font-weight:600;margin-bottom:10px}
+select.input.demo-switch{height:36px;width:170px;flex:none;padding:0 10px;font-size:12.5px;background:var(--accent-soft);border-color:var(--accent-line)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 
 /* ══════════ MOTION ══════════ */
@@ -147,7 +150,7 @@ textarea.input{height:auto;min-height:84px;padding:12px 14px;resize:vertical}
 .topbar-in{max-width:1320px;margin:0 auto;height:64px;padding:0 24px;display:flex;align-items:center;gap:16px}
 .topbar .brandmark{color:var(--ink);font-size:14.5px}
 .topbar .brandmark .logo{width:34px;height:34px;border-radius:10px}
-.topbar .brandmark small{display:block;font-size:11px;color:var(--ink-3);font-weight:500;margin-top:1px}
+.topbar .brandmark small{display:block;font-size:11px;color:var(--ink-3);font-weight:500;margin-top:1px;white-space:nowrap}
 .nav{display:flex;gap:2px;background:var(--sunken);border:1px solid var(--line);padding:3px;border-radius:12px;position:relative;margin-inline-start:12px}
 .nav a{position:relative;z-index:1;padding:6px 14px;border-radius:9px;font-size:13px;font-weight:500;color:var(--ink-2);text-decoration:none;transition:color .2s;white-space:nowrap}
 .nav a[aria-current="page"]{color:var(--ink)}
@@ -157,8 +160,8 @@ textarea.input{height:auto;min-height:84px;padding:12px 14px;resize:vertical}
 [dir="ltr"] .who{padding:4px 12px 4px 4px}
 .avatar{width:32px;height:32px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700;font-size:13px}
 .who .meta{line-height:1.25}
-.who .meta b{font-size:13px;font-weight:600;display:block}
-.who .meta span{font-size:11.5px;color:var(--ink-3)}
+.who .meta b{font-size:13px;font-weight:600;display:block;white-space:nowrap}
+.who .meta span{font-size:11.5px;color:var(--ink-3);white-space:nowrap}
 main{max-width:1320px;margin:0 auto;padding:28px 24px 96px}
 .page-head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
 .page-head h1{font-size:26px;font-weight:700;letter-spacing:-.015em;line-height:1.2}
@@ -388,7 +391,7 @@ const store = {
 const API = () => CONFIG.API_URL || store.get('apex.api') || '';
 
 const state = {
-  token: store.get('apex.token'),
+  token: window.APEX_DEMO ? null : store.get('apex.token'),
   user: null,
   lang: store.get('apex.lang') || 'ar',
   charts: [],
@@ -516,6 +519,21 @@ function modal({ title, body, foot = '', wide = false, onMount }) {
   return { el: scrim, close };
 }
 
+function confirmDialog(message) {
+  return new Promise(resolve => {
+    let answered = false;
+    const m = modal({
+      title: 'تأكيد', body: `<p>${esc(message)}</p>`,
+      foot: `<button class="btn" data-no>إلغاء</button><button class="btn primary" data-yes>متابعة</button>`,
+      onMount(el, close) {
+        $('[data-yes]', el).onclick = () => { answered = true; close(); resolve(true); };
+        $('[data-no]', el).onclick = () => { answered = true; close(); resolve(false); };
+        el.addEventListener('click', e => { if (!answered && (e.target === el || e.target.closest('[data-close]'))) { answered = true; resolve(false); } });
+      },
+    });
+  });
+}
+
 function busy(btn, on, label) {
   if (!btn) return;
   if (on) { btn.dataset.label = btn.innerHTML; btn.innerHTML = `<span class="spin"></span>${label ? esc(label) : ''}`; btn.disabled = true; }
@@ -555,17 +573,21 @@ async function copyText(text) {
 
 /* ══════════ API ══════════ */
 async function api(action, payload = {}) {
-  if (!API()) throw new Error(t('noApi'));
-  let res;
-  try {
-    res = await fetch(API(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // يتجنب طلب preflight مع Apps Script
-      body: JSON.stringify(Object.assign({ action, token: state.token }, payload)),
-    });
-  } catch (e) { throw new Error(t('netErr')); }
   let j;
-  try { j = await res.json(); } catch (e) { throw new Error(t('netErr')); }
+  if (window.APEX_DEMO_API) {
+    j = await window.APEX_DEMO_API(Object.assign({ action, token: state.token }, payload));
+  } else {
+    if (!API()) throw new Error(t('noApi'));
+    let res;
+    try {
+      res = await fetch(API(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // يتجنب طلب preflight مع Apps Script
+        body: JSON.stringify(Object.assign({ action, token: state.token }, payload)),
+      });
+    } catch (e) { throw new Error(t('netErr')); }
+    try { j = await res.json(); } catch (e) { throw new Error(t('netErr')); }
+  }
   if (!j.ok) {
     if (j.code === 'AUTH') { logout(true); }
     if (j.code === 'MUST_CHANGE') { renderChangePassword(); }
@@ -621,12 +643,15 @@ function renderLogin(error) {
         <div class="field"><label for="lu">${t('user')}</label><input class="input" id="lu" dir="ltr" autocomplete="username" autocapitalize="off" spellcheck="false" required></div>
         <div class="field"><label for="lp">${t('pass')}</label><input class="input" id="lp" type="password" dir="ltr" autocomplete="current-password" required></div>
         <button class="btn primary lg block" type="submit" id="lb">${t('enter')}</button>
-        ${!API() ? `<div class="form-error">${esc(t('noApi'))}</div>` : ''}
+        ${window.APEX_DEMO ? `<div class="demo-box"><b>${state.lang === 'en' ? 'Demo — fictional data. Try as:' : 'نسخة تجريبية ببيانات وهمية. جرّب بصفة:'}</b>
+          <div class="chips">${DEMO_ACCOUNTS.map(a => `<button type="button" class="btn sm" data-demo="${a.u}">${a.label}</button>`).join('')}</div></div>` : ''}
+        ${!API() && !window.APEX_DEMO ? `<div class="form-error">${esc(t('noApi'))}</div>` : ''}
         ${error ? `<div class="form-error">${esc(error)}</div>` : '<div id="le"></div>'}
       </form>
     </section>
   </div>`;
   $$('[data-lang]').forEach(b => b.onclick = () => { applyLang(b.dataset.lang); renderLogin(); });
+  $$('[data-demo]').forEach(b => b.onclick = () => demoLogin(b.dataset.demo));
   $('#login-form').onsubmit = async e => {
     e.preventDefault();
     const btn = $('#lb');
@@ -678,11 +703,25 @@ function renderChangePassword() {
   };
 }
 
+const DEMO_ACCOUNTS = [
+  { u: 'layla.hassan@demo.apex', label: 'ممرضة' }, { u: 'hr', label: 'الموارد البشرية' },
+  { u: 'quality', label: 'الجودة' }, { u: 'supply', label: 'التموين' }, { u: 'admin', label: 'المدير' },
+];
+async function demoLogin(u) {
+  try {
+    const d = await api('login', { username: u, password: 'demo' });
+    state.token = d.token; state.user = d.user;
+    if (d.user.role !== 'nurse') applyLang('ar');
+    if (location.hash && location.hash !== '#') location.hash = ''; // hashchange يعيد الرسم
+    else boot();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
 async function logout(expired) {
   const tok = state.token;
   state.token = null; state.user = null;
   store.del('apex.token');
-  if (tok && !expired) { try { await fetch(API(), { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'logout', token: tok }) }); } catch (e) {} }
+  if (tok && !expired && !window.APEX_DEMO) { try { await fetch(API(), { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'logout', token: tok }) }); } catch (e) {} }
   location.hash = '';
   renderLogin(expired ? (state.lang === 'en' ? 'Session expired, please sign in again.' : 'انتهت الجلسة، سجّل الدخول مرة أخرى') : '');
 }
@@ -738,12 +777,14 @@ function renderShell(page) {
       const l = PAGES[p].label; return `<a href="#/${p}" ${p === page ? 'aria-current="page"' : ''}>${esc(typeof l === 'function' ? l(u) : l)}</a>`; }).join('')}</nav>` : ''}
     <div class="spacer"></div>
     ${nurse ? `<div class="lang-switch" style="margin:0" role="group" aria-label="Language"><button type="button" data-lang="ar" aria-pressed="${state.lang === 'ar'}">ع</button><button type="button" data-lang="en" aria-pressed="${state.lang === 'en'}">EN</button></div>` : ''}
+ ${window.APEX_DEMO ? `<select class="input demo-switch" id="demo-switch" aria-label="تبديل الدور"><option value="">عرض تجريبي · تبديل الدور</option>${DEMO_ACCOUNTS.map(a => `<option value="${a.u}">${a.label}</option>`).join('')}</select>` : ''}
     <button class="icon-btn" id="theme-btn" title="${t('theme')}" aria-label="${t('theme')}">${icon(isDark() ? 'sun' : 'moon')}</button>
     <div class="who"><span class="avatar">${esc(initials(u.name))}</span><span class="meta"><b>${esc(u.name)}</b><span>${esc(nurse ? br(u.branch) : u.roleLabel + (u.branch && u.branch !== 'ALL' ? ' · ' + br(u.branch) : ''))}</span></span></div>
     <button class="icon-btn" id="logout-btn" title="${t('logout')}" aria-label="${t('logout')}">${icon('out')}</button>
   </div></header>
   <main id="view"></main>`;
   $('#theme-btn').onclick = toggleTheme;
+  $('#demo-switch') && ($('#demo-switch').onchange = e => e.target.value && demoLogin(e.target.value));
   $('#logout-btn').onclick = () => logout();
   $$('.topbar [data-lang]').forEach(b => b.onclick = () => { applyLang(b.dataset.lang); route(); });
   moveNavIndicator();
@@ -803,6 +844,8 @@ async function lineChart(canvas, labels, series, { max = 100, suffix = '%' } = {
   o.scales.y.ticks.callback = v => v + suffix;
   o.scales.x.reverse = document.dir === 'rtl';
   o.plugins.tooltip.callbacks = { label: c => ` ${c.dataset.label}: ${c.parsed.y == null ? '—' : c.parsed.y + suffix}` };
+  if (!canvas || !canvas.isConnected) return;
+  const old = Chart.getChart(canvas); if (old) old.destroy();
   const surface = cssVar('--surface');
   const c = new Chart(canvas, {
     type: 'line',
@@ -830,6 +873,8 @@ async function barChart(canvas, labels, series, { horizontal = false, max = null
   else o.scales.x.reverse = document.dir === 'rtl';
   o.interaction = { mode: 'nearest', axis: cat, intersect: false };
   o.plugins.tooltip.callbacks = { label: c => ` ${c.dataset.label}: ${c.parsed[val]}${suffix}` };
+  if (!canvas || !canvas.isConnected) return;
+  const old = Chart.getChart(canvas); if (old) old.destroy();
   const c = new Chart(canvas, {
     type: 'bar',
     data: { labels, datasets: series.map(s => ({
@@ -862,6 +907,7 @@ async function renderNurse(view) {
   let ctx;
   try { ctx = await api('nurse.context'); }
   catch (e) { return errorBlock(view, e, () => renderNurse(view)); }
+  if (!view.isConnected) return; // تم الانتقال لصفحة أخرى أثناء التحميل
 
   const pending = ctx.clinics.filter(c => !c.submitted);
   const done = ctx.clinics.length - pending.length;
@@ -1086,6 +1132,7 @@ async function renderHR(view) {
   let d;
   try { d = await api('hr.overview', { week: hrState.week, weeks: hrState.weeks }); }
   catch (e) { return errorBlock(view, e, () => renderHR(view)); }
+  if (!view.isConnected) return; // تم الانتقال لصفحة أخرى أثناء التحميل
   hrState.week = d.week;
   const s = d.summary;
   const isCurrent = !hrState.week || d.week >= addDays(ymd(new Date()), -6);
@@ -1226,6 +1273,7 @@ async function renderQuality(view) {
   let d;
   try { d = await api('quality.stats', { from: range.from, to: range.to, branch: qState.branch }); }
   catch (e) { return errorBlock(view, e, () => renderQuality(view)); }
+  if (!view.isConnected) return; // تم الانتقال لصفحة أخرى أثناء التحميل
   const k = d.kpi;
   const colors = { BURIDAH: cssVar('--s1'), ONIZAH: cssVar('--s2') };
   const uncovered = d.coverage.filter(c => !c.covered);
@@ -1354,6 +1402,7 @@ async function renderIssues(view) {
       api('issues.list', { status: ['open', 'in_progress', 'resolved'], department: iState.dept }),
     ]);
   } catch (e) { return errorBlock(view, e, () => renderIssues(view)); }
+  if (!view.isConnected) return; // تم الانتقال لصفحة أخرى أثناء التحميل
   const cnt = s => counts.issues.filter(i => s.includes(i.status)).length;
   const supply = role === 'supply';
 
@@ -1468,6 +1517,7 @@ async function renderReports(view) {
   let d;
   try { d = await api('reports.list', { from: range.from, to: range.to, branch: rState.branch }); }
   catch (e) { return errorBlock(view, e, () => renderReports(view)); }
+  if (!view.isConnected) return; // تم الانتقال لصفحة أخرى أثناء التحميل
   view.innerHTML = `
   <div class="page-head rise"><div><h1>سجل التقارير</h1><p>${esc(range.label)} · <span class="num">${d.reports.length}</span> تقرير</p></div><div class="spacer"></div>
     <div class="toolbar">
@@ -1522,6 +1572,7 @@ async function renderUsers(view) {
   let d;
   try { d = await api('users.list'); }
   catch (e) { return errorBlock(view, e, () => renderUsers(view)); }
+  if (!view.isConnected) return; // تم الانتقال لصفحة أخرى أثناء التحميل
   const admin = state.user.role === 'admin';
   const clinicName = id => { const c = d.clinics.find(x => x.clinic_id === id); return c ? c.name + ' — ' + br(c.branch) : id; };
   view.innerHTML = `
@@ -1552,7 +1603,7 @@ async function renderUsers(view) {
     $$('#u-t [data-edit]').forEach(b => b.onclick = () => userDialog(d, d.users.find(u => u.username === b.dataset.edit), () => renderUsers(view)));
     $$('#u-t [data-reset]').forEach(b => b.onclick = async () => {
       const u = d.users.find(x => x.username === b.dataset.reset);
-      if (!confirm(`إنشاء كلمة مرور مؤقتة جديدة لـ ${u.name}؟ ستتوقف كلمة المرور الحالية.`)) return;
+      if (!await confirmDialog(`إنشاء كلمة مرور مؤقتة جديدة لـ ${u.name}؟ ستتوقف كلمة المرور الحالية.`)) return;
       busy(b, true);
       try { const r = await api('users.reset', { username: u.username }); busy(b, false); showTemp(u.name, r.username, r.tempPassword); }
       catch (e) { busy(b, false); toast(e.message, 'err'); }

@@ -441,7 +441,11 @@ function upsertIssues_(list, report, opts) {
       if (obj.status === 'open') openMap[key(obj)] = obj;
     }
   });
-  if (fresh.length) appendObjects_(S.ISSUES, fresh, sheet);
+  if (fresh.length) {
+    const startRow = sheet.getLastRow() + 1;
+    appendObjects_(S.ISSUES, fresh, sheet);
+    fresh.forEach((o, i) => { o._row = startRow + i; }); // يسمح بتحديث عدّاد التكرار لاحقاً داخل نفس الدفعة
+  }
   return list.length;
 }
 
