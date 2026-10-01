@@ -66,6 +66,7 @@ a{color:var(--accent)}
 .ico{width:16px;height:16px;flex:none;display:inline-block;vertical-align:middle}
 .icon-btn .ico{width:19px;height:19px}
 .logo .ico{width:20px;height:20px}
+.is-demo .btn[onclick*="print"]{display:none}
 .demo-box{margin-top:18px;padding:14px;border:1px dashed var(--accent-line);background:var(--accent-soft);border-radius:var(--r)}
 .demo-box b{display:block;font-size:12.5px;font-weight:600;margin-bottom:10px}
 select.input.demo-switch{height:36px;width:170px;flex:none;padding:0 10px;font-size:12.5px;background:var(--accent-soft);border-color:var(--accent-line)}
@@ -146,7 +147,7 @@ textarea.input{height:auto;min-height:84px;padding:12px 14px;resize:vertical}
 .rating button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 1px var(--accent) inset;transform:translateY(-1px)}
 
 /* ══════════ SHELL ══════════ */
-.topbar{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line)}
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line)}
 .topbar-in{max-width:1320px;margin:0 auto;height:64px;padding:0 24px;display:flex;align-items:center;gap:16px}
 .topbar .brandmark{color:var(--ink);font-size:14.5px}
 .topbar .brandmark .logo{width:34px;height:34px;border-radius:10px}
@@ -557,6 +558,12 @@ function countUp(root = document) {
 }
 
 function downloadCSV(name, headers, rows) {
+  if (window.APEX_DEMO) {   // التنزيل محجوب داخل إطار العرض: نعرض النص للنسخ
+    const text = [headers, ...rows].map(r => r.map(v => { const x = String(v == null ? '' : v); return /[",\n]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x; }).join(',')).join('\n');
+    modal({ title: name, wide: true, body: `<p class="muted" style="margin-bottom:10px">في النسخة الفعلية يُنزَّل هذا كملف CSV يفتح في Excel.</p><textarea class="input" id="csv-t" readonly style="min-height:220px;direction:ltr;font-family:monospace;font-size:12px">${esc(text)}</textarea>`,
+      foot: `<button class="btn primary" id="csv-c">${icon('copy')}نسخ</button>`, onMount(el) { $('#csv-c', el).onclick = () => copyText(text); } });
+    return;
+  }
   const q = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const csv = '﻿' + [headers, ...rows].map(r => r.map(q).join(',')).join('\n');
   const a = document.createElement('a');
@@ -763,6 +770,7 @@ function route() {
   destroyCharts();
   PAGES[page].render($('#view'));
 }
+if (window.APEX_DEMO) document.documentElement.classList.add('is-demo');
 window.addEventListener('hashchange', () => state.user && route());
 function rerender() { if (state.user) route(); else renderLogin(); }
 
@@ -774,7 +782,7 @@ function renderShell(page) {
   <header class="topbar"><div class="topbar-in">
     <div class="brandmark"><span class="logo">${icon('logo')}</span><span>ApexCare<small>${nurse ? (state.lang === 'en' ? 'Nursing weekly report' : 'التقرير الأسبوعي للتمريض') : 'منصة متابعة التمريض'}</small></span></div>
     ${pages.length > 1 ? `<nav class="nav" aria-label="الأقسام"><span class="ind"></span>${pages.map(p => {
-      const l = PAGES[p].label; return `<a href="#/${p}" ${p === page ? 'aria-current="page"' : ''}>${esc(typeof l === 'function' ? l(u) : l)}</a>`; }).join('')}</nav>` : ''}
+      const l = PAGES[p].label; return `<a href="#${p}" ${p === page ? 'aria-current="page"' : ''}>${esc(typeof l === 'function' ? l(u) : l)}</a>`; }).join('')}</nav>` : ''}
     <div class="spacer"></div>
     ${nurse ? `<div class="lang-switch" style="margin:0" role="group" aria-label="Language"><button type="button" data-lang="ar" aria-pressed="${state.lang === 'ar'}">ع</button><button type="button" data-lang="en" aria-pressed="${state.lang === 'en'}">EN</button></div>` : ''}
  ${window.APEX_DEMO ? `<select class="input demo-switch" id="demo-switch" aria-label="تبديل الدور"><option value="">عرض تجريبي · تبديل الدور</option>${DEMO_ACCOUNTS.map(a => `<option value="${a.u}">${a.label}</option>`).join('')}</select>` : ''}

@@ -25,5 +25,12 @@ let html = read('index.html')
   .replace('<title>ApexCare Nursing</title>', '<title>ApexCare Nursing Demo</title>')
   .replace('<script>\n\'use strict\';', () => demoScript + '<script>\n\'use strict\';');
 if (!html.includes('window.APEX_DEMO = true')) throw new Error('inject failed');
-fs.writeFileSync(process.argv[2] || path.join(__dirname, 'demo.html'), html);
+// --artifact: remove the document wrapper (html/head/body, charset, viewport) for hosts that add their own skeleton
+if (process.argv.includes('--artifact')) {
+  const head = html.match(/<head>([\s\S]*?)<\/head>/)[1].replace(/<meta (charset|name="(viewport|theme-color)")[^>]*>\s*/g, '').replace(/<meta name="description"[^>]*>\s*/, '');
+  const body = html.match(/<body>([\s\S]*)<\/body>/)[1];
+  const title = head.match(/<title>[\s\S]*?<\/title>/)[0];
+  html = title + '\n' + head.replace(title, '').trim() + '\n' + body;
+}
+fs.writeFileSync(process.argv.find(a => a.endsWith('.html')) || path.join(__dirname, 'demo.html'), html);
 console.log('built', (html.length / 1024).toFixed(0) + ' KB');
