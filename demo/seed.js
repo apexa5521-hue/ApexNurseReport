@@ -38,13 +38,25 @@ function seedDemo() {
   const slug = n => n.toLowerCase().replace(/\s+/g, '.');
   const users = NURSES.map(n => {
     const c = newUserRow_({ username: slug(n[0]) + '@demo.apex', name: n[0], email: slug(n[0]) + '@demo.apex', role: 'nurse',
-      branch: n[1], clinics: n[2].join(','), start_date: ago(n[4]), status: n[5] || 'active' });
+      branch: n[1], clinics: n[2].join(','), start_date: ago(n[4]), status: n[5] || 'active',
+      end_date: n[5] === 'inactive' ? weeks[3] : '' });
     const salt = Utilities.getUuid();
     c.row.salt = salt; c.row.pass_hash = hash_(PW, salt); c.row.must_change = 'no';
     return c.row;
   });
   appendObjects_(S.USERS, users); clr();
 
+  // إجازات: Dina Putri في إجازة حالية، وJoy Reyes أنهت إجازة سابقة
+  const LEAVES = {
+    'Dina Putri': [{ from: weeks[10], to: dateStr_(addDays_(parseDate_(weeks[11]), 10)) }],
+    'Joy Reyes': [{ from: weeks[4], to: dateStr_(addDays_(parseDate_(weeks[5]), 3)) }],
+  };
+  const leaveRows = [];
+  Object.keys(LEAVES).forEach(name => LEAVES[name].forEach((l, i) => leaveRows.push({
+    leave_id: 'LD' + leaveRows.length, username: slug(name) + '@demo.apex', from_date: l.from, to_date: l.to,
+    cancelled: '', created_at: nowStr_(), created_by: 'الموارد البشرية' })));
+  appendObjects_(S.LEAVES, leaveRows); clr();
+  const onLeaveWeek = (name, w) => (LEAVES[name] || []).some(l => l.from <= w && w <= l.to);
   const FORCE_MISS = { 'Aisha Khan': [9, 10, 11], 'Maria Santos': [10, 11] };
   const PERSIST = { 'BUR-C5': 'Low speed handpiece', 'BUR-C9': 'Extraction forceps', 'ONZ-C2': 'Light cure unit' };
   const ITEMS = ['Adrenaline', 'Lidocaine 2%', 'Composite A2', 'Alveogyl', 'Dexamethasone', 'Bonding agent', 'Gutta-percha', 'Impression material'];
@@ -61,6 +73,7 @@ function seedDemo() {
       if (wi < weeks.length - n[4]) return;     // لم تبدأ العمل بعد
       if (inactive && wi > 3) return;           // توقفت عن العمل قبل 8 أسابيع
       if (!inactive && (FORCE_MISS[n[0]] || []).indexOf(wi) >= 0) return;
+      if (onLeaveWeek(n[0], w)) return;           // لا تُرفع تقارير أثناء الإجازة
       const prob = wi === weeks.length - 1 ? Math.min(.62, n[3]) : (inactive ? .9 : n[3]);
       (inactive ? ['BUR-C13'] : n[2]).forEach(cid => {
         if (n[0] === 'Layla Hassan' && cid === 'BUR-C2' && wi === weeks.length - 1) return; // تبقى جاهزة لتجربة الرفع
@@ -70,7 +83,10 @@ function seedDemo() {
         const r0 = demoNurseNow ? 0 : rnd(), dayOff = r0 < .72 ? 0 : r0 < .9 ? 1 : r0 < .97 ? 2 : 3;
         const base = parseDate_(w); base.setDate(base.getDate() + dayOff);
         const when = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 9 + Math.floor(rnd() * 9), Math.floor(rnd() * 60), Math.floor(rnd() * 60));
-        if (when > now) return;
+        if (when > now) {                       // موعد التسليم لم يأتِ بعد اليوم: نُقدّمه ليكون قبل الآن مباشرة
+          const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() + 60000;
+          when.setTime(Math.max(midnight, now.getTime() - rnd() * 6 * 3600000));
+        }
         const cls = classifySubmission_(when, cfg), clinic = clinicById[cid];
         const fridge = clinic.has_fridge === 'yes' ? (rnd() < .95 ? 'ok' : 'problem') : 'none';
         const temp = fridge === 'ok' && rnd() < .5 ? (rnd() < .93 ? Math.round((2.5 + rnd() * 4.5) * 10) / 10 : 10.5) : '';

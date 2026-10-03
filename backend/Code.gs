@@ -41,12 +41,13 @@ const S = {
   SETTINGS: 'Settings',
   LOG: 'Audit_Log',
   TEMP: 'Temp_Passwords',
+  LEAVES: 'Leaves',
 };
 
 const HEADERS = {
   Users: ['username', 'name', 'email', 'role', 'branch', 'clinics', 'status', 'start_date',
-          'pass_hash', 'salt', 'must_change', 'created_at', 'last_login', 'aliases'],
-  Clinics: ['clinic_id', 'name', 'branch', 'type', 'has_fridge', 'status'],
+          'pass_hash', 'salt', 'must_change', 'created_at', 'last_login', 'aliases', 'end_date', 'last_reminder'],
+  Clinics: ['clinic_id', 'number', 'name', 'branch', 'type', 'has_fridge', 'status'],
   Reports: ['report_id', 'submitted_at', 'week_start', 'timing', 'username', 'nurse_name', 'branch',
             'clinic_id', 'clinic_name', 'expiry_checked', 'earliest_expiry', 'expiry_item',
             'sterilization_ok', 'fridge', 'fridge_temp', 'employee_card', 'cleanliness',
@@ -58,6 +59,7 @@ const HEADERS = {
   Settings: ['key', 'value', 'description'],
   Audit_Log: ['at', 'user', 'action', 'details'],
   Temp_Passwords: ['name', 'username', 'role', 'temp_password', 'created_at'],
+  Leaves: ['leave_id', 'username', 'from_date', 'to_date', 'cancelled', 'created_at', 'created_by'],
 };
 
 const DEFAULT_SETTINGS = [
@@ -67,6 +69,7 @@ const DEFAULT_SETTINGS = [
   ['EXPIRY_ALERT_DAYS', 60, 'تنبيه إذا كان أقرب تاريخ انتهاء خلال هذا العدد من الأيام'],
   ['FRIDGE_MIN', 2, 'أقل حرارة مقبولة للثلاجة'],
   ['FRIDGE_MAX', 8, 'أعلى حرارة مقبولة للثلاجة'],
+  ['APP_URL', '', 'رابط صفحة المنصة، يُضاف في رسائل التذكير'],
   ['FORM_SOURCE', '', 'رابط الشيت الأساسي (ردود النموذج) لسحب البيانات منه. اتركه فارغاً إذا كان السكربت داخل نفس الشيت'],
   ['FORM_TAB', 'ردود النموذج 1', 'اسم ورقة ردود Google Form'],
   ['LEGACY_OPEN_WEEKS', 2, 'المشاكل المستوردة من آخر N أسابيع تبقى مفتوحة، والأقدم تُؤرشف'],
@@ -74,13 +77,14 @@ const DEFAULT_SETTINGS = [
 
 /** العيادات الافتراضية — مستخرجة من بيانات النموذج القديم */
 const DEFAULT_CLINICS = (function () {
+  // [clinic_id, number, name, branch, type, has_fridge, status] — الممرضة تكتب «رقم العيادة» فقط
   const list = [];
-  for (let i = 1; i <= 14; i++) list.push(['BUR-C' + i, 'عيادة ' + i, 'BURIDAH', 'dental', 'yes', 'active']);
-  list.push(['BUR-CLARITY', 'غرفة Clarity (ليزر)', 'BURIDAH', 'derma', 'no', 'active']);
-  list.push(['BUR-GENTLE', 'غرفة Gentle Pro Max', 'BURIDAH', 'derma', 'no', 'active']);
-  list.push(['BUR-HYDRAFACIAL', 'غرفة الهيدرافيشل', 'BURIDAH', 'derma', 'no', 'active']);
-  list.push(['BUR-BLEACHING', 'غرفة التشقير / التبييض', 'BURIDAH', 'derma', 'no', 'active']);
-  for (let i = 1; i <= 7; i++) list.push(['ONZ-C' + i, 'عيادة ' + i, 'ONIZAH', 'dental', 'yes', 'active']);
+  for (let i = 1; i <= 14; i++) list.push(['BUR-C' + i, i, 'عيادة ' + i, 'BURIDAH', 'dental', 'yes', 'active']);
+  list.push(['BUR-CLARITY', 15, 'غرفة Clarity (ليزر)', 'BURIDAH', 'derma', 'no', 'active']);
+  list.push(['BUR-GENTLE', 16, 'غرفة Gentle Pro Max', 'BURIDAH', 'derma', 'no', 'active']);
+  list.push(['BUR-HYDRAFACIAL', 17, 'غرفة الهيدرافيشل', 'BURIDAH', 'derma', 'no', 'active']);
+  list.push(['BUR-BLEACHING', 18, 'غرفة التشقير / التبييض', 'BURIDAH', 'derma', 'no', 'active']);
+  for (let i = 1; i <= 7; i++) list.push(['ONZ-C' + i, i, 'عيادة ' + i, 'ONIZAH', 'dental', 'yes', 'active']);
   return list;
 })();
 
@@ -132,8 +136,10 @@ const ACTIONS = {
   'nurse.submit':   { roles: ['nurse', 'admin'], fn: apiNurseSubmit_ },
 
   'hr.overview':    { roles: ['hr', 'admin'], fn: apiHrOverview_ },
-  'quality.stats':  { roles: ['quality', 'admin', 'hr'], fn: apiQualityStats_ },
-  'reports.list':   { roles: STAFF, fn: apiReportsList_ },
+  'hr.remind':      { roles: ['hr', 'admin'], fn: apiHrRemind_ },
+  // الموارد البشرية لا ترى الإحصائيات الفنية (تعقيم، أدوية، ثلاجة…) ولا تفاصيل التقارير
+  'quality.stats':  { roles: ['quality', 'admin'], fn: apiQualityStats_ },
+  'reports.list':   { roles: ['quality', 'admin'], fn: apiReportsList_ },
 
   'issues.list':    { roles: STAFF, fn: apiIssuesList_ },
   'issues.update':  { roles: ['supply', 'quality', 'hr', 'admin'], fn: apiIssueUpdate_ },
@@ -141,6 +147,7 @@ const ACTIONS = {
   'users.list':     { roles: ['hr', 'admin'], fn: apiUsersList_ },
   'users.save':     { roles: ['hr', 'admin'], fn: apiUserSave_ },
   'users.reset':    { roles: ['hr', 'admin'], fn: apiUserReset_ },
+  'users.setStatus': { roles: ['hr', 'admin'], fn: apiUserSetStatus_ },
   'clinics.list':   { roles: STAFF, fn: () => ({ clinics: clinics_() }) },
   'clinics.save':   { roles: ['admin', 'quality'], fn: apiClinicSave_ },
 };
@@ -293,7 +300,7 @@ function apiNurseContext_(req, user) {
     deadline: now.week,
     lateUntil: dateStr_(addDays_(parseDate_(now.week), cfg.LATE_ALLOWED_DAYS)),
     clinics: clinics.map(c => ({
-      clinic_id: c.clinic_id, name: c.name, branch: c.branch, has_fridge: c.has_fridge === 'yes',
+      clinic_id: c.clinic_id, number: c.number, name: c.name, branch: c.branch, type: c.type, has_fridge: c.has_fridge === 'yes',
       submitted: weekAll.some(r => r.clinic_id === c.clinic_id),
       submittedBy: (weekAll.find(r => r.clinic_id === c.clinic_id) || {}).nurse_name || '',
     })),
@@ -314,8 +321,20 @@ function nurseClinics_(user) {
 function apiNurseSubmit_(req, user) {
   const cfg = settings_();
   const p = req.report || {};
-  const clinic = nurseClinics_(user).find(c => c.clinic_id === p.clinic_id);
-  if (!clinic) throw err_('اختر عيادة صحيحة من عياداتك');
+  const pool = nurseClinics_(user);
+  let clinic;
+  if (p.clinic_number != null && String(p.clinic_number).trim() !== '') {
+    // رقم العيادة: أرقام فقط (نقبل الأرقام العربية الهندية ونحوّلها)
+    const num = String(p.clinic_number).trim().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+    if (!/^\d{1,3}$/.test(num)) throw err_('رقم العيادة يقبل أرقاماً فقط');
+    const hits = pool.filter(c => String(c.number) !== '' && Number(c.number) === Number(num));
+    if (!hits.length) throw err_('لا توجد عيادة بالرقم ' + Number(num) + ' ضمن عياداتك');
+    if (hits.length > 1) throw err_('الرقم ' + Number(num) + ' مكرر في أكثر من فرع');
+    clinic = hits[0];
+  } else {
+    clinic = pool.find(c => c.clinic_id === p.clinic_id);
+  }
+  if (!clinic) throw err_('اكتب رقم عيادة صحيحاً من عياداتك');
 
   const yn = v => (v === 'yes' || v === 'no') ? v : null;
   const r = {
@@ -451,68 +470,210 @@ function upsertIssues_(list, report, opts) {
 
 /* ════════════════════════════ HR ════════════════════════════ */
 
-function apiHrOverview_(req, user) {
-  const cfg = settings_();
-  const week = normalizeWeek_(req.week, cfg);
-  const nWeeks = Math.min(52, Math.max(4, Number(req.weeks) || 12));
-  const weeks = weeksBack_(week, nWeeks);
+/** إجازات الممرضات غير الملغاة، مجمّعة باسم المستخدم */
+function leavesMap_() {
+  const m = {};
+  rows_(S.LEAVES).forEach(l => { if (l.cancelled !== 'yes') (m[l.username] = m[l.username] || []).push(l); });
+  return m;
+}
+
+function onLeave_(leaves, week) {
+  return (leaves || []).some(l => l.from_date <= week && week <= l.to_date);
+}
+
+/** هل يُطلب من الممرضة تقرير في أسبوع التسليم w (تاريخ السبت)؟ */
+function expectedOn_(n, w, leaves, cfg) {
+  if (n.start_date) { const st = dateStr_(parseDate_(n.start_date)); if (st && w < weekOf_(st, cfg)) return false; }
+  if (n.status !== 'active') {
+    const end = n.end_date ? dateStr_(parseDate_(n.end_date)) : '';
+    if (!end || w > end) return false;   // متوقفة عن العمل
+  }
+  return !onLeave_(leaves, w);
+}
+
+/** الحالة الحالية: على رأس العمل / إجازة (حالية أو قادمة) / متوقفة */
+function nurseState_(u, userLeaves, today) {
+  const up = (userLeaves || []).filter(l => l.to_date >= today).sort((a, b) => a.from_date < b.from_date ? -1 : 1)[0];
+  return {
+    state: u.status !== 'active' ? 'inactive' : (up ? 'leave' : 'active'),
+    leave: up ? { from: up.from_date, to: up.to_date, current: up.from_date <= today } : null,
+  };
+}
+
+const ROSTER_ORDER = { missing: 0, very_late: 1, late: 2, on_time: 3, early: 3, leave: 4, na: 5 };
+
+function buildRoster_(user, week, weeks, cfg) {
   const nurses = rows_(S.USERS).filter(u => u.role === 'nurse' && branchAllowed_(user, u.branch));
   const reports = rows_(S.REPORTS).filter(r => branchAllowed_(user, r.branch) && weeks.indexOf(r.week_start) >= 0);
-
+  const lm = leavesMap_();
+  const today = dateStr_(new Date());
   const byNurse = {};
   reports.forEach(r => { (byNurse[r.username] = byNurse[r.username] || []).push(r); });
 
-  const roster = nurses.map(n => {
+  return nurses.map(n => {
     const mine = byNurse[n.username] || [];
-    const start = n.start_date ? dateStr_(parseDate_(n.start_date)) : '';
+    const leaves = lm[n.username] || [];
     const cells = weeks.map(w => {
-      if (start && w < weekOf_(start, cfg)) return 'na';
-      if (n.status !== 'active' && !mine.some(r => r.week_start === w)) return 'na';
-      return bestTiming_(mine.filter(r => r.week_start === w));
+      const rs = mine.filter(r => r.week_start === w);
+      if (expectedOn_(n, w, leaves, cfg) || rs.length) return bestTiming_(rs);
+      return onLeave_(leaves, w) ? 'leave' : 'na';
     });
-    const counted = cells.filter(c => c !== 'na');
+    const counted = cells.filter(c => c !== 'na' && c !== 'leave');
     const done = counted.filter(c => c !== 'missing');
     const onTime = counted.filter(c => c === 'on_time' || c === 'early');
     let streak = 0;
-    for (let i = cells.length - 1; i >= 0; i--) { if (cells[i] === 'missing') streak++; else if (cells[i] !== 'na') break; }
+    for (let i = cells.length - 1; i >= 0; i--) { if (cells[i] === 'missing') streak++; else if (cells[i] !== 'na' && cells[i] !== 'leave') break; }
+    const st = nurseState_(n, leaves, today);
     return {
       username: n.username, name: n.name, email: n.email, branch: n.branch, status: n.status,
-      clinics: splitList_(n.clinics),
-      thisWeek: cells[cells.length - 1],
-      cells: cells,
+      state: st.state, leave: st.leave,
+      thisWeek: cells[cells.length - 1], cells: cells,
       compliance: counted.length ? Math.round(done.length / counted.length * 100) : null,
       onTimeRate: counted.length ? Math.round(onTime.length / counted.length * 100) : null,
       missedStreak: streak,
-      reportsThisWeek: mine.filter(r => r.week_start === week).length,
       lastSubmission: mine.reduce((m, r) => r.submitted_at > m ? r.submitted_at : m, ''),
+      lastReminder: n.last_reminder || '',
     };
   });
+}
 
-  const active = roster.filter(r => r.thisWeek !== 'na');
-  const count = t => active.filter(r => r.thisWeek === t).length;
-  const weekly = weeks.map((w, i) => {
-    const cols = roster.map(r => r.cells[i]).filter(c => c !== 'na');
-    const done = cols.filter(c => c !== 'missing').length;
-    return { week: w, expected: cols.length, submitted: done,
-             onTime: cols.filter(c => c === 'on_time' || c === 'early').length,
-             rate: cols.length ? Math.round(done / cols.length * 100) : null };
-  });
+function apiHrOverview_(req, user) {
+  const cfg = settings_();
+  const week = normalizeWeek_(req.week, cfg);
+  const weeks = weeksBack_(week, Math.min(52, Math.max(4, Number(req.weeks) || 12)));
+  const roster = buildRoster_(user, week, weeks, cfg);
 
+  const expected = roster.filter(r => r.thisWeek !== 'na' && r.thisWeek !== 'leave');
+  const count = t => expected.filter(r => r.thisWeek === t).length;
+  const committed = expected.filter(r => r.thisWeek !== 'missing').length;
+
+  // الموارد البشرية ترى فقط ما يخصها: بطاقات الموظفين
   const cardIssues = rows_(S.ISSUES)
     .filter(i => i.category === 'card' && (i.status === 'open' || i.status === 'in_progress') && branchAllowed_(user, i.branch))
     .map(issueOut_);
 
+  const isCurrent = week === currentWeek_(cfg);
+  const today = dateStr_(new Date());
+  const remindable = isCurrent ? roster.filter(r => r.thisWeek === 'missing' && r.state === 'active' && emailOf_(r)).length : 0;
   return {
-    week: week, weeks: weeks,
+    week: week, weeks: weeks, isCurrent: isCurrent,
     summary: {
-      expected: active.length, onTime: count('on_time') + count('early'), late: count('late') + count('very_late'),
-      missing: count('missing'),
-      rate: active.length ? Math.round(active.filter(r => r.thisWeek !== 'missing').length / active.length * 100) : 0,
+      expected: expected.length, committed: committed, missing: count('missing'),
+      onTime: count('on_time') + count('early'), late: count('late') + count('very_late'),
+      rate: expected.length ? Math.round(committed / expected.length * 100) : 0,
+      onLeave: roster.filter(r => r.state === 'leave' && r.thisWeek === 'leave').length,
+      stopped: roster.filter(r => r.state === 'inactive').length,
     },
-    roster: roster.sort((a, b) => (TIMING_RANK[a.thisWeek] || 0) - (TIMING_RANK[b.thisWeek] || 0) || (a.compliance || 0) - (b.compliance || 0)),
-    weekly: weekly,
+    remindable: remindable,
+    remindedToday: roster.filter(r => r.thisWeek === 'missing' && String(r.lastReminder).slice(0, 10) === today).length,
+    roster: roster.sort((a, b) => (ROSTER_ORDER[a.thisWeek] - ROSTER_ORDER[b.thisWeek]) || (a.compliance == null ? 101 : a.compliance) - (b.compliance == null ? 101 : b.compliance)),
     cardIssues: cardIssues,
   };
+}
+
+function emailOf_(r) {
+  const e = String(r.email || (String(r.username).indexOf('@') > 0 ? r.username : '')).trim();
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) ? e : '';
+}
+
+/* ───────── تذكير الممرضات اللواتي لم يسلّمن ───────── */
+
+function apiHrRemind_(req, user) {
+  const cfg = settings_();
+  const res = sendReminders_(user, currentWeek_(cfg), cfg, 'missed');
+  log_(user.username, 'remind', res.sent.length + ' sent');
+  return res;
+}
+
+/** يرسل بريداً لكل ممرضة نشطة لم تسلّم تقرير الأسبوع. kind: 'deadline' (صباح السبت) أو 'missed' (متابعة) */
+function sendReminders_(scopeUser, week, cfg, kind) {
+  const roster = buildRoster_(scopeUser, week, [week], cfg).filter(r => r.thisWeek === 'missing' && r.state === 'active');
+  const withMail = roster.filter(emailOf_), noEmail = roster.filter(r => !emailOf_(r)).map(r => r.name);
+  if (!withMail.length) return { sent: [], noEmail: noEmail, failed: [], week: week };
+  const quota = MailApp.getRemainingDailyQuota();
+  if (quota < withMail.length) throw err_('حصة البريد اليومية لا تكفي (المتبقي ' + quota + ' رسالة). حاول غداً.');
+
+  const url = cfg.APP_URL ? String(cfg.APP_URL) : '';
+  const subject = 'تذكير: التقرير الأسبوعي للعيادة | Weekly clinic report reminder';
+  const line = kind === 'deadline'
+    ? ['اليوم موعد رفع التقرير الأسبوعي للعيادة (السبت ' + week + ').', 'Today is the deadline for the weekly clinic report (Saturday ' + week + ').']
+    : ['لم يصلنا بعد تقرير العيادة لأسبوع السبت ' + week + '. نرجو رفعه في أقرب وقت.', 'We have not received your clinic report for the week of Saturday ' + week + ' yet. Please submit it as soon as possible.'];
+  const users = {};
+  rows_(S.USERS).forEach(u => { users[u.username] = u; });
+
+  const sent = [], failed = [];
+  withMail.forEach(r => {
+    const body = ['مرحباً ' + r.name + '،', line[0], url ? 'رابط الدخول: ' + url : '', '',
+                  'Hello ' + r.name + ',', line[1], url ? 'Sign-in link: ' + url : '', '', 'ApexCare Clinics']
+      .filter((l, i, a) => l !== '' || (a[i - 1] !== '' && i > 0)).join('\n');
+    try {
+      MailApp.sendEmail({ to: emailOf_(r), subject: subject, body: body, name: 'ApexCare Nursing' });
+      sent.push(r.name);
+      if (users[r.username]) setCell_(S.USERS, users[r.username]._row, 'last_reminder', nowStr_());
+    } catch (e) { failed.push(r.name); }
+  });
+  return { sent: sent, noEmail: noEmail, failed: failed, week: week };
+}
+
+/** تذكير تلقائي (يعمل بالمشغّل الزمني، شغّل installReminderTriggers مرة واحدة لتفعيله) */
+function autoReminderSaturday() { const cfg = settings_(); sendReminders_({ role: 'admin', branch: 'ALL' }, currentWeek_(cfg), cfg, 'deadline'); }
+function autoReminderSunday() { const cfg = settings_(); sendReminders_({ role: 'admin', branch: 'ALL' }, currentWeek_(cfg), cfg, 'missed'); }
+
+function installReminderTriggers() {
+  const names = ['autoReminderSaturday', 'autoReminderSunday'];
+  ScriptApp.getProjectTriggers().filter(t => names.indexOf(t.getHandlerFunction()) >= 0).forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('autoReminderSaturday').timeBased().onWeekDay(ScriptApp.WeekDay.SATURDAY).atHour(10).create();
+  ScriptApp.newTrigger('autoReminderSunday').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(10).create();
+  SpreadsheetApp.getActive().toast('تم تفعيل التذكير التلقائي: السبت والأحد الساعة 10 صباحاً', APP.NAME, 8);
+}
+
+/* ───────── حالة الممرضة: على رأس العمل / إجازة / متوقفة ───────── */
+
+function apiUserSetStatus_(req, user) {
+  const st = req.status;
+  if (['active', 'leave', 'inactive'].indexOf(st) < 0) throw err_('حالة غير صحيحة');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const u = rows_(S.USERS).find(x => x.username === req.username);
+    if (!u || u.role !== 'nurse') throw err_('الممرضة غير موجودة');
+    if (!branchAllowed_(user, u.branch)) throw err_('ليست لديك صلاحية على هذا الفرع', 'FORBIDDEN');
+    const today = dateStr_(new Date());
+    const open = rows_(S.LEAVES).filter(l => l.username === u.username && l.cancelled !== 'yes' && l.to_date >= today);
+    const yesterday = dateStr_(addDays_(parseDate_(today), -1));
+    const closeLeaves = () => open.forEach(l => {
+      if (l.from_date >= today) setCell_(S.LEAVES, l._row, 'cancelled', 'yes');   // لم تبدأ بعد: تُلغى
+      else setCell_(S.LEAVES, l._row, 'to_date', yesterday);                       // بدأت: تنتهي أمس
+    });
+
+    if (st === 'leave') {
+      const from = parseDate_(req.leave_from), to = parseDate_(req.leave_to);
+      if (!from || !to) throw err_('حدد تاريخ بداية الإجازة ونهايتها');
+      if (to < from) throw err_('تاريخ نهاية الإجازة قبل بدايتها');
+      if (daysBetween_(from, to) > 400) throw err_('مدة الإجازة طويلة جداً، تحقق من التواريخ');
+      if (open.length) {
+        setCells_(S.LEAVES, open[0]._row, { from_date: dateStr_(from), to_date: dateStr_(to) });   // تمديد أو تعديل
+        open.slice(1).forEach(l => setCell_(S.LEAVES, l._row, 'cancelled', 'yes'));
+      } else {
+        appendObjects_(S.LEAVES, [{ leave_id: 'L' + Utilities.formatDate(new Date(), APP.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 90 + 10),
+          username: u.username, from_date: dateStr_(from), to_date: dateStr_(to), cancelled: '', created_at: nowStr_(), created_by: user.name }]);
+      }
+      setCells_(S.USERS, u._row, { status: 'active', end_date: '' });
+    } else if (st === 'inactive') {
+      closeLeaves();
+      // آخر أسبوع مطلوب منها هو الأسبوع السابق للجاري، فلا يُحسب عليها التقرير الحالي
+      setCells_(S.USERS, u._row, { status: 'inactive', end_date: dateStr_(addDays_(parseDate_(currentWeek_(settings_())), -1)) });
+    } else {
+      closeLeaves();
+      setCells_(S.USERS, u._row, { status: 'active', end_date: '' });
+    }
+    log_(user.username, 'status_' + st, u.username + (st === 'leave' ? ' ' + req.leave_from + '→' + req.leave_to : ''));
+    delete ROWS_CACHE_[S.LEAVES]; delete ROWS_CACHE_[S.USERS];
+    const fresh = nurseState_(rows_(S.USERS).find(x => x.username === u.username), (leavesMap_()[u.username] || []), today);
+    return { username: u.username, state: fresh.state, leave: fresh.leave };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /* ════════════════════════════ QUALITY / STATS ════════════════════════════ */
@@ -531,6 +692,7 @@ function apiQualityStats_(req, user) {
   const issues = rows_(S.ISSUES).filter(i => inScope(i.branch));
   const clinics = clinics_().filter(c => c.status === 'active' && inScope(c.branch));
   const nurses = rows_(S.USERS).filter(u => u.role === 'nurse' && inScope(u.branch));
+  const lm = leavesMap_();
 
   // نسبة النجاح لكل بند فحص
   const pass = (key, okVal, skip) => {
@@ -551,8 +713,7 @@ function apiQualityStats_(req, user) {
   const trend = weeks.map(w => {
     const row = { week: w };
     branchKeys.forEach(b => {
-      const expected = nurses.filter(n => n.branch === b && n.status === 'active' &&
-        (!n.start_date || weekOf_(dateStr_(parseDate_(n.start_date)), cfg) <= w)).length;
+      const expected = nurses.filter(n => n.branch === b && expectedOn_(n, w, lm[n.username], cfg)).length;
       const submitted = unique_(reports.filter(r => r.branch === b && r.week_start === w).map(r => r.username)).length;
       row[b] = expected ? Math.min(100, Math.round(submitted / expected * 100)) : null;
       row[b + '_reports'] = reports.filter(r => r.branch === b && r.week_start === w).length;
@@ -602,16 +763,16 @@ function apiQualityStats_(req, user) {
     .sort((a, b) => Number(b.occurrences) - Number(a.occurrences)).slice(0, 25).map(issueOut_);
 
   // ترتيب الممرضات خلال الفترة
-  const nurseStats = nurses.filter(n => n.status === 'active').map(n => {
-    const eligible = weeks.filter(w => !n.start_date || weekOf_(dateStr_(parseDate_(n.start_date)), cfg) <= w);
+  const nurseStats = nurses.map(n => {
+    const eligible = weeks.filter(w => expectedOn_(n, w, lm[n.username], cfg));
     const mine = reports.filter(r => r.username === n.username);
-    const doneWeeks = unique_(mine.map(r => r.week_start));
+    const doneWeeks = unique_(mine.map(r => r.week_start)).filter(w => eligible.indexOf(w) >= 0);
     const onTimeWeeks = eligible.filter(w => ['on_time', 'early'].indexOf(bestTiming_(mine.filter(r => r.week_start === w))) >= 0);
     return { name: n.name, branch: n.branch, expected: eligible.length, submitted: doneWeeks.length,
              rate: eligible.length ? Math.min(100, Math.round(doneWeeks.length / eligible.length * 100)) : null,
              onTime: eligible.length ? Math.round(onTimeWeeks.length / eligible.length * 100) : null,
              reports: mine.length, issues: mine.reduce((s, r) => s + Number(r.issues_count || 0), 0) };
-  }).sort((a, b) => (b.rate || 0) - (a.rate || 0));
+  }).filter(n => n.expected > 0).sort((a, b) => (b.rate || 0) - (a.rate || 0));
 
   const expectedTotal = nurseStats.reduce((s, n) => s + n.expected, 0);
   const submittedTotal = nurseStats.reduce((s, n) => s + Math.min(n.submitted, n.expected), 0);
@@ -648,7 +809,7 @@ function apiReportsList_(req, user) {
 /* ════════════════════════════ ISSUES (SUPPLY / QUALITY / HR) ════════════════════════════ */
 
 function apiIssuesList_(req, user) {
-  const dept = req.department || (user.role === 'supply' ? 'supply' : user.role === 'hr' ? 'hr' : '');
+  const dept = (user.role === 'supply' || user.role === 'hr') ? user.role : req.department;   // الأقسام ترى مشاكلها فقط
   const statuses = req.status ? [].concat(req.status) : ['open', 'in_progress'];
   const list = rows_(S.ISSUES)
     .filter(i => branchAllowed_(user, i.branch))
@@ -704,12 +865,16 @@ function apiIssueUpdate_(req, user) {
 /* ════════════════════════════ USERS & CLINICS ════════════════════════════ */
 
 function apiUsersList_(req, user) {
+  const lm = leavesMap_(), today = dateStr_(new Date());
   const list = rows_(S.USERS)
     .filter(u => user.role === 'admin' || u.role === 'nurse')
     .filter(u => branchAllowed_(user, u.branch) || u.branch === 'ALL' && user.role === 'admin')
-    .map(u => ({ username: u.username, name: u.name, email: u.email, role: u.role, branch: u.branch,
-                 clinics: splitList_(u.clinics), status: u.status, start_date: dateStr_(parseDate_(u.start_date)) || '',
-                 last_login: u.last_login, must_change: u.must_change === 'yes' }));
+    .map(u => {
+      const st = nurseState_(u, lm[u.username], today);
+      return { username: u.username, name: u.name, email: u.email, role: u.role, branch: u.branch,
+               clinics: splitList_(u.clinics), status: u.status, state: u.role === 'nurse' ? st.state : u.status, leave: st.leave,
+               start_date: dateStr_(parseDate_(u.start_date)) || '', last_login: u.last_login, must_change: u.must_change === 'yes' };
+    });
   return { users: list, clinics: clinics_(), roles: ROLES, branches: BRANCHES };
 }
 
@@ -735,7 +900,6 @@ function apiUserSave_(req, user) {
       if (user.role !== 'admin' && existing.role !== 'nurse') throw err_('لا يمكن تعديل هذا الحساب', 'FORBIDDEN');
       setCells_(S.USERS, existing._row, {
         name: name, email: email, role: role, branch: branch, clinics: clinicsStr,
-        status: p.status === 'inactive' ? 'inactive' : 'active',
         start_date: p.start_date ? dateStr_(parseDate_(p.start_date)) : existing.start_date,
       });
       log_(user.username, 'user_update', existing.username);
@@ -775,7 +939,10 @@ function apiClinicSave_(req, user) {
   if (!name) throw err_('أدخل اسم العيادة');
   const list = rows_(S.CLINICS);
   const ex = list.find(c => c.clinic_id === p.clinic_id);
-  const row = { name: name, branch: p.branch, type: clean_(p.type, 30) || 'dental',
+  const num = String(p.number == null ? '' : p.number).trim();
+  if (!/^\d{1,3}$/.test(num)) throw err_('رقم العيادة أرقام فقط (حتى 3 خانات)');
+  if (list.some(c => c.branch === p.branch && Number(c.number) === Number(num) && c.clinic_id !== (ex && ex.clinic_id))) throw err_('رقم العيادة مستخدم في هذا الفرع');
+  const row = { number: String(Number(num)), name: name, branch: p.branch, type: clean_(p.type, 30) || 'dental',
                 has_fridge: p.has_fridge ? 'yes' : 'no', status: p.status === 'inactive' ? 'inactive' : 'active' };
   if (ex) setCells_(S.CLINICS, ex._row, row);
   else {
@@ -801,7 +968,7 @@ function setup() {
   if (missing.length) settings.getRange(settings.getLastRow() + 1, 1, missing.length, 3).setValues(missing);
 
   if (!rows_(S.CLINICS).length) {
-    sh_(S.CLINICS).getRange(2, 1, DEFAULT_CLINICS.length, 6).setValues(DEFAULT_CLINICS);
+    sh_(S.CLINICS).getRange(2, 1, DEFAULT_CLINICS.length, 7).setValues(DEFAULT_CLINICS);
   }
   const staff = [
     ['admin', 'مدير النظام', 'admin', 'ALL'],
@@ -901,7 +1068,8 @@ function importFormResponses() {
     const email = top(g.emails), name = top(g.names);
     if (!name || (g.total < 2 && !email)) return; // إدخال عابر
     const created = newUserRow_({ username: email || normText_(name), name: name, email: email, role: 'nurse',
-      branch: top(g.branch) || 'BURIDAH', start_date: '', status: g.last >= recentCut ? 'active' : 'inactive' });
+      branch: top(g.branch) || 'BURIDAH', start_date: '', status: g.last >= recentCut ? 'active' : 'inactive',
+      end_date: g.last >= recentCut ? '' : g.last });
     createdUsers.push(created);
     known[root] = created.row;
   });
@@ -936,7 +1104,7 @@ function importFormResponses() {
     if (!branch) branch = 'BURIDAH';
     const clinicId = legacyClinicId_(v[C.clinic], branch, /unaizah|onizah|عنيزة/i.test(String(v[C.clinic])));
     if (!clinicById[clinicId]) {
-      const c = { clinic_id: clinicId, name: String(v[C.clinic]).trim() || clinicId, branch: branch, type: 'other', has_fridge: 'no', status: 'inactive' };
+      const c = { clinic_id: clinicId, number: '', name: String(v[C.clinic]).trim() || clinicId, branch: branch, type: 'other', has_fridge: 'no', status: 'inactive' };
       clinicById[clinicId] = c; newClinics.push(c);
     }
     const cls = classifySubmission_(v[C.ts], cfg);
@@ -1138,7 +1306,7 @@ function settings_() {
 }
 
 function clinics_() {
-  return rows_(S.CLINICS).map(c => ({ clinic_id: c.clinic_id, name: c.name, branch: c.branch, type: c.type,
+  return rows_(S.CLINICS).map(c => ({ clinic_id: c.clinic_id, number: String(c.number === '' || c.number == null ? '' : c.number), name: c.name, branch: c.branch, type: c.type,
                                       has_fridge: c.has_fridge, status: c.status || 'active' }));
 }
 
@@ -1153,7 +1321,7 @@ function newUserRow_(o) {
     temp: temp,
     row: {
       username: o.username, name: o.name, email: o.email || '', role: o.role, branch: o.branch,
-      clinics: o.clinics || '', status: o.status || 'active', start_date: o.start_date != null ? o.start_date : dateStr_(new Date()),
+      clinics: o.clinics || '', status: o.status || 'active', end_date: o.end_date || '', start_date: o.start_date != null ? o.start_date : dateStr_(new Date()),
       pass_hash: hash_(temp, salt), salt: salt, must_change: 'yes', created_at: nowStr_(), last_login: '',
     },
   };

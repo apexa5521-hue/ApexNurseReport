@@ -67,6 +67,28 @@ a{color:var(--accent)}
 .icon-btn .ico{width:19px;height:19px}
 .logo .ico{width:20px;height:20px}
 .is-demo .btn[onclick*="print"]{display:none}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.num-field{max-width:240px}
+.num-field .input{height:56px;font-size:24px;font-weight:600;text-align:center;letter-spacing:.14em}
+.num-field .input::placeholder{font-size:15px;font-weight:400;letter-spacing:0}
+.input.shake{animation:shake .35s;border-color:var(--crit)}
+.num-warn{display:none;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;border-radius:10px;background:var(--crit-soft);font-size:12.5px}
+.num-warn.show{display:flex;animation:rise .25s var(--ease)}
+.num-warn::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--crit)}
+.clinic-msg{display:flex;align-items:center;gap:6px;min-height:22px;margin-top:10px;font-size:13.5px;font-weight:500}
+.clinic-msg.ok svg{color:var(--good)}
+.clinic-msg.bad::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--crit)}
+.prow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.prow:last-child{border-bottom:0}
+.pinfo{flex:1;min-width:0}.pinfo b{font-weight:500}.pinfo .muted{font-size:11.5px}
+.avatar.sm{width:28px;height:28px;font-size:11px}
+.plist{max-height:330px;overflow:auto}
+select.input.status-select{height:36px;min-width:150px;padding:0 10px;font-size:13px;font-weight:500}
+select.input.status-select.st-leave{background:var(--accent-soft);border-color:var(--accent-line)}
+select.input.status-select.st-inactive{background:var(--na-soft)}
+.leave-note{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:11.5px;color:var(--ink-2)}
+.linkbtn{font-size:11.5px;color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.heat i.leave{background:var(--accent-soft);border:1.5px solid var(--accent)}
 .demo-box{margin-top:18px;padding:14px;border:1px dashed var(--accent-line);background:var(--accent-soft);border-radius:var(--r)}
 .demo-box b{display:block;font-size:12.5px;font-weight:600;margin-bottom:10px}
 select.input.demo-switch{height:36px;width:170px;flex:none;padding:0 10px;font-size:12.5px;background:var(--accent-soft);border-color:var(--accent-line)}
@@ -363,6 +385,7 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
   <symbol id="i-dl" viewBox="0 0 20 20"><path d="M10 3.5v9M6 9l4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-print" viewBox="0 0 20 20"><path d="M6 8V3.5h8V8M6 14H4.5A1 1 0 013.5 13V9a1 1 0 011-1h11a1 1 0 011 1v4a1 1 0 01-1 1H14M6 11.5h8V16.5H6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
   <symbol id="i-copy" viewBox="0 0 20 20"><rect x="7" y="7" width="9" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13 7V5a1 1 0 00-1-1H5a1 1 0 00-1 1v7a1 1 0 001 1h2" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 20 20"><path d="M5.5 14.5h9l-1.2-1.8V9a3.3 3.3 0 00-6.6 0v3.7zM8.3 16.5a1.8 1.8 0 003.4 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-logo" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></symbol>
 </svg>
 
@@ -407,7 +430,8 @@ const T = {
     newPass: 'كلمة المرور الجديدة (6 أحرف على الأقل)', confirmPass: 'تأكيد كلمة المرور', save: 'حفظ', mismatch: 'كلمتا المرور غير متطابقتين',
     hello: 'مرحباً', weekOf: 'تقرير أسبوع', dueToday: 'موعد التسليم اليوم', onTimeNow: 'التسليم الآن يُحسب في الوقت',
     lateNow: 'التسليم الآن يُحسب متأخراً', veryLateNow: 'فات موعد التسليم — التقرير سيُسجّل متأخراً جداً', earlyNow: 'التسليم الآن يُحسب مبكراً لأسبوع',
-    submittedOf: 'عيادات تم رفعها', q1: 'العيادة', q1h: 'اختر العيادة التي تكتب تقريرها', submitted: 'تم الرفع',
+    submittedOf: 'عيادات تم رفعها', q1: 'رقم العيادة', q1h: 'اكتب رقم العيادة بالأرقام فقط', submitted: 'تم الرفع',
+    numOnly: 'هذا الحقل يقبل أرقاماً فقط (0–9)', noClinic: 'لا توجد عيادة بهذا الرقم ضمن عياداتك', alreadyDone: 'تم رفع تقرير هذه العيادة هذا الأسبوع', byWho: 'بواسطة', yourClinics: 'عياداتك', specialRooms: 'الغرف الخاصة', example: 'مثال',
     q2: 'هل تم فحص تواريخ انتهاء الأدوية والمواد داخل العيادة؟', q2h: 'سجّل أقرب تاريخ انتهاء بين المواد والأدوية',
     earliest: 'أقرب تاريخ انتهاء', earliestItem: 'اسم المادة أو الدواء', earliestItemPh: 'مثال: Adrenaline',
     q3: 'هل التعقيم سليم والأكياس جافة ومغلقة بشكل صحيح؟', q3h: '',
@@ -422,7 +446,7 @@ const T = {
     doneTitle: 'تم رفع التقرير', doneIssues: 'بنود أُرسلت للمتابعة مع الأقسام المختصة', doneNone: 'لا توجد ملاحظات تحتاج متابعة. شكراً لك.',
     another: 'رفع تقرير لعيادة أخرى', finish: 'تم', history: 'سجل التسليم — آخر 12 أسبوع', followUp: 'متابعة مشاكل عياداتك',
     noFollow: 'لا توجد مشاكل مفتوحة في عياداتك.', allDone: 'تم رفع تقارير كل عياداتك لهذا الأسبوع', allDoneSub: 'شكراً لك، نراك السبت القادم.',
-    st_on_time: 'في الوقت', st_early: 'مبكر', st_late: 'متأخر', st_very_late: 'متأخر جداً', st_missing: 'لم تُسلّم', st_na: '—',
+    st_on_time: 'في الوقت', st_early: 'مبكر', st_late: 'متأخر', st_very_late: 'متأخر جداً', st_missing: 'لم تُسلّم', st_leave: 'إجازة', st_na: '—',
     is_open: 'مفتوحة', is_in_progress: 'قيد المعالجة', is_resolved: 'تم الحل', is_archived: 'مؤرشفة',
     logout: 'خروج', theme: 'تبديل المظهر', required: 'أكمل الأسئلة المطلوبة', fillTools: 'أدخل اسم كل أداة ناقصة',
     netErr: 'تعذر الاتصال بالخادم. تحقق من الإنترنت وحاول مجدداً.',
@@ -434,7 +458,8 @@ const T = {
     newPass: 'New password (min. 6 characters)', confirmPass: 'Confirm password', save: 'Save', mismatch: 'Passwords do not match',
     hello: 'Hello', weekOf: 'Weekly report', dueToday: 'Due today', onTimeNow: 'Submitting now counts as on time',
     lateNow: 'Submitting now counts as late', veryLateNow: 'Deadline passed — this report will be marked very late', earlyNow: 'Submitting now counts as early for the week of',
-    submittedOf: 'clinics submitted', q1: 'Clinic', q1h: 'Choose the clinic you are reporting on', submitted: 'Submitted',
+    submittedOf: 'clinics submitted', q1: 'Clinic number', q1h: 'Type the clinic number (digits only)', submitted: 'Submitted',
+    numOnly: 'Only numbers are accepted (0–9)', noClinic: 'No clinic with this number in your list', alreadyDone: 'This clinic was already reported this week', byWho: 'by', yourClinics: 'Your clinics', specialRooms: 'Special rooms', example: 'e.g.',
     q2: 'Have expiry dates of drugs and materials in the clinic been checked?', q2h: 'Record the earliest expiry date you found',
     earliest: 'Earliest expiry date', earliestItem: 'Drug / material name', earliestItemPh: 'e.g. Adrenaline',
     q3: 'Is sterilization safe and are pouches dry and sealed correctly?', q3h: '',
@@ -449,7 +474,7 @@ const T = {
     doneTitle: 'Report submitted', doneIssues: 'items were sent to the responsible departments for follow-up', doneNone: 'Nothing needs follow-up. Thank you!',
     another: 'Report another clinic', finish: 'Done', history: 'Submission history — last 12 weeks', followUp: 'Follow-up on your clinics',
     noFollow: 'No open issues in your clinics.', allDone: 'All your clinics are reported for this week', allDoneSub: 'Thank you — see you next Saturday.',
-    st_on_time: 'On time', st_early: 'Early', st_late: 'Late', st_very_late: 'Very late', st_missing: 'Missed', st_na: '—',
+    st_on_time: 'On time', st_early: 'Early', st_late: 'Late', st_very_late: 'Very late', st_missing: 'Missed', st_leave: 'On leave', st_na: '—',
     is_open: 'Open', is_in_progress: 'In progress', is_resolved: 'Resolved', is_archived: 'Archived',
     logout: 'Sign out', theme: 'Toggle theme', required: 'Please answer the required questions', fillTools: 'Enter the name of each missing tool',
     netErr: 'Could not reach the server. Check your connection and try again.',
@@ -486,7 +511,7 @@ const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => 
 
 const TIMING = {
   on_time: ['good', 'check'], early: ['good', 'check'], late: ['warn', 'clock'],
-  very_late: ['serious', 'alert'], missing: ['crit', 'x'], na: ['', 'dash'],
+  very_late: ['serious', 'alert'], missing: ['crit', 'x'], leave: ['accent', 'clock'], na: ['', 'dash'],
 };
 const timingPill = s => { const m = TIMING[s] || TIMING.na; return `<span class="pill ${m[0]}">${icon(m[1])}${t('st_' + (s || 'na'))}</span>`; };
 const SEV = { high: ['crit', 'alert', 'عالية'], medium: ['warn', 'clock', 'متوسطة'], low: ['', 'dash', 'منخفضة'] };
@@ -503,13 +528,13 @@ function toast(msg, kind = 'ok') {
   setTimeout(() => el.remove(), 3600);
 }
 
-function modal({ title, body, foot = '', wide = false, onMount }) {
+function modal({ title, body, foot = '', wide = false, onMount, onClose }) {
   const scrim = document.createElement('div');
   scrim.className = 'scrim';
   scrim.innerHTML = `<div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
     <div class="modal-h"><h3>${esc(title)}</h3><button class="icon-btn" data-close aria-label="إغلاق">${icon('x')}</button></div>
     <div class="modal-b">${body}</div>${foot ? `<div class="modal-f">${foot}</div>` : ''}</div>`;
-  const close = () => { scrim.style.transition = 'opacity .18s'; scrim.style.opacity = '0'; setTimeout(() => scrim.remove(), 180); document.removeEventListener('keydown', onKey); };
+  const close = () => { scrim.style.transition = 'opacity .18s'; scrim.style.opacity = '0'; setTimeout(() => scrim.remove(), 180); document.removeEventListener('keydown', onKey); if (onClose) onClose(); };
   const onKey = e => { if (e.key === 'Escape') close(); };
   scrim.addEventListener('click', e => { if (e.target === scrim || e.target.closest('[data-close]')) close(); });
   document.addEventListener('keydown', onKey);
@@ -737,9 +762,9 @@ async function logout(expired) {
 const PAGES = {
   nurse:   { label: 'تقريري', roles: ['nurse'], render: renderNurse },
   hr:      { label: 'الموارد البشرية', roles: ['hr', 'admin'], render: renderHR },
-  quality: { label: 'الجودة والإحصائيات', roles: ['quality', 'admin', 'hr'], render: renderQuality },
+  quality: { label: 'الجودة والإحصائيات', roles: ['quality', 'admin'], render: renderQuality },
   supply:  { label: u => u.role === 'supply' ? 'طلبات التموين' : 'متابعة المشاكل', roles: ['supply', 'quality', 'admin'], render: renderIssues },
-  reports: { label: 'التقارير', roles: ['quality', 'admin', 'hr'], render: renderReports },
+  reports: { label: 'التقارير', roles: ['quality', 'admin'], render: renderReports },
   users:   { label: 'المستخدمون', roles: ['hr', 'admin'], render: renderUsers },
 };
 const HOME = { nurse: 'nurse', hr: 'hr', quality: 'quality', supply: 'supply', admin: 'quality' };
@@ -919,7 +944,8 @@ async function renderNurse(view) {
 
   const pending = ctx.clinics.filter(c => !c.submitted);
   const done = ctx.clinics.length - pending.length;
-  const f = { clinic_id: pending.length === 1 ? pending[0].clinic_id : '', tools: [] };
+  const f = { clinic_id: '', tools: [] };
+  const onlyPending = pending.length === 1 && pending[0].number ? pending[0] : null;
 
   const nowText = {
     on_time: t('onTimeNow'), late: t('lateNow'), very_late: t('veryLateNow'),
@@ -951,8 +977,19 @@ async function renderNurse(view) {
     <form id="nform" novalidate style="display:grid;gap:12px;margin-top:16px">
       <section class="card step rise" style="--i:1" data-step="clinic"><span class="no">1</span><div>
         <h3>${t('q1')}</h3><p class="hint">${t('q1h')}</p>
-        <div class="clinics">${ctx.clinics.map(c => `<button type="button" data-clinic="${esc(c.clinic_id)}" ${c.submitted ? `disabled title="${t('submitted')}: ${esc(c.submittedBy)}"` : ''} aria-pressed="${f.clinic_id === c.clinic_id}">
-          <span>${esc(clinicLabel(c))}</span>${c.submitted ? icon('check') : ''}</button>`).join('')}</div>
+        <div class="num-field">
+          <input class="input num" id="f-clinic" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" dir="ltr"
+            placeholder="${t('example')}: ${esc((pending.find(c => c.number) || {}).number || '7')}" value="${esc(onlyPending ? onlyPending.number : '')}"
+            aria-label="${t('q1')}" aria-describedby="clinic-warn clinic-msg">
+          <div id="clinic-warn" class="num-warn" role="alert"></div>
+          <div id="clinic-msg" class="clinic-msg" aria-live="polite"></div>
+        </div>
+        ${(() => {
+          const numbered = ctx.clinics.filter(c => c.number);
+          if (ctx.user.clinics.length) return `<p class="hint" style="margin:12px 0 0">${t('yourClinics')}: ${numbered.map(c => `<b class="num">${esc(c.number)}</b>${c.submitted ? ' ✓' : ''}`).join(' · ')}</p>`;
+          const rooms = numbered.filter(c => c.type && c.type !== 'dental');
+          return rooms.length ? `<p class="hint" style="margin:12px 0 0">${t('specialRooms')}: ${rooms.map(c => `<b class="num">${esc(c.number)}</b> ${esc(clinicLabel(c))}`).join(' · ')}</p>` : '';
+        })()}
       </div></section>
 
       <section class="card step rise" style="--i:2" data-step="expiry"><span class="no">2</span><div>
@@ -1033,11 +1070,39 @@ async function renderNurse(view) {
   const form = $('#nform');
   const set = (k, v) => { f[k] = v; update(); };
 
-  $$('.clinics button', form).forEach(b => b.onclick = () => {
-    $$('.clinics button', form).forEach(x => x.setAttribute('aria-pressed', x === b));
-    set('clinic_id', b.dataset.clinic);
-    const c = ctx.clinics.find(x => x.clinic_id === b.dataset.clinic);
-    if (c && !c.has_fridge && !f.fridge) { const nb = $('[data-name="fridge"] [data-v="none"]', form); nb && nb.click(); }
+  // رقم العيادة: أرقام فقط. الحروف تُرفض مع تنبيه، والأرقام العربية الهندية تُحوَّل تلقائياً
+  const inp = $('#f-clinic');
+  const byNum = {};
+  ctx.clinics.forEach(c => { if (c.number !== '') byNum[String(Number(c.number))] = c; });
+  const toLatin = v => String(v).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+  let warnTimer;
+  const warnNumbersOnly = () => {
+    const w = $('#clinic-warn');
+    w.textContent = t('numOnly'); w.classList.add('show');
+    inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+    clearTimeout(warnTimer);
+    warnTimer = setTimeout(() => { w.classList.remove('show'); inp.classList.remove('shake'); }, 2800);
+  };
+  const resolveClinic = () => {
+    const msg = $('#clinic-msg'), v = inp.value;
+    f.clinic_id = ''; msg.className = 'clinic-msg'; msg.textContent = '';
+    if (v) {
+      const c = byNum[String(Number(v))];
+      if (!c) { msg.textContent = t('noClinic'); msg.classList.add('bad'); }
+      else if (c.submitted) { msg.textContent = `${t('alreadyDone')} (${t('byWho')} ${c.submittedBy})`; msg.classList.add('bad'); }
+      else {
+        f.clinic_id = c.clinic_id; msg.classList.add('ok'); msg.innerHTML = icon('check') + esc(clinicLabel(c));
+        if (!c.has_fridge && !f.fridge) { const nb = $('[data-name="fridge"] [data-v="none"]', form); nb && nb.click(); }
+      }
+    }
+    update();
+  };
+  inp.addEventListener('beforeinput', e => { if (e.data && /^[^0-9٠-٩۰-۹]+$/.test(e.data)) { e.preventDefault(); warnNumbersOnly(); } });   // أحرف فقط: تُمنع. نص مختلط: تبقى أرقامه ويُنبَّه
+  inp.addEventListener('input', () => {
+    const latin = toLatin(inp.value), digits = latin.replace(/\D/g, '');
+    if (digits !== latin) warnNumbersOnly();          // لصق أو لوحة مفاتيح لا تدعم beforeinput
+    if (inp.value !== digits.slice(0, 3)) inp.value = digits.slice(0, 3);
+    resolveClinic();
   });
   $$('.seg, .rating', form).forEach(g => $$('button', g).forEach(b => b.onclick = () => {
     $$('button', g).forEach(x => x.setAttribute('aria-pressed', x === b));
@@ -1083,6 +1148,7 @@ async function renderNurse(view) {
     $('#prog-b').style.width = (n / total * 100) + '%';
   }
   update();
+  resolveClinic();
 
   form.onsubmit = async e => {
     e.preventDefault();
@@ -1098,7 +1164,7 @@ async function renderNurse(view) {
     const btn = $('#nsubmit');
     busy(btn, true, t('sending'));
     const report = {
-      clinic_id: f.clinic_id, expiry_checked: f.expiry_checked, earliest_expiry: f.expiry_checked === 'yes' ? $('#f-exp').value : '',
+      clinic_id: f.clinic_id, clinic_number: inp.value, expiry_checked: f.expiry_checked, earliest_expiry: f.expiry_checked === 'yes' ? $('#f-exp').value : '',
       expiry_item: $('#f-expi').value, sterilization_ok: f.sterilization_ok, fridge: f.fridge,
       fridge_temp: f.fridge === 'ok' ? $('#f-temp').value : '', employee_card: f.employee_card, cleanliness: f.cleanliness,
       missing_tools: f.missing_tools, tools: f.missing_tools === 'yes' ? f.tools : [],
@@ -1133,17 +1199,24 @@ function showNurseDone(view, d, more) {
 /* ══════════════════════════════════════════════════════════
    HR — الموارد البشرية
    ══════════════════════════════════════════════════════════ */
-const hrState = { week: '', weeks: 12, branch: 'ALL', filter: 'all', q: '' };
+const hrState = { week: '', q: '', branch: 'ALL', filter: 'all' };
+const STATE_LABEL = { active: 'على رأس العمل', leave: 'إجازة', inactive: 'متوقفة عن العمل' };
+const fmtDay = s => fmtDate(s, { day: 'numeric', month: 'short' });
 
 async function renderHR(view) {
-  skeleton(view);
+  skeleton(view, [120, 300, 460]);
   let d;
-  try { d = await api('hr.overview', { week: hrState.week, weeks: hrState.weeks }); }
+  try { d = await api('hr.overview', { week: hrState.week, weeks: 12 }); }
   catch (e) { return errorBlock(view, e, () => renderHR(view)); }
-  if (!view.isConnected) return; // تم الانتقال لصفحة أخرى أثناء التحميل
+  if (!view.isConnected) return;
   hrState.week = d.week;
   const s = d.summary;
-  const isCurrent = !hrState.week || d.week >= addDays(ymd(new Date()), -6);
+  const today = ymd(new Date());
+  const missing = d.roster.filter(r => r.thisWeek === 'missing' && r.state === 'active');
+  const submitted = d.roster.filter(r => ['on_time', 'early', 'late', 'very_late'].includes(r.thisWeek));
+
+  const person = (r, tail) => `<div class="prow"><span class="avatar sm">${esc(initials(r.name))}</span>
+    <div class="pinfo"><b>${esc(r.name)}</b><div class="muted">${br(r.branch)}${r.missedStreak > 1 && r.thisWeek === 'missing' ? ` · ${r.missedStreak} أسابيع متتالية` : ''}</div></div>${tail}</div>`;
 
   view.innerHTML = `
   <div class="page-head rise">
@@ -1153,51 +1226,45 @@ async function renderHR(view) {
       <button class="icon-btn" id="wk-prev" aria-label="الأسبوع السابق">${icon('chev')}</button>
       <input class="input" type="date" id="wk" value="${d.week}" aria-label="الأسبوع">
       <button class="icon-btn" id="wk-next" aria-label="الأسبوع التالي" style="transform:scaleX(-1)">${icon('chev')}</button>
-      <select class="input" id="wk-n" aria-label="الفترة">${[4, 8, 12, 26].map(n => `<option value="${n}" ${hrState.weeks === n ? 'selected' : ''}>آخر ${n} أسبوع</option>`).join('')}</select>
-      <button class="btn sm" onclick="window.print()">${icon('print')}طباعة</button>
     </div>
   </div>
 
   <div class="grid g-kpi">
-    <div class="card kpi hero rise" style="--i:1"><div class="k-label">نسبة الالتزام هذا الأسبوع</div>
-      <div class="k-val num"><span data-count="${s.rate}">0</span><small>%</small></div>
-      <div class="meter"><i style="width:${s.rate}%"></i></div>
-      <div class="k-sub">${s.expected - s.missing} من ${s.expected} ممرضة سلّمن</div></div>
-    <div class="card kpi rise" style="--i:2"><div class="k-label">${timingPill('on_time')}</div><div class="k-val num" data-count="${s.onTime}">0</div><div class="k-sub">سلّمن يوم السبت</div></div>
-    <div class="card kpi rise" style="--i:3"><div class="k-label">${timingPill('late')}</div><div class="k-val num" data-count="${s.late}">0</div><div class="k-sub">بعد موعد السبت</div></div>
-    <div class="card kpi rise" style="--i:4"><div class="k-label">${timingPill('missing')}</div><div class="k-val num" data-count="${s.missing}">0</div><div class="k-sub">${isCurrent ? 'حتى الآن' : 'لم يسلّمن'}</div></div>
+    ${kpiCard('نسبة الالتزام', s.rate, '%', `${s.committed} من ${s.expected} ممرضة سلّمن`, true, 1)}
+    ${kpiCard('ملتزمات', s.committed, '', `${s.onTime} في الوقت · ${s.late} متأخرة`, false, 2)}
+    ${kpiCard('غير ملتزمات', s.missing, '', d.isCurrent ? 'لم يسلّمن حتى الآن' : 'لم يسلّمن هذا الأسبوع', false, 3)}
+    ${kpiCard('في إجازة', s.onLeave, '', `${s.stopped} متوقفة عن العمل`, false, 4)}
   </div>
 
-  <div class="grid g-2" style="margin-top:16px">
-    <section class="card rise" style="--i:5"><div class="card-h"><h3>الالتزام الأسبوعي</h3><div class="spacer"></div>
-      ${legendHTML([{ label: 'سلّمن', color: cssVar('--s1') }, { label: 'في الوقت', color: cssVar('--s2') }])}</div>
-      <div class="card-b"><div class="chart-box"><canvas id="hr-trend" role="img" aria-label="نسبة الالتزام الأسبوعية"></canvas></div></div></section>
-    <section class="card rise" style="--i:6"><div class="card-h"><h3>لم يسلّمن هذا الأسبوع</h3><span class="sub num">${s.missing}</span><div class="spacer"></div>
-      ${s.missing ? `<button class="btn sm" id="copy-remind">${icon('copy')}نسخ رسالة تذكير</button>` : ''}</div>
-      <div class="card-b" style="padding-top:8px">${d.roster.filter(r => r.thisWeek === 'missing').length ? `<div style="display:grid;gap:2px;max-height:250px;overflow:auto">${d.roster.filter(r => r.thisWeek === 'missing').map(r => `
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
-          <span class="avatar" style="width:28px;height:28px;font-size:11px">${esc(initials(r.name))}</span>
-          <div style="flex:1;min-width:0"><b style="font-weight:500">${esc(r.name)}</b><div class="muted" style="font-size:11.5px">${br(r.branch)}${r.missedStreak > 1 ? ` · <span style="color:var(--ink)">${r.missedStreak} أسابيع متتالية</span>` : ''}</div></div>
-          ${r.missedStreak >= 3 ? `<span class="repeat">${icon('alert')}متكرر</span>` : ''}
-        </div>`).join('')}</div>` : `<div class="empty"><b>الجميع سلّمن</b>لا توجد ممرضة متأخرة هذا الأسبوع</div>`}</div></section>
+  <div class="grid g-2e" style="margin-top:16px">
+    <section class="card rise" style="--i:5"><div class="card-h" style="flex-wrap:wrap"><h3>غير الملتزمات</h3><span class="sub num">${missing.length}</span><div class="spacer"></div>
+      ${d.isCurrent ? (d.remindable ? `<button class="btn primary sm" id="remind-btn">${icon('bell')}إرسال تذكير (${d.remindable})</button>` : '') : '<span class="sub">التذكير متاح للأسبوع الحالي فقط</span>'}</div>
+      <div class="card-b" style="padding-top:6px">${missing.length ? `<div class="plist">${missing.map(r => person(r,
+        `${String(r.lastReminder).slice(0, 10) === today ? '<span class="tag">تم تذكيرها اليوم</span>' : ''}${r.missedStreak >= 3 ? `<span class="repeat">${icon('alert')}متكرر</span>` : ''}${!r.email && String(r.username).indexOf('@') < 0 ? '<span class="tag" title="لا يوجد بريد لإرسال التذكير">بدون بريد</span>' : ''}`)).join('')}</div>`
+        : '<div class="empty"><b>الجميع ملتزم</b>لا توجد ممرضة متأخرة هذا الأسبوع</div>'}</div></section>
+    <section class="card rise" style="--i:6"><div class="card-h"><h3>الملتزمات</h3><span class="sub num">${submitted.length}</span></div>
+      <div class="card-b" style="padding-top:6px">${submitted.length ? `<div class="plist">${submitted.map(r => person(r,
+        `${timingPill(r.thisWeek)}<span class="muted num" style="font-size:11.5px;min-width:72px;text-align:end">${esc(r.lastSubmission ? fmtDay(r.lastSubmission) : '')}</span>`)).join('')}</div>`
+        : '<div class="empty"><b>لا أحد بعد</b>لم يصل أي تقرير لهذا الأسبوع</div>'}</div></section>
   </div>
 
   <section class="card rise" style="--i:7;margin-top:16px">
-    <div class="card-h" style="flex-wrap:wrap"><h3>سجل الممرضات</h3><span class="sub">آخر ${d.weeks.length} أسبوع</span><div class="spacer"></div>
+    <div class="card-h" style="flex-wrap:wrap"><h3>حالة الممرضات</h3><span class="sub">حدّث حالة أي ممرضة من القائمة بجانب اسمها</span><div class="spacer"></div>
       <div class="toolbar">
-        <input class="input" id="r-q" placeholder="بحث بالاسم" value="${esc(hrState.q)}" style="min-width:160px">
+        <input class="input" id="r-q" placeholder="بحث بالاسم" value="${esc(hrState.q)}" style="min-width:150px">
         <select class="input" id="r-br"><option value="ALL">كل الفروع</option><option value="BURIDAH">بريدة</option><option value="ONIZAH">عنيزة</option></select>
-        <select class="input" id="r-f"><option value="all">كل الحالات</option><option value="missing">لم تُسلّم</option><option value="late">متأخرة</option><option value="on_time">في الوقت</option><option value="inactive">غير نشطة</option></select>
+        <select class="input" id="r-f"><option value="all">العاملات والإجازات</option><option value="missing">غير الملتزمات</option><option value="leave">في إجازة</option><option value="inactive">المتوقفات عن العمل</option></select>
         <button class="btn sm" id="r-csv">${icon('dl')}CSV</button>
       </div></div>
     <div id="roster"></div>
     <div class="card-b legend" style="padding-top:10px">
       <span><span class="heat"><i class="on_time"></i></span>في الوقت</span><span><span class="heat"><i class="late"></i></span>متأخر</span>
-      <span><span class="heat"><i class="very_late"></i></span>متأخر جداً</span><span><span class="heat"><i class="missing"></i></span>لم تُسلّم</span><span><span class="heat"><i class="na"></i></span>غير مطلوب</span>
+      <span><span class="heat"><i class="very_late"></i></span>متأخر جداً</span><span><span class="heat"><i class="missing"></i></span>لم تُسلّم</span>
+      <span><span class="heat"><i class="leave"></i></span>إجازة</span><span><span class="heat"><i class="na"></i></span>غير مطلوب</span>
     </div>
   </section>
 
-  <section class="card rise" style="--i:8;margin-top:16px"><div class="card-h"><h3>بطاقات الموظفين غير الموجودة</h3><span class="sub">مشاكل مفتوحة من اختصاص الموارد البشرية</span></div>
+  <section class="card rise" style="--i:8;margin-top:16px"><div class="card-h"><h3>بطاقات الموظفين غير الموجودة</h3><span class="sub">من اختصاص الموارد البشرية</span></div>
     <div id="cards"></div></section>`;
 
   countUp(view);
@@ -1206,35 +1273,73 @@ async function renderHR(view) {
   $('#wk').onchange = e => e.target.value && go(e.target.value);
   $('#wk-prev').onclick = () => go(addDays(d.week, -7));
   $('#wk-next').onclick = () => go(addDays(d.week, 7));
-  $('#wk-n').onchange = e => { hrState.weeks = +e.target.value; renderHR(view); };
 
-  const missing = d.roster.filter(r => r.thisWeek === 'missing');
-  $('#copy-remind') && ($('#copy-remind').onclick = () => copyText(
-    `Reminder — ApexCare weekly clinic report (week of ${fmtShort(d.week)}).\nPlease submit your report today:\n` +
-    missing.map(r => '• ' + r.name).join('\n') + `\n\nتذكير: نرجو رفع التقرير الأسبوعي للعيادة اليوم.`));
+  /* ───── إرسال تذكير السبت ───── */
+  const remind = $('#remind-btn');
+  if (remind) remind.onclick = () => {
+    const targets = missing.filter(r => r.email || String(r.username).indexOf('@') > 0);
+    const already = targets.filter(r => String(r.lastReminder).slice(0, 10) === today).length;
+    modal({
+      title: 'إرسال تذكير بالبريد',
+      body: `<p>سيصل تذكير بالتقرير الأسبوعي (بالعربي والإنجليزي) إلى <b class="num">${targets.length}</b> ممرضة لم تسلّم تقرير أسبوع السبت ${fmtDate(d.week, { day: 'numeric', month: 'long' })}:</p>
+        <div class="plist" style="margin:12px 0;max-height:200px">${targets.map(r => `<div class="prow"><span class="avatar sm">${esc(initials(r.name))}</span><div class="pinfo"><b>${esc(r.name)}</b><div class="muted" dir="ltr" style="text-align:start">${esc(r.email || r.username)}</div></div></div>`).join('')}</div>
+        ${already ? `<div class="notice">تم تذكير ${already} منهن اليوم. سيصلهن تذكير آخر.</div>` : ''}<div id="rm-err"></div>`,
+      foot: `<button class="btn" data-close>إلغاء</button><button class="btn primary" id="rm-send">${icon('bell')}إرسال الآن</button>`,
+      onMount(el, close) {
+        $('#rm-send', el).onclick = async () => {
+          const b = $('#rm-send', el); busy(b, true, 'جارٍ الإرسال…');
+          try {
+            const r = await api('hr.remind');
+            close();
+            toast(`تم إرسال ${r.sent.length} تذكير${window.APEX_DEMO ? ' (عرض تجريبي: لا يُرسل بريد فعلي)' : ''}`);
+            if (r.noEmail.length || r.failed.length) setTimeout(() => toast(`لم يُرسل إلى: ${r.noEmail.concat(r.failed).join('، ')}`, 'err'), 600);
+            renderHR(view);
+          } catch (e) { busy(b, false); $('#rm-err', el).innerHTML = `<div class="form-error">${esc(e.message)}</div>`; }
+        };
+      },
+    });
+  };
 
+  /* ───── جدول الحالة ───── */
+  const statusCell = r => `<select class="input status-select st-${r.state}" data-status="${esc(r.username)}" aria-label="حالة ${esc(r.name)}">
+      ${['active', 'leave', 'inactive'].map(k => `<option value="${k}" ${r.state === k ? 'selected' : ''}>${STATE_LABEL[k]}</option>`).join('')}</select>
+      ${r.leave ? `<div class="leave-note"><span class="num">${esc(fmtDay(r.leave.from))} → ${esc(fmtDay(r.leave.to))}</span><button class="linkbtn" data-leave-edit="${esc(r.username)}">تعديل / تمديد</button></div>` : ''}`;
   const cols = [
-    { label: 'الممرضة', html: r => `<div style="display:flex;align-items:center;gap:10px"><span class="avatar" style="width:28px;height:28px;font-size:11px">${esc(initials(r.name))}</span><div><b style="font-weight:600">${esc(r.name)}</b>${r.status !== 'active' ? ' <span class="tag">غير نشطة</span>' : ''}<div class="muted" style="font-size:11.5px" dir="ltr">${esc(r.email || '')}</div></div></div>`, csv: r => r.name },
+    { label: 'الممرضة', html: r => `<div style="display:flex;align-items:center;gap:10px"><span class="avatar sm">${esc(initials(r.name))}</span><div><b style="font-weight:600">${esc(r.name)}</b><div class="muted" style="font-size:11.5px" dir="ltr">${esc(r.email || '')}</div></div></div>`, csv: r => r.name },
     { label: 'الفرع', get: r => br(r.branch) },
-    { label: 'هذا الأسبوع', html: r => timingPill(r.thisWeek), csv: r => t('st_' + r.thisWeek) },
-    { label: 'آخر الأسابيع', html: r => `<div class="heat">${r.cells.map((c, i) => `<i class="${c}" title="${fmtShort(d.weeks[i])} — ${t('st_' + c)}"></i>`).join('')}</div>`, csv: r => r.cells.map(c => t('st_' + c)).join(' | ') },
+    { label: 'هذا الأسبوع', html: r => r.state === 'inactive' ? '<span class="muted">—</span>' : timingPill(r.thisWeek), csv: r => r.state === 'inactive' ? '' : t('st_' + r.thisWeek) },
+    { label: 'آخر 12 أسبوع', html: r => `<div class="heat">${r.cells.map((c, i) => `<i class="${c}" title="${fmtShort(d.weeks[i])} — ${t('st_' + c)}"></i>`).join('')}</div>`, csv: r => r.cells.map(c => t('st_' + c)).join(' | ') },
     { label: 'الالتزام', html: r => `<span class="num strong">${pct(r.compliance)}</span>`, csv: r => pct(r.compliance) },
-    { label: 'في الوقت', html: r => `<span class="num">${pct(r.onTimeRate)}</span>`, csv: r => pct(r.onTimeRate) },
-    { label: 'آخر تسليم', get: r => r.lastSubmission ? fmtDT(r.lastSubmission) : '—' },
+    { label: 'الحالة', html: statusCell, csv: r => STATE_LABEL[r.state] + (r.leave ? ` (${r.leave.from} → ${r.leave.to})` : '') },
   ];
   const filtered = () => d.roster.filter(r =>
     (hrState.branch === 'ALL' || r.branch === hrState.branch) &&
-    (hrState.filter === 'all' ? r.status === 'active' || r.thisWeek !== 'na'
-      : hrState.filter === 'inactive' ? r.status !== 'active'
-      : hrState.filter === 'late' ? ['late', 'very_late'].includes(r.thisWeek)
-      : hrState.filter === 'on_time' ? ['on_time', 'early'].includes(r.thisWeek) : r.thisWeek === hrState.filter) &&
-    (!hrState.q || (r.name + ' ' + r.email).toLowerCase().includes(hrState.q.toLowerCase())));
-  const draw = () => { $('#roster').innerHTML = tableHTML(cols, filtered(), { empty: 'لا توجد نتائج' }); };
+    (hrState.filter === 'all' ? r.state !== 'inactive'
+      : hrState.filter === 'missing' ? (r.thisWeek === 'missing' && r.state === 'active')
+      : hrState.filter === 'leave' ? r.state === 'leave' : r.state === 'inactive') &&
+    (!hrState.q || (r.name + ' ' + (r.email || '')).toLowerCase().includes(hrState.q.toLowerCase())));
+
+  const draw = () => {
+    $('#roster').innerHTML = tableHTML(cols, filtered(), { empty: 'لا توجد نتائج' });
+    $$('#roster [data-status]').forEach(sel => sel.onchange = async () => {
+      const r = d.roster.find(x => x.username === sel.dataset.status), v = sel.value;
+      const revert = () => { sel.value = r.state; };
+      if (v === 'leave') return leaveDialog(r, () => renderHR(view), revert);
+      if (v === 'inactive' && !(await confirmDialog(`تحويل ${r.name} إلى «متوقفة عن العمل»؟ لن يُطلب منها التقرير من الأسبوع الجاري، وتبقى تقاريرها السابقة محفوظة.`))) return revert();
+      sel.disabled = true;
+      try {
+        await api('users.setStatus', { username: r.username, status: v });
+        toast(`${r.name}: ${STATE_LABEL[v]}`);
+        renderHR(view);
+      } catch (e) { sel.disabled = false; revert(); toast(e.message, 'err'); }
+    });
+    $$('#roster [data-leave-edit]').forEach(b => b.onclick = () => leaveDialog(d.roster.find(x => x.username === b.dataset.leaveEdit), () => renderHR(view)));
+  };
   draw();
   $('#r-q').oninput = e => { hrState.q = e.target.value; draw(); };
   $('#r-br').onchange = e => { hrState.branch = e.target.value; draw(); };
   $('#r-f').onchange = e => { hrState.filter = e.target.value; draw(); };
-  $('#r-csv').onclick = () => exportTable('التزام-الممرضات-' + d.week, cols, filtered());
+  $('#r-csv').onclick = () => exportTable('حالة-الممرضات-' + d.week, cols, filtered());
 
   $('#cards').innerHTML = tableHTML([
     { label: 'العيادة', get: r => r.clinic_name + ' — ' + br(r.branch) },
@@ -1245,11 +1350,33 @@ async function renderHR(view) {
     { label: '', html: r => `<button class="btn sm" data-issue="${esc(r.issue_id)}">تحديث</button>` },
   ], d.cardIssues, { empty: 'كل البطاقات موجودة' });
   $$('#cards [data-issue]').forEach(b => b.onclick = () => issueDialog(d.cardIssues.find(i => i.issue_id === b.dataset.issue), () => renderHR(view)));
+}
 
-  lineChart($('#hr-trend'), d.weekly.map(w => fmtShort(w.week)), [
-    { label: 'سلّمن', data: d.weekly.map(w => w.rate), color: cssVar('--s1'), fill: true },
-    { label: 'في الوقت', data: d.weekly.map(w => w.expected ? Math.round(w.onTime / w.expected * 100) : null), color: cssVar('--s2') },
-  ]);
+/** تحديد فترة الإجازة أو تعديلها / تمديدها */
+function leaveDialog(r, done, onCancel) {
+  const cur = r.leave, from0 = cur ? cur.from : ymd(new Date());
+  let saved = false;
+  modal({
+    title: (cur ? 'تعديل إجازة ' : 'إجازة ') + r.name,
+    body: `<div class="grid g-2e" style="gap:0 14px">
+        <div class="field"><label for="lv-f">من</label><input class="input" id="lv-f" type="date" value="${from0}"></div>
+        <div class="field"><label for="lv-t">إلى</label><input class="input" id="lv-t" type="date" value="${cur ? cur.to : addDays(from0, 6)}"></div></div>
+      <p class="muted" style="font-size:12.5px">لا يُحسب عليها التقرير الأسبوعي خلال هذه الفترة. إذا طالت الإجازة عدّل تاريخ النهاية من نفس الصف.</p><div id="lv-err"></div>`,
+    foot: `<button class="btn" data-close>إلغاء</button><button class="btn primary" id="lv-save">${icon('check')}حفظ الإجازة</button>`,
+    onClose: () => { if (!saved && onCancel) onCancel(); },
+    onMount(el, close) {
+      $('#lv-save', el).onclick = async () => {
+        const b = $('#lv-save', el), from = $('#lv-f', el).value, to = $('#lv-t', el).value;
+        if (!from || !to) { $('#lv-err', el).innerHTML = '<div class="form-error">حدد تاريخ البداية والنهاية</div>'; return; }
+        if (to < from) { $('#lv-err', el).innerHTML = '<div class="form-error">تاريخ النهاية قبل تاريخ البداية</div>'; return; }
+        busy(b, true);
+        try {
+          await api('users.setStatus', { username: r.username, status: 'leave', leave_from: from, leave_to: to });
+          saved = true; close(); toast(`إجازة ${r.name}: ${fmtDay(from)} → ${fmtDay(to)}`); done && done();
+        } catch (e) { busy(b, false); $('#lv-err', el).innerHTML = `<div class="form-error">${esc(e.message)}</div>`; }
+      };
+    },
+  });
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -1599,7 +1726,9 @@ async function renderUsers(view) {
     { label: 'الدور', get: u => d.roles[u.role] || u.role },
     { label: 'الفرع', get: u => br(u.branch) },
     { label: 'العيادات', get: u => u.clinics.length ? u.clinics.length + ' عيادة' : (u.role === 'nurse' ? 'كل عيادات الفرع' : '—') },
-    { label: 'الحالة', html: u => u.status === 'active' ? `<span class="pill good">${icon('check')}نشط</span>` : `<span class="pill">${icon('dash')}غير نشط</span>` },
+    { label: 'الحالة', html: u => u.role !== 'nurse' ? (u.status === 'active' ? `<span class="pill good">${icon('check')}نشط</span>` : `<span class="pill">${icon('dash')}غير نشط</span>`)
+        : u.state === 'leave' ? `<span class="pill accent">${icon('clock')}إجازة</span><div class="muted num" style="font-size:11px;margin-top:3px">${esc(fmtDay(u.leave.from))} → ${esc(fmtDay(u.leave.to))}</div>`
+        : u.state === 'inactive' ? `<span class="pill">${icon('dash')}متوقفة عن العمل</span>` : `<span class="pill good">${icon('check')}على رأس العمل</span>` },
     { label: 'آخر دخول', html: u => u.must_change ? '<span class="tag">لم يسجّل بعد</span>' : esc(u.last_login ? fmtDT(u.last_login) : '—') },
     { label: '', html: u => `<div style="display:flex;gap:6px"><button class="btn sm" data-edit="${esc(u.username)}">تعديل</button><button class="btn sm ghost" data-reset="${esc(u.username)}">كلمة مرور مؤقتة</button></div>` },
   ];
@@ -1638,7 +1767,6 @@ function userDialog(d, u, done) {
       ${admin && isNew ? `<div class="field"><label for="uf-u">اسم المستخدم (اختياري، للأقسام)</label><input class="input" id="uf-u" dir="ltr" placeholder="يُستخدم البريد إذا تُرك فارغاً"></div>` : ''}
       <div class="field"><label for="uf-b">الفرع</label><select class="input" id="uf-b">${branchOpts.map(b => `<option value="${b}" ${u.branch === b ? 'selected' : ''}>${br(b)}</option>`).join('')}</select></div>
       <div class="field"><label for="uf-sd">تاريخ بداية المسؤولية</label><input class="input" id="uf-sd" type="date" value="${esc(u.start_date || ymd(new Date()))}"></div>
-      ${!isNew ? `<div class="field"><label for="uf-s">الحالة</label><select class="input" id="uf-s"><option value="active">نشط</option><option value="inactive" ${u.status === 'inactive' ? 'selected' : ''}>غير نشط (انتهاء خدمة / إجازة طويلة)</option></select></div>` : ''}
     </div>
     <div class="field" id="uf-cl-wrap"><label>العيادات المسؤولة عنها <span class="muted">(اتركها فارغة لتظهر كل عيادات الفرع)</span></label><div class="chips" id="uf-cl"></div></div>
     <div id="uf-err"></div>`,
@@ -1660,7 +1788,7 @@ function userDialog(d, u, done) {
         const payload = {
           username: isNew ? '' : u.username, name: $('#uf-n', el).value, email: $('#uf-e', el).value,
           role: $('#uf-r', el) ? $('#uf-r', el).value : 'nurse', branch: $('#uf-b', el).value,
-          start_date: $('#uf-sd', el).value, status: $('#uf-s', el) ? $('#uf-s', el).value : 'active',
+          start_date: $('#uf-sd', el).value,
           clinics: $$('#uf-cl input:checked', el).map(x => x.value), newUsername: $('#uf-u', el) ? $('#uf-u', el).value : '',
         };
         try {

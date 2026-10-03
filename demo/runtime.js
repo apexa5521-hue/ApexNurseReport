@@ -72,6 +72,8 @@ function createGasServices() {
     SpreadsheetApp: { getActiveSpreadsheet: () => ss, getActive: () => ss, openById() { throw new Error('not available in demo'); } },
     PropertiesService: { getScriptProperties: () => ({ getProperty: () => null }) },
     CacheService: { getScriptCache: () => ({ get: k => cache.has(k) ? cache.get(k) : null, put: (k, v) => { cache.set(k, v); }, remove: k => { cache.delete(k); } }) },
+    MailApp: { sendEmail() {}, getRemainingDailyQuota: () => 100 },
+    ScriptApp: { WeekDay: {}, getProjectTriggers: () => [], deleteTrigger() {}, newTrigger() { throw new Error('not available in demo'); } },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: t => ({ getContent: () => t, setMimeType() { return this; } }) },
     Utilities: {
