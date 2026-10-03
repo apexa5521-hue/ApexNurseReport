@@ -26,13 +26,12 @@ function seedDemo() {
     ['Fatima Noor', 'BURIDAH', ['BUR-C9'], .75, 20],
     ['Joy Reyes', 'BURIDAH', ['BUR-C10', 'BUR-C11'], .95, 22],
     ['Aisha Khan', 'BURIDAH', ['BUR-C12'], .5, 18],
-    ['Dina Putri', 'BURIDAH', ['BUR-C13', 'BUR-C14'], .9, 16],
-    ['Hana Yusuf', 'BURIDAH', ['BUR-CLARITY', 'BUR-GENTLE'], .8, 14],
-    ['Grace Lim', 'BURIDAH', ['BUR-HYDRAFACIAL', 'BUR-BLEACHING'], .9, 5],
+    ['Dina Putri', 'BURIDAH', ['BUR-HYDRAFACIAL', 'BUR-CLARITY'], .9, 16],
+    ['Hana Yusuf', 'BURIDAH', ['BUR-GENTLE', 'BUR-DERMA'], .8, 14],
+    ['Grace Lim', 'BURIDAH', ['BUR-STERIL'], .9, 5],
     ['Nora Ali', 'ONIZAH', ['ONZ-C1', 'ONZ-C2'], 1, 30],
     ['Sana Malik', 'ONIZAH', ['ONZ-C3', 'ONZ-C4'], .85, 26],
-    ['Lina Kareem', 'ONIZAH', ['ONZ-C5'], .7, 18],
-    ['Mary Cruz', 'ONIZAH', ['ONZ-C6', 'ONZ-C7'], .95, 28],
+    ['Lina Kareem', 'ONIZAH', ['ONZ-STERIL'], .7, 18],
     ['Ayu Lestari', 'BURIDAH', [], 0, 30, 'inactive'],
   ];
   const slug = n => n.toLowerCase().replace(/\s+/g, '.');
@@ -75,7 +74,7 @@ function seedDemo() {
       if (!inactive && (FORCE_MISS[n[0]] || []).indexOf(wi) >= 0) return;
       if (onLeaveWeek(n[0], w)) return;           // لا تُرفع تقارير أثناء الإجازة
       const prob = wi === weeks.length - 1 ? Math.min(.62, n[3]) : (inactive ? .9 : n[3]);
-      (inactive ? ['BUR-C13'] : n[2]).forEach(cid => {
+      (inactive ? ['BUR-STERIL'] : n[2]).forEach(cid => {
         if (n[0] === 'Layla Hassan' && cid === 'BUR-C2' && wi === weeks.length - 1) return; // تبقى جاهزة لتجربة الرفع
         if (n[0] === 'Layla Hassan' && cid === 'BUR-C2' && wi === 0) return;
         const demoNurseNow = n[0] === 'Layla Hassan' && cid === 'BUR-C1' && wi === weeks.length - 1;

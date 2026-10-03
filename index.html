@@ -431,7 +431,7 @@ const T = {
     hello: 'مرحباً', weekOf: 'تقرير أسبوع', dueToday: 'موعد التسليم اليوم', onTimeNow: 'التسليم الآن يُحسب في الوقت',
     lateNow: 'التسليم الآن يُحسب متأخراً', veryLateNow: 'فات موعد التسليم — التقرير سيُسجّل متأخراً جداً', earlyNow: 'التسليم الآن يُحسب مبكراً لأسبوع',
     submittedOf: 'عيادات تم رفعها', q1: 'رقم العيادة', q1h: 'اكتب رقم العيادة بالأرقام فقط', submitted: 'تم الرفع',
-    numOnly: 'هذا الحقل يقبل أرقاماً فقط (0–9)', noClinic: 'لا توجد عيادة بهذا الرقم ضمن عياداتك', alreadyDone: 'تم رفع تقرير هذه العيادة هذا الأسبوع', byWho: 'بواسطة', yourClinics: 'عياداتك', specialRooms: 'الغرف الخاصة', example: 'مثال',
+    numOnly: 'هذا الحقل يقبل أرقاماً فقط (0–9)', noClinic: 'لا توجد عيادة بهذا الرقم ضمن عياداتك', alreadyDone: 'تم رفع تقرير هذه العيادة هذا الأسبوع', byWho: 'بواسطة', yourClinics: 'عياداتك', specialRooms: 'أقسام أخرى', example: 'مثال',
     q2: 'هل تم فحص تواريخ انتهاء الأدوية والمواد داخل العيادة؟', q2h: 'سجّل أقرب تاريخ انتهاء بين المواد والأدوية',
     earliest: 'أقرب تاريخ انتهاء', earliestItem: 'اسم المادة أو الدواء', earliestItemPh: 'مثال: Adrenaline',
     q3: 'هل التعقيم سليم والأكياس جافة ومغلقة بشكل صحيح؟', q3h: '',
@@ -459,7 +459,7 @@ const T = {
     hello: 'Hello', weekOf: 'Weekly report', dueToday: 'Due today', onTimeNow: 'Submitting now counts as on time',
     lateNow: 'Submitting now counts as late', veryLateNow: 'Deadline passed — this report will be marked very late', earlyNow: 'Submitting now counts as early for the week of',
     submittedOf: 'clinics submitted', q1: 'Clinic number', q1h: 'Type the clinic number (digits only)', submitted: 'Submitted',
-    numOnly: 'Only numbers are accepted (0–9)', noClinic: 'No clinic with this number in your list', alreadyDone: 'This clinic was already reported this week', byWho: 'by', yourClinics: 'Your clinics', specialRooms: 'Special rooms', example: 'e.g.',
+    numOnly: 'Only numbers are accepted (0–9)', noClinic: 'No clinic with this number in your list', alreadyDone: 'This clinic was already reported this week', byWho: 'by', yourClinics: 'Your clinics', specialRooms: 'Other units', example: 'e.g.',
     q2: 'Have expiry dates of drugs and materials in the clinic been checked?', q2h: 'Record the earliest expiry date you found',
     earliest: 'Earliest expiry date', earliestItem: 'Drug / material name', earliestItemPh: 'e.g. Adrenaline',
     q3: 'Is sterilization safe and are pouches dry and sealed correctly?', q3h: '',
@@ -503,7 +503,7 @@ const locale = () => state.lang === 'en' ? 'en-GB' : 'ar-SA-u-ca-gregory-nu-latn
 const fmtDate = (s, opt = { day: 'numeric', month: 'long' }) => { const d = parseD(s); return d ? new Intl.DateTimeFormat(locale(), opt).format(d) : '—'; };
 const fmtShort = s => { const d = parseD(s); return d ? `${d.getDate()}/${d.getMonth() + 1}` : ''; };
 const fmtDT = s => s ? fmtDate(s, { day: 'numeric', month: 'short' }) + ' · ' + String(s).slice(11, 16) : '—';
-const clinicLabel = c => { const m = state.lang === 'en' && String(c.clinic_id || '').match(/-C(\d+)$/); return m ? 'Clinic ' + m[1] : (c.name || c.clinic_name); };
+const clinicLabel = c => c.name || c.clinic_name;
 const CAT_EN = { tools: 'Missing tools', expiry: 'Expiry', expiry_check: 'Expiry not checked', sterilization: 'Sterilization', fridge: 'Refrigerator', card: 'Employee card', cleanliness: 'Cleanliness', other: 'Other' };
 const catLabel = i => state.lang === 'en' ? (CAT_EN[i.category] || i.categoryLabel) : i.categoryLabel;
 const pct = v => v == null ? '—' : v + '%';

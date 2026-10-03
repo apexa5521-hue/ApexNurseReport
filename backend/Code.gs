@@ -77,14 +77,17 @@ const DEFAULT_SETTINGS = [
 
 /** العيادات الافتراضية — مستخرجة من بيانات النموذج القديم */
 const DEFAULT_CLINICS = (function () {
-  // [clinic_id, number, name, branch, type, has_fridge, status] — الممرضة تكتب «رقم العيادة» فقط
+  // [clinic_id, number, name, branch, type, has_fridge, status] — الممرضة تكتب «رقم العيادة» فقط.
+  // الترقيم بحسب ترتيب القائمة داخل كل فرع، والرقم فريد داخل الفرع.
   const list = [];
-  for (let i = 1; i <= 14; i++) list.push(['BUR-C' + i, i, 'عيادة ' + i, 'BURIDAH', 'dental', 'yes', 'active']);
-  list.push(['BUR-CLARITY', 15, 'غرفة Clarity (ليزر)', 'BURIDAH', 'derma', 'no', 'active']);
-  list.push(['BUR-GENTLE', 16, 'غرفة Gentle Pro Max', 'BURIDAH', 'derma', 'no', 'active']);
-  list.push(['BUR-HYDRAFACIAL', 17, 'غرفة الهيدرافيشل', 'BURIDAH', 'derma', 'no', 'active']);
-  list.push(['BUR-BLEACHING', 18, 'غرفة التشقير / التبييض', 'BURIDAH', 'derma', 'no', 'active']);
-  for (let i = 1; i <= 7; i++) list.push(['ONZ-C' + i, i, 'عيادة ' + i, 'ONIZAH', 'dental', 'yes', 'active']);
+  for (let i = 1; i <= 12; i++) list.push(['BUR-C' + i, i, 'Dental Clinic ' + i, 'BURIDAH', 'dental', 'yes', 'active']);
+  list.push(['BUR-HYDRAFACIAL', 13, 'Derma Hydrafacial', 'BURIDAH', 'derma', 'no', 'active']);
+  list.push(['BUR-CLARITY', 14, 'Derma Clarity', 'BURIDAH', 'derma', 'no', 'active']);
+  list.push(['BUR-GENTLE', 15, 'Derma Gentle Pro', 'BURIDAH', 'derma', 'no', 'active']);
+  list.push(['BUR-DERMA', 16, 'Derma CLINIC', 'BURIDAH', 'derma', 'no', 'active']);
+  list.push(['BUR-STERIL', 17, 'Sterilization - Buraydah', 'BURIDAH', 'sterilization', 'no', 'active']);
+  for (let i = 1; i <= 4; i++) list.push(['ONZ-C' + i, i, 'Dental Clinic ' + i, 'ONIZAH', 'dental', 'yes', 'active']);
+  list.push(['ONZ-STERIL', 5, 'Sterilization - Unayzah', 'ONIZAH', 'sterilization', 'no', 'active']);
   return list;
 })();
 
@@ -1104,7 +1107,7 @@ function importFormResponses() {
     if (!branch) branch = 'BURIDAH';
     const clinicId = legacyClinicId_(v[C.clinic], branch, /unaizah|onizah|عنيزة/i.test(String(v[C.clinic])));
     if (!clinicById[clinicId]) {
-      const c = { clinic_id: clinicId, number: '', name: String(v[C.clinic]).trim() || clinicId, branch: branch, type: 'other', has_fridge: 'no', status: 'inactive' };
+      const c = { clinic_id: clinicId, number: '', name: /-C(\d+)$/.test(clinicId) ? 'Old clinic ' + clinicId.match(/(\d+)$/)[1] : (String(v[C.clinic]).trim() || clinicId), branch: branch, type: 'other', has_fridge: 'no', status: 'inactive' };
       clinicById[clinicId] = c; newClinics.push(c);
     }
     const cls = classifySubmission_(v[C.ts], cfg);
@@ -1195,8 +1198,9 @@ function parseTimestamp_(v) {
 function legacyClinicId_(raw, branch, forceOnizah) {
   const t = String(raw || '').toLowerCase();
   const pre = (forceOnizah || branch === 'ONIZAH') ? 'ONZ-' : 'BUR-';
-  const rules = [[/clarity/, 'CLARITY'], [/gent/, 'GENTLE'], [/hydra|هيدرا/, 'HYDRAFACIAL'],
-                 [/bleach|تشقير|تبييض/, 'BLEACHING'], [/derma/, 'CLARITY']];
+  // أسماء قديمة (غرفة التشقير/التبييض أو «derma» فقط) تُنسب إلى Derma CLINIC
+  const rules = [[/clarity/, 'CLARITY'], [/gent/, 'GENTLE'], [/hydra|هيدرا/, 'HYDRAFACIAL'], [/steril|تعقيم/, 'STERIL'],
+                 [/bleach|تشقير|تبييض|derma/, 'DERMA']];
   for (let i = 0; i < rules.length; i++) if (rules[i][0].test(t)) return pre + rules[i][1];
   const m = t.replace(/o(?=\d)/g, '0').match(/\d+/);
   return m ? pre + 'C' + Number(m[0]) : pre + 'OTHER';
