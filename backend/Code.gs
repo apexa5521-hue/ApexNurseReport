@@ -292,6 +292,11 @@ function apiNurseContext_(req, user) {
     const rs = mine.filter(r => r.week_start === w);
     return { week: w, timing: bestTiming_(rs), count: rs.length };
   });
+  // إحصائياتها وآخر تقاريرها (تظهر حتى خارج نافذة التقديم)
+  const me = buildRoster_({ role: 'admin', branch: 'ALL' }, week, weeksBack_(week, 12), cfg).find(r => r.username === user.username) || {};
+  const recent = mine.slice().sort((a, b) => a.submitted_at < b.submitted_at ? 1 : -1).slice(0, 6).map(r => ({
+    report_id: r.report_id, submitted_at: r.submitted_at, week_start: r.week_start, timing: r.timing, clinic_name: r.clinic_name,
+    issues_count: Number(r.issues_count) || 0, notes: r.notes || '', other_issue: r.other_issue || '' }));
   // متابعة البلاغات: ما بلّغت عنه هي فقط، وليس كل ما في عيادتها
   const openIssues = rows_(S.ISSUES)
     .filter(i => (i.status === 'open' || i.status === 'in_progress') && reportedBy_(i, user.username))
@@ -315,6 +320,10 @@ function apiNurseContext_(req, user) {
       submitted: weekAll.some(r => r.clinic_id === c.clinic_id),
       submittedBy: (weekAll.find(r => r.clinic_id === c.clinic_id) || {}).nurse_name || '',
     })),
+    stats: { weeks: 12, compliance: me.compliance == null ? null : me.compliance, onTime: me.onTimeRate == null ? null : me.onTimeRate,
+             lastSubmission: me.lastSubmission || '', missedStreak: me.missedStreak || 0, openReports: openIssues.length,
+             state: me.state || 'active', leave: me.leave || null },
+    recent: recent,
     submittedThisWeek: thisWeek.map(reportOut_),
     history: history,
     openIssues: openIssues,

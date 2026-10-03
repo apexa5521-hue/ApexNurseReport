@@ -432,7 +432,7 @@ const T = {
     changeTitle: 'تعيين كلمة مرور جديدة', changeSub: 'هذا أول دخول لك، اختر كلمة مرور خاصة بك.', oldPass: 'كلمة المرور المؤقتة',
     newPass: 'كلمة المرور الجديدة (6 أحرف على الأقل)', confirmPass: 'تأكيد كلمة المرور', save: 'حفظ', mismatch: 'كلمتا المرور غير متطابقتين',
     hello: 'مرحباً', weekOf: 'تقرير أسبوع', dueToday: 'موعد التسليم اليوم', onTimeNow: 'التسليم الآن يُحسب في الوقت',
-    lateNow: 'التسليم الآن يُحسب متأخراً', closedNow: 'نافذة التقديم مغلقة', veryLateNow: 'فات موعد التسليم — التقرير سيُسجّل متأخراً جداً', earlyNow: 'التسليم الآن يُحسب مبكراً لأسبوع',
+    lateNow: 'التسليم الآن يُحسب متأخراً', closedNow: 'نافذة التقديم مغلقة', closedDone: 'وقد رفعتِ تقارير كل أقسامك لهذا الأسبوع.', myStats: 'إحصائياتك', statCommit: 'التزامك', stat12: 'آخر 12 أسبوع', statOnTime: 'في الوقت', statLast: 'آخر تقديم', statOpen: 'بلاغات مفتوحة', statStreak: 'أسابيع بلا تقديم', recent: 'آخر تقاريرك', colDate: 'التاريخ', colUnit: 'القسم', colTiming: 'التوقيت', colItems: 'بنود للمتابعة', colNote: 'ملاحظتك', noRecent: 'لم ترفعي أي تقرير بعد.', onLeaveNote: (a, b) => `مسجّل لك إجازة من ${a} إلى ${b}، فلا يُطلب منك تقرير خلالها.`, veryLateNow: 'فات موعد التسليم — التقرير سيُسجّل متأخراً جداً', earlyNow: 'التسليم الآن يُحسب مبكراً لأسبوع',
     submittedOf: 'عيادات تم رفعها', q1: 'العيادة', q1h: 'اختر العيادة أو القسم الذي تكتب تقريره', submitted: 'تم الرفع',
     pick: 'اختر من القائمة…', gDental: 'عيادات الأسنان', gDerma: 'Derma', gSteril: 'التعقيم', gOther: 'أخرى',
     q2: 'هل تم فحص تواريخ انتهاء الأدوية والمواد داخل العيادة؟', q2h: 'سجّل أقرب تاريخ انتهاء بين المواد والأدوية',
@@ -462,7 +462,7 @@ const T = {
     changeTitle: 'Set a new password', changeSub: 'This is your first sign-in. Choose your own password.', oldPass: 'Temporary password',
     newPass: 'New password (min. 6 characters)', confirmPass: 'Confirm password', save: 'Save', mismatch: 'Passwords do not match',
     hello: 'Hello', weekOf: 'Weekly report', dueToday: 'Due today', onTimeNow: 'Submitting now counts as on time',
-    lateNow: 'Submitting now counts as late', closedNow: 'Submission window is closed', veryLateNow: 'Deadline passed — this report will be marked very late', earlyNow: 'Submitting now counts as early for the week of',
+    lateNow: 'Submitting now counts as late', closedNow: 'Submission window is closed', closedDone: 'You have already reported all your units this week.', myStats: 'Your statistics', statCommit: 'Your commitment', stat12: 'last 12 weeks', statOnTime: 'On time', statLast: 'Last submission', statOpen: 'Open reports', statStreak: 'Weeks missed in a row', recent: 'Your latest reports', colDate: 'Date', colUnit: 'Unit', colTiming: 'Timing', colItems: 'Follow-up items', colNote: 'Your note', noRecent: 'You have not submitted a report yet.', onLeaveNote: (a, b) => `You are on leave from ${a} to ${b}; no report is required during this period.`, veryLateNow: 'Deadline passed — this report will be marked very late', earlyNow: 'Submitting now counts as early for the week of',
     submittedOf: 'clinics submitted', q1: 'Clinic', q1h: 'Choose the clinic or unit you are reporting on', submitted: 'Submitted',
     pick: 'Select from the list…', gDental: 'Dental clinics', gDerma: 'Derma', gSteril: 'Sterilization', gOther: 'Other',
     q2: 'Have expiry dates of drugs and materials in the clinic been checked?', q2h: 'Record the earliest expiry date you found',
@@ -997,6 +997,8 @@ async function renderNurse(view) {
       <div class="sch out ${closed ? 'now' : ''}"><b>${t('schMon')}</b><span>${t('schOut')}</span><i class="num">${fmtDay(ctx.window.monday)}</i>${closed ? `<em>${t('today')}</em>` : ''}</div>
     </div></section>
 
+    ${ctx.stats.leave ? `<div class="notice rise" style="margin-top:12px">${t('onLeaveNote')(fmtDay(ctx.stats.leave.from), fmtDay(ctx.stats.leave.to))}</div>` : ''}
+
     ${pending.length && !closed ? `
     <form id="nform" novalidate style="display:grid;gap:12px;margin-top:16px">
       <section class="card step rise" style="--i:1" data-step="clinic"><span class="no">1</span><div>
@@ -1063,15 +1065,34 @@ async function renderNurse(view) {
     <div class="submit-bar"><div class="in">
       <div class="progress"><span id="prog-t"></span><div class="bar"><i id="prog-b" style="width:0"></i></div></div>
       <button class="btn primary lg" id="nsubmit" form="nform" type="submit">${t('submit')}</button>
-    </div></div>` : (pending.length && closed ? `
+    </div></div>` : (closed ? `
     <section class="card done-view rise" style="margin-top:16px">
       <div class="check" style="background:var(--crit-soft)"><svg width="44" height="44" viewBox="0 0 44 44"><path d="M14 14l16 16M30 14L14 30" style="stroke:var(--crit);stroke-dashoffset:0"/></svg></div>
       <h2>${t('closedTitle')}</h2><p>${t('closedBody')(fmtDate(ctx.window.opensOn, { day: 'numeric', month: 'long' }), fmtDate(ctx.window.nextDeadline, { day: 'numeric', month: 'long' }))}</p>
+      ${pending.length ? '' : `<p class="muted" style="margin-top:6px">${t('closedDone')}</p>`}
     </section>` : `
     <section class="card done-view rise" style="margin-top:16px">
       <div class="check"><svg width="44" height="44" viewBox="0 0 44 44"><path d="M12 23l7 7 14-15"/></svg></div>
       <h2>${t('allDone')}</h2><p>${t('allDoneSub')}</p>
     </section>`)}
+
+    <section class="card rise" id="nstats" style="--i:8;margin-top:16px"><div class="card-h"><h3>${t('myStats')}</h3><span class="sub">${t('stat12')}</span></div>
+      <div class="card-b"><div class="mini">
+        <div><b>${pct(ctx.stats.compliance)}</b><span>${t('statCommit')}</span></div>
+        <div><b>${pct(ctx.stats.onTime)}</b><span>${t('statOnTime')}</span></div>
+        <div><b>${ctx.stats.openReports}</b><span>${t('statOpen')}</span></div>
+        <div><b>${ctx.stats.missedStreak}</b><span>${t('statStreak')}</span></div></div>
+        <div class="muted" style="font-size:12.5px">${t('statLast')}: ${ctx.stats.lastSubmission ? esc(fmtDT(ctx.stats.lastSubmission)) : '—'}</div></div></section>
+
+    <section class="card rise" id="nrecent" style="--i:9;margin-top:16px"><div class="card-h"><h3>${t('recent')}</h3></div>
+      ${ctx.recent.length ? tableHTML([
+        { label: t('colDate'), html: r => `<span class="num">${esc(fmtDT(r.submitted_at))}</span>` },
+        { label: t('colUnit'), get: r => clinicLabel(r) },
+        { label: t('colTiming'), html: r => timingPill(r.timing) },
+        { label: t('colItems'), html: r => r.issues_count ? `<span class="pill warn">${r.issues_count}</span>` : '<span class="muted">—</span>' },
+        { label: t('colNote'), html: r => `<span class="muted" style="font-size:12.5px">${esc([r.other_issue, r.notes].filter(Boolean).join(' · ') || '—')}</span>` },
+      ], ctx.recent) : `<div class="empty">${t('noRecent')}</div>`}
+    </section>
 
     <section class="card rise" style="--i:9;margin-top:16px"><div class="card-h"><h3>${t('history')}</h3></div>
       <div class="card-b"><div class="hist">${ctx.history.map(h => `<div title="${fmtDate(h.week)} — ${t('st_' + h.timing)}">
