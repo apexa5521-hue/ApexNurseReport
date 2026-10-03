@@ -47,7 +47,7 @@ const S = {
 const HEADERS = {
   Users: ['username', 'name', 'email', 'role', 'branch', 'clinics', 'status', 'start_date',
           'pass_hash', 'salt', 'must_change', 'created_at', 'last_login', 'aliases', 'end_date', 'last_reminder'],
-  Clinics: ['clinic_id', 'number', 'name', 'branch', 'type', 'has_fridge', 'status'],
+  Clinics: ['clinic_id', 'name', 'branch', 'type', 'has_fridge', 'status'],
   Reports: ['report_id', 'submitted_at', 'week_start', 'timing', 'username', 'nurse_name', 'branch',
             'clinic_id', 'clinic_name', 'expiry_checked', 'earliest_expiry', 'expiry_item',
             'sterilization_ok', 'fridge', 'fridge_temp', 'employee_card', 'cleanliness',
@@ -77,17 +77,17 @@ const DEFAULT_SETTINGS = [
 
 /** العيادات الافتراضية — مستخرجة من بيانات النموذج القديم */
 const DEFAULT_CLINICS = (function () {
-  // [clinic_id, number, name, branch, type, has_fridge, status] — الممرضة تكتب «رقم العيادة» فقط.
-  // الترقيم بحسب ترتيب القائمة داخل كل فرع، والرقم فريد داخل الفرع.
+  // [clinic_id, name, branch, type, has_fridge, status] — الممرضة تختار من قائمة منسدلة بحسب فرعها.
+  // ترتيب القائمة هو ترتيب الصفوف في ورقة Clinics (غيّره من الورقة مباشرة).
   const list = [];
-  for (let i = 1; i <= 12; i++) list.push(['BUR-C' + i, i, 'Dental Clinic ' + i, 'BURIDAH', 'dental', 'yes', 'active']);
-  list.push(['BUR-HYDRAFACIAL', 13, 'Derma Hydrafacial', 'BURIDAH', 'derma', 'no', 'active']);
-  list.push(['BUR-CLARITY', 14, 'Derma Clarity', 'BURIDAH', 'derma', 'no', 'active']);
-  list.push(['BUR-GENTLE', 15, 'Derma Gentle Pro', 'BURIDAH', 'derma', 'no', 'active']);
-  list.push(['BUR-DERMA', 16, 'Derma CLINIC', 'BURIDAH', 'derma', 'no', 'active']);
-  list.push(['BUR-STERIL', 17, 'Sterilization - Buraydah', 'BURIDAH', 'sterilization', 'no', 'active']);
-  for (let i = 1; i <= 4; i++) list.push(['ONZ-C' + i, i, 'Dental Clinic ' + i, 'ONIZAH', 'dental', 'yes', 'active']);
-  list.push(['ONZ-STERIL', 5, 'Sterilization - Unayzah', 'ONIZAH', 'sterilization', 'no', 'active']);
+  for (let i = 1; i <= 13; i++) list.push(['BUR-C' + i, 'Dental Clinic ' + i, 'BURIDAH', 'dental', 'yes', 'active']);
+  list.push(['BUR-HYDRAFACIAL', 'Derma Hydrafacial', 'BURIDAH', 'derma', 'no', 'active']);
+  list.push(['BUR-CLARITY', 'Derma Clarity', 'BURIDAH', 'derma', 'no', 'active']);
+  list.push(['BUR-GENTLE', 'Derma Gentle Pro', 'BURIDAH', 'derma', 'no', 'active']);
+  list.push(['BUR-DERMA', 'Derma CLINIC', 'BURIDAH', 'derma', 'no', 'active']);
+  list.push(['BUR-STERIL', 'Sterilization - Buraydah', 'BURIDAH', 'sterilization', 'no', 'active']);
+  for (let i = 1; i <= 4; i++) list.push(['ONZ-C' + i, 'Dental Clinic ' + i, 'ONIZAH', 'dental', 'yes', 'active']);
+  list.push(['ONZ-STERIL', 'Sterilization - Unayzah', 'ONIZAH', 'sterilization', 'no', 'active']);
   return list;
 })();
 
@@ -303,7 +303,7 @@ function apiNurseContext_(req, user) {
     deadline: now.week,
     lateUntil: dateStr_(addDays_(parseDate_(now.week), cfg.LATE_ALLOWED_DAYS)),
     clinics: clinics.map(c => ({
-      clinic_id: c.clinic_id, number: c.number, name: c.name, branch: c.branch, type: c.type, has_fridge: c.has_fridge === 'yes',
+      clinic_id: c.clinic_id, name: c.name, branch: c.branch, type: c.type, has_fridge: c.has_fridge === 'yes',
       submitted: weekAll.some(r => r.clinic_id === c.clinic_id),
       submittedBy: (weekAll.find(r => r.clinic_id === c.clinic_id) || {}).nurse_name || '',
     })),
@@ -324,20 +324,8 @@ function nurseClinics_(user) {
 function apiNurseSubmit_(req, user) {
   const cfg = settings_();
   const p = req.report || {};
-  const pool = nurseClinics_(user);
-  let clinic;
-  if (p.clinic_number != null && String(p.clinic_number).trim() !== '') {
-    // رقم العيادة: أرقام فقط (نقبل الأرقام العربية الهندية ونحوّلها)
-    const num = String(p.clinic_number).trim().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
-    if (!/^\d{1,3}$/.test(num)) throw err_('رقم العيادة يقبل أرقاماً فقط');
-    const hits = pool.filter(c => String(c.number) !== '' && Number(c.number) === Number(num));
-    if (!hits.length) throw err_('لا توجد عيادة بالرقم ' + Number(num) + ' ضمن عياداتك');
-    if (hits.length > 1) throw err_('الرقم ' + Number(num) + ' مكرر في أكثر من فرع');
-    clinic = hits[0];
-  } else {
-    clinic = pool.find(c => c.clinic_id === p.clinic_id);
-  }
-  if (!clinic) throw err_('اكتب رقم عيادة صحيحاً من عياداتك');
+  const clinic = nurseClinics_(user).find(c => c.clinic_id === p.clinic_id);   // يجب أن تكون من عيادات فرعها/تخصيصها
+  if (!clinic) throw err_('اختر العيادة من القائمة');
 
   const yn = v => (v === 'yes' || v === 'no') ? v : null;
   const r = {
@@ -942,10 +930,8 @@ function apiClinicSave_(req, user) {
   if (!name) throw err_('أدخل اسم العيادة');
   const list = rows_(S.CLINICS);
   const ex = list.find(c => c.clinic_id === p.clinic_id);
-  const num = String(p.number == null ? '' : p.number).trim();
-  if (!/^\d{1,3}$/.test(num)) throw err_('رقم العيادة أرقام فقط (حتى 3 خانات)');
-  if (list.some(c => c.branch === p.branch && Number(c.number) === Number(num) && c.clinic_id !== (ex && ex.clinic_id))) throw err_('رقم العيادة مستخدم في هذا الفرع');
-  const row = { number: String(Number(num)), name: name, branch: p.branch, type: clean_(p.type, 30) || 'dental',
+  if (list.some(c => c.branch === p.branch && normText_(c.name) === normText_(name) && c.clinic_id !== (ex && ex.clinic_id))) throw err_('يوجد قسم بنفس الاسم في هذا الفرع');
+  const row = { name: name, branch: p.branch, type: clean_(p.type, 30) || 'dental',
                 has_fridge: p.has_fridge ? 'yes' : 'no', status: p.status === 'inactive' ? 'inactive' : 'active' };
   if (ex) setCells_(S.CLINICS, ex._row, row);
   else {
@@ -971,7 +957,7 @@ function setup() {
   if (missing.length) settings.getRange(settings.getLastRow() + 1, 1, missing.length, 3).setValues(missing);
 
   if (!rows_(S.CLINICS).length) {
-    sh_(S.CLINICS).getRange(2, 1, DEFAULT_CLINICS.length, 7).setValues(DEFAULT_CLINICS);
+    sh_(S.CLINICS).getRange(2, 1, DEFAULT_CLINICS.length, 6).setValues(DEFAULT_CLINICS);
   }
   const staff = [
     ['admin', 'مدير النظام', 'admin', 'ALL'],
@@ -1107,7 +1093,7 @@ function importFormResponses() {
     if (!branch) branch = 'BURIDAH';
     const clinicId = legacyClinicId_(v[C.clinic], branch, /unaizah|onizah|عنيزة/i.test(String(v[C.clinic])));
     if (!clinicById[clinicId]) {
-      const c = { clinic_id: clinicId, number: '', name: /-C(\d+)$/.test(clinicId) ? 'Old clinic ' + clinicId.match(/(\d+)$/)[1] : (String(v[C.clinic]).trim() || clinicId), branch: branch, type: 'other', has_fridge: 'no', status: 'inactive' };
+      const c = { clinic_id: clinicId, name: /-C(\d+)$/.test(clinicId) ? 'Old clinic ' + clinicId.match(/(\d+)$/)[1] : (String(v[C.clinic]).trim() || clinicId), branch: branch, type: 'other', has_fridge: 'no', status: 'inactive' };
       clinicById[clinicId] = c; newClinics.push(c);
     }
     const cls = classifySubmission_(v[C.ts], cfg);
@@ -1310,7 +1296,7 @@ function settings_() {
 }
 
 function clinics_() {
-  return rows_(S.CLINICS).map(c => ({ clinic_id: c.clinic_id, number: String(c.number === '' || c.number == null ? '' : c.number), name: c.name, branch: c.branch, type: c.type,
+  return rows_(S.CLINICS).map(c => ({ clinic_id: c.clinic_id, name: c.name, branch: c.branch, type: c.type,
                                       has_fridge: c.has_fridge, status: c.status || 'active' }));
 }
 

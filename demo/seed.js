@@ -25,7 +25,7 @@ function seedDemo() {
     ['Anita Rao', 'BURIDAH', ['BUR-C7', 'BUR-C8'], .85, 24],
     ['Fatima Noor', 'BURIDAH', ['BUR-C9'], .75, 20],
     ['Joy Reyes', 'BURIDAH', ['BUR-C10', 'BUR-C11'], .95, 22],
-    ['Aisha Khan', 'BURIDAH', ['BUR-C12'], .5, 18],
+    ['Aisha Khan', 'BURIDAH', ['BUR-C12', 'BUR-C13'], .5, 18],
     ['Dina Putri', 'BURIDAH', ['BUR-HYDRAFACIAL', 'BUR-CLARITY'], .9, 16],
     ['Hana Yusuf', 'BURIDAH', ['BUR-GENTLE', 'BUR-DERMA'], .8, 14],
     ['Grace Lim', 'BURIDAH', ['BUR-STERIL'], .9, 5],

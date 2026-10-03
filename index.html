@@ -67,17 +67,6 @@ a{color:var(--accent)}
 .icon-btn .ico{width:19px;height:19px}
 .logo .ico{width:20px;height:20px}
 .is-demo .btn[onclick*="print"]{display:none}
-@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
-.num-field{max-width:240px}
-.num-field .input{height:56px;font-size:24px;font-weight:600;text-align:center;letter-spacing:.14em}
-.num-field .input::placeholder{font-size:15px;font-weight:400;letter-spacing:0}
-.input.shake{animation:shake .35s;border-color:var(--crit)}
-.num-warn{display:none;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;border-radius:10px;background:var(--crit-soft);font-size:12.5px}
-.num-warn.show{display:flex;animation:rise .25s var(--ease)}
-.num-warn::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--crit)}
-.clinic-msg{display:flex;align-items:center;gap:6px;min-height:22px;margin-top:10px;font-size:13.5px;font-weight:500}
-.clinic-msg.ok svg{color:var(--good)}
-.clinic-msg.bad::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--crit)}
 .prow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
 .prow:last-child{border-bottom:0}
 .pinfo{flex:1;min-width:0}.pinfo b{font-weight:500}.pinfo .muted{font-size:11.5px}
@@ -430,8 +419,8 @@ const T = {
     newPass: 'كلمة المرور الجديدة (6 أحرف على الأقل)', confirmPass: 'تأكيد كلمة المرور', save: 'حفظ', mismatch: 'كلمتا المرور غير متطابقتين',
     hello: 'مرحباً', weekOf: 'تقرير أسبوع', dueToday: 'موعد التسليم اليوم', onTimeNow: 'التسليم الآن يُحسب في الوقت',
     lateNow: 'التسليم الآن يُحسب متأخراً', veryLateNow: 'فات موعد التسليم — التقرير سيُسجّل متأخراً جداً', earlyNow: 'التسليم الآن يُحسب مبكراً لأسبوع',
-    submittedOf: 'عيادات تم رفعها', q1: 'رقم العيادة', q1h: 'اكتب رقم العيادة بالأرقام فقط', submitted: 'تم الرفع',
-    numOnly: 'هذا الحقل يقبل أرقاماً فقط (0–9)', noClinic: 'لا توجد عيادة بهذا الرقم ضمن عياداتك', alreadyDone: 'تم رفع تقرير هذه العيادة هذا الأسبوع', byWho: 'بواسطة', yourClinics: 'عياداتك', specialRooms: 'أقسام أخرى', example: 'مثال',
+    submittedOf: 'عيادات تم رفعها', q1: 'العيادة', q1h: 'اختر العيادة أو القسم الذي تكتب تقريره', submitted: 'تم الرفع',
+    pick: 'اختر من القائمة…', gDental: 'عيادات الأسنان', gDerma: 'Derma', gSteril: 'التعقيم', gOther: 'أخرى',
     q2: 'هل تم فحص تواريخ انتهاء الأدوية والمواد داخل العيادة؟', q2h: 'سجّل أقرب تاريخ انتهاء بين المواد والأدوية',
     earliest: 'أقرب تاريخ انتهاء', earliestItem: 'اسم المادة أو الدواء', earliestItemPh: 'مثال: Adrenaline',
     q3: 'هل التعقيم سليم والأكياس جافة ومغلقة بشكل صحيح؟', q3h: '',
@@ -458,8 +447,8 @@ const T = {
     newPass: 'New password (min. 6 characters)', confirmPass: 'Confirm password', save: 'Save', mismatch: 'Passwords do not match',
     hello: 'Hello', weekOf: 'Weekly report', dueToday: 'Due today', onTimeNow: 'Submitting now counts as on time',
     lateNow: 'Submitting now counts as late', veryLateNow: 'Deadline passed — this report will be marked very late', earlyNow: 'Submitting now counts as early for the week of',
-    submittedOf: 'clinics submitted', q1: 'Clinic number', q1h: 'Type the clinic number (digits only)', submitted: 'Submitted',
-    numOnly: 'Only numbers are accepted (0–9)', noClinic: 'No clinic with this number in your list', alreadyDone: 'This clinic was already reported this week', byWho: 'by', yourClinics: 'Your clinics', specialRooms: 'Other units', example: 'e.g.',
+    submittedOf: 'clinics submitted', q1: 'Clinic', q1h: 'Choose the clinic or unit you are reporting on', submitted: 'Submitted',
+    pick: 'Select from the list…', gDental: 'Dental clinics', gDerma: 'Derma', gSteril: 'Sterilization', gOther: 'Other',
     q2: 'Have expiry dates of drugs and materials in the clinic been checked?', q2h: 'Record the earliest expiry date you found',
     earliest: 'Earliest expiry date', earliestItem: 'Drug / material name', earliestItemPh: 'e.g. Adrenaline',
     q3: 'Is sterilization safe and are pouches dry and sealed correctly?', q3h: '',
@@ -945,7 +934,7 @@ async function renderNurse(view) {
   const pending = ctx.clinics.filter(c => !c.submitted);
   const done = ctx.clinics.length - pending.length;
   const f = { clinic_id: '', tools: [] };
-  const onlyPending = pending.length === 1 && pending[0].number ? pending[0] : null;
+  const onlyPending = pending.length === 1 ? pending[0] : null;
 
   const nowText = {
     on_time: t('onTimeNow'), late: t('lateNow'), very_late: t('veryLateNow'),
@@ -977,19 +966,14 @@ async function renderNurse(view) {
     <form id="nform" novalidate style="display:grid;gap:12px;margin-top:16px">
       <section class="card step rise" style="--i:1" data-step="clinic"><span class="no">1</span><div>
         <h3>${t('q1')}</h3><p class="hint">${t('q1h')}</p>
-        <div class="num-field">
-          <input class="input num" id="f-clinic" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" dir="ltr"
-            placeholder="${t('example')}: ${esc((pending.find(c => c.number) || {}).number || '7')}" value="${esc(onlyPending ? onlyPending.number : '')}"
-            aria-label="${t('q1')}" aria-describedby="clinic-warn clinic-msg">
-          <div id="clinic-warn" class="num-warn" role="alert"></div>
-          <div id="clinic-msg" class="clinic-msg" aria-live="polite"></div>
-        </div>
-        ${(() => {
-          const numbered = ctx.clinics.filter(c => c.number);
-          if (ctx.user.clinics.length) return `<p class="hint" style="margin:12px 0 0">${t('yourClinics')}: ${numbered.map(c => `<b class="num">${esc(c.number)}</b>${c.submitted ? ' ✓' : ''}`).join(' · ')}</p>`;
-          const rooms = numbered.filter(c => c.type && c.type !== 'dental');
-          return rooms.length ? `<p class="hint" style="margin:12px 0 0">${t('specialRooms')}: ${rooms.map(c => `<b class="num">${esc(c.number)}</b> ${esc(clinicLabel(c))}`).join(' · ')}</p>` : '';
-        })()}
+        <select class="input" id="f-clinic" aria-label="${t('q1')}" style="max-width:360px">
+          <option value="">${t('pick')}</option>
+          ${[['dental', 'gDental'], ['derma', 'gDerma'], ['sterilization', 'gSteril']].map(([ty, g]) => {
+            const list = ctx.clinics.filter(c => c.type === ty);
+            return list.length ? `<optgroup label="${t(g)}">${list.map(c => `<option value="${esc(c.clinic_id)}" ${c.submitted ? 'disabled' : ''} ${onlyPending && onlyPending.clinic_id === c.clinic_id ? 'selected' : ''}>${esc(c.name)}${c.submitted ? ` — ${t('submitted')}${c.submittedBy ? ' (' + esc(c.submittedBy) + ')' : ''}` : ''}</option>`).join('')}</optgroup>` : '';
+          }).join('')}
+          ${(() => { const rest = ctx.clinics.filter(c => ['dental', 'derma', 'sterilization'].indexOf(c.type) < 0); return rest.length ? `<optgroup label="${t('gOther')}">${rest.map(c => `<option value="${esc(c.clinic_id)}" ${c.submitted ? 'disabled' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>` : ''; })()}
+        </select>
       </div></section>
 
       <section class="card step rise" style="--i:2" data-step="expiry"><span class="no">2</span><div>
@@ -1070,40 +1054,14 @@ async function renderNurse(view) {
   const form = $('#nform');
   const set = (k, v) => { f[k] = v; update(); };
 
-  // رقم العيادة: أرقام فقط. الحروف تُرفض مع تنبيه، والأرقام العربية الهندية تُحوَّل تلقائياً
-  const inp = $('#f-clinic');
-  const byNum = {};
-  ctx.clinics.forEach(c => { if (c.number !== '') byNum[String(Number(c.number))] = c; });
-  const toLatin = v => String(v).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
-  let warnTimer;
-  const warnNumbersOnly = () => {
-    const w = $('#clinic-warn');
-    w.textContent = t('numOnly'); w.classList.add('show');
-    inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
-    clearTimeout(warnTimer);
-    warnTimer = setTimeout(() => { w.classList.remove('show'); inp.classList.remove('shake'); }, 2800);
-  };
-  const resolveClinic = () => {
-    const msg = $('#clinic-msg'), v = inp.value;
-    f.clinic_id = ''; msg.className = 'clinic-msg'; msg.textContent = '';
-    if (v) {
-      const c = byNum[String(Number(v))];
-      if (!c) { msg.textContent = t('noClinic'); msg.classList.add('bad'); }
-      else if (c.submitted) { msg.textContent = `${t('alreadyDone')} (${t('byWho')} ${c.submittedBy})`; msg.classList.add('bad'); }
-      else {
-        f.clinic_id = c.clinic_id; msg.classList.add('ok'); msg.innerHTML = icon('check') + esc(clinicLabel(c));
-        if (!c.has_fridge && !f.fridge) { const nb = $('[data-name="fridge"] [data-v="none"]', form); nb && nb.click(); }
-      }
-    }
+  const sel = $('#f-clinic');
+  const onClinic = () => {
+    const c = ctx.clinics.find(x => x.clinic_id === sel.value);
+    f.clinic_id = c ? c.clinic_id : '';
+    if (c && !c.has_fridge && !f.fridge) { const nb = $('[data-name="fridge"] [data-v="none"]', form); nb && nb.click(); }
     update();
   };
-  inp.addEventListener('beforeinput', e => { if (e.data && /^[^0-9٠-٩۰-۹]+$/.test(e.data)) { e.preventDefault(); warnNumbersOnly(); } });   // أحرف فقط: تُمنع. نص مختلط: تبقى أرقامه ويُنبَّه
-  inp.addEventListener('input', () => {
-    const latin = toLatin(inp.value), digits = latin.replace(/\D/g, '');
-    if (digits !== latin) warnNumbersOnly();          // لصق أو لوحة مفاتيح لا تدعم beforeinput
-    if (inp.value !== digits.slice(0, 3)) inp.value = digits.slice(0, 3);
-    resolveClinic();
-  });
+  sel.addEventListener('change', onClinic);
   $$('.seg, .rating', form).forEach(g => $$('button', g).forEach(b => b.onclick = () => {
     $$('button', g).forEach(x => x.setAttribute('aria-pressed', x === b));
     set(g.dataset.name, g.dataset.name === 'cleanliness' ? Number(b.dataset.v) : b.dataset.v);
@@ -1148,7 +1106,7 @@ async function renderNurse(view) {
     $('#prog-b').style.width = (n / total * 100) + '%';
   }
   update();
-  resolveClinic();
+  onClinic();
 
   form.onsubmit = async e => {
     e.preventDefault();
@@ -1164,7 +1122,7 @@ async function renderNurse(view) {
     const btn = $('#nsubmit');
     busy(btn, true, t('sending'));
     const report = {
-      clinic_id: f.clinic_id, clinic_number: inp.value, expiry_checked: f.expiry_checked, earliest_expiry: f.expiry_checked === 'yes' ? $('#f-exp').value : '',
+      clinic_id: f.clinic_id, expiry_checked: f.expiry_checked, earliest_expiry: f.expiry_checked === 'yes' ? $('#f-exp').value : '',
       expiry_item: $('#f-expi').value, sterilization_ok: f.sterilization_ok, fridge: f.fridge,
       fridge_temp: f.fridge === 'ok' ? $('#f-temp').value : '', employee_card: f.employee_card, cleanliness: f.cleanliness,
       missing_tools: f.missing_tools, tools: f.missing_tools === 'yes' ? f.tools : [],
