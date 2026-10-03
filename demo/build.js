@@ -11,12 +11,14 @@ window.APEX_DEMO = true;
 ${read('demo/runtime.js')}
 window.APEX_DEMO_API = (function () {
   const svc = createGasServices();
-  const server = (function (SpreadsheetApp, PropertiesService, CacheService, LockService, ContentService, Utilities, MailApp, ScriptApp, console) {
+  const clock = createDemoClock();
+  window.APEX_DEMO_SET_NOW = clock.set;
+  const server = (function (SpreadsheetApp, PropertiesService, CacheService, LockService, ContentService, Utilities, MailApp, ScriptApp, console, Date) {
 ${gas}
 ${read('demo/seed.js')}
     seedDemo();
     return { call: req => { Object.keys(ROWS_CACHE_).forEach(k => delete ROWS_CACHE_[k]); return JSON.parse(doPost({ postData: { contents: JSON.stringify(req) } }).getContent()); } };
-  })(svc.SpreadsheetApp, svc.PropertiesService, svc.CacheService, svc.LockService, svc.ContentService, svc.Utilities, svc.MailApp, svc.ScriptApp, svc.console);
+  })(svc.SpreadsheetApp, svc.PropertiesService, svc.CacheService, svc.LockService, svc.ContentService, svc.Utilities, svc.MailApp, svc.ScriptApp, svc.console, clock.DemoDate);
   return req => new Promise(res => setTimeout(() => res(server.call(req)), 120 + Math.random() * 180));
 })();
 </script>

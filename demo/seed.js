@@ -79,7 +79,7 @@ function seedDemo() {
         if (n[0] === 'Layla Hassan' && cid === 'BUR-C2' && wi === 0) return;
         const demoNurseNow = n[0] === 'Layla Hassan' && cid === 'BUR-C1' && wi === weeks.length - 1;
         if (rnd() > prob && !demoNurseNow) return;
-        const r0 = demoNurseNow ? 0 : rnd(), dayOff = r0 < .72 ? 0 : r0 < .9 ? 1 : r0 < .97 ? 2 : 3;
+        const r0 = demoNurseNow ? 0 : rnd(), dayOff = r0 < .74 ? 0 : 1;   // السبت في الوقت، الأحد متأخر. بعدها تُغلق النافذة
         const base = parseDate_(w); base.setDate(base.getDate() + dayOff);
         const when = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 9 + Math.floor(rnd() * 9), Math.floor(rnd() * 60), Math.floor(rnd() * 60));
         if (when > now) {                       // موعد التسليم لم يأتِ بعد اليوم: نُقدّمه ليكون قبل الآن مباشرة

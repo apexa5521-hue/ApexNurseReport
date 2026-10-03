@@ -88,3 +88,15 @@ function createGasServices() {
     console,
   };
 }
+
+/** ساعة قابلة للتحكم داخل الخادم الوهمي فقط: تتيح عرض السبت/الأحد/الاثنين/الجمعة بدون انتظار اليوم الفعلي */
+function createDemoClock() {
+  const Native = Date;
+  let override = null;
+  class DemoDate extends Native {
+    constructor(...a) { if (a.length === 0 && override != null) super(override); else super(...a); }
+    static now() { return override != null ? override : Native.now(); }
+    static [Symbol.hasInstance](x) { return Object.prototype.toString.call(x) === '[object Date]'; }
+  }
+  return { DemoDate: DemoDate, set: t => { override = t; } };
+}

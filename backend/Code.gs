@@ -55,7 +55,7 @@ const HEADERS = {
   Issues: ['issue_id', 'report_id', 'created_at', 'week_start', 'branch', 'clinic_id', 'clinic_name',
            'username', 'nurse_name', 'category', 'item', 'qty', 'severity', 'description',
            'department', 'status', 'occurrences', 'last_seen', 'assigned_to', 'updated_at',
-           'updated_by', 'resolved_at', 'resolution'],
+           'updated_by', 'resolved_at', 'resolution', 'reporters'],
   Settings: ['key', 'value', 'description'],
   Audit_Log: ['at', 'user', 'action', 'details'],
   Temp_Passwords: ['name', 'username', 'role', 'temp_password', 'created_at'],
@@ -65,6 +65,7 @@ const HEADERS = {
 const DEFAULT_SETTINGS = [
   ['DEADLINE_WEEKDAY', 6, 'يوم التسليم: 6 = السبت (0 الأحد … 6 السبت)'],
   ['LATE_ALLOWED_DAYS', 1, 'عدد أيام السماح بعد يوم التسليم (1 = الأحد يُحسب متأخر)'],
+  ['ALLOW_VERY_LATE', 'no', 'no = نافذة التقديم تُغلق من الاثنين (السبت في الوقت، الأحد متأخر). yes = يُقبل التقديم بعدها ويُسجَّل متأخراً جداً'],
   ['EARLY_ALLOWED_DAYS', 1, 'التسليم قبل يوم التسليم بهذا العدد يُحسب للأسبوع القادم (مبكر)'],
   ['EXPIRY_ALERT_DAYS', 60, 'تنبيه إذا كان أقرب تاريخ انتهاء خلال هذا العدد من الأيام'],
   ['FRIDGE_MIN', 2, 'أقل حرارة مقبولة للثلاجة'],
@@ -291,15 +292,22 @@ function apiNurseContext_(req, user) {
     const rs = mine.filter(r => r.week_start === w);
     return { week: w, timing: bestTiming_(rs), count: rs.length };
   });
-  const clinicIds = clinics.map(c => c.clinic_id);
+  // متابعة البلاغات: ما بلّغت عنه هي فقط، وليس كل ما في عيادتها
   const openIssues = rows_(S.ISSUES)
-    .filter(i => (i.status === 'open' || i.status === 'in_progress') && clinicIds.indexOf(i.clinic_id) >= 0)
+    .filter(i => (i.status === 'open' || i.status === 'in_progress') && reportedBy_(i, user.username))
     .map(issueOut_);
+  const closed = now.timing === 'very_late' && !allowVeryLate_(cfg);
+  const nextSat = addDays_(parseDate_(now.week), 7);
 
   return {
     user: publicUser_(user),
     week: now.week,
-    timingIfNow: now.timing,
+    timingIfNow: closed ? 'closed' : now.timing,
+    window: {
+      state: closed ? 'closed' : now.timing,          // early | on_time | late | closed
+      saturday: now.week, sunday: dateStr_(addDays_(parseDate_(now.week), 1)), monday: dateStr_(addDays_(parseDate_(now.week), 2)),
+      opensOn: dateStr_(addDays_(nextSat, -cfg.EARLY_ALLOWED_DAYS)), nextDeadline: dateStr_(nextSat),
+    },
     deadline: now.week,
     lateUntil: dateStr_(addDays_(parseDate_(now.week), cfg.LATE_ALLOWED_DAYS)),
     clinics: clinics.map(c => ({
@@ -314,6 +322,8 @@ function apiNurseContext_(req, user) {
   };
 }
 
+function allowVeryLate_(cfg) { return String(cfg.ALLOW_VERY_LATE).toLowerCase() === 'yes'; }
+
 function nurseClinics_(user) {
   const all = clinics_().filter(c => c.status === 'active');
   const assigned = splitList_(user.clinics);
@@ -323,6 +333,10 @@ function nurseClinics_(user) {
 
 function apiNurseSubmit_(req, user) {
   const cfg = settings_();
+  const win = classifySubmission_(new Date(), cfg);
+  if (win.timing === 'very_late' && !allowVeryLate_(cfg)) {
+    throw err_('نافذة التقديم لهذا الأسبوع مغلقة. التقديم السبت، ويُقبل الأحد كمتأخر. تفتح النافذة القادمة من الجمعة.', 'CLOSED');
+  }
   const p = req.report || {};
   const clinic = nurseClinics_(user).find(c => c.clinic_id === p.clinic_id);   // يجب أن تكون من عيادات فرعها/تخصيصها
   if (!clinic) throw err_('اختر العيادة من القائمة');
@@ -431,7 +445,7 @@ function upsertIssues_(list, report, opts) {
       username: report.username, nurse_name: report.nurse_name,
       category: x.category, item: x.item, qty: x.qty, severity: x.severity, description: x.description,
       department: CATEGORIES[x.category].dept, status: opts.status || 'open', occurrences: 1,
-      last_seen: report.week_start, assigned_to: '', updated_at: report.submitted_at, updated_by: '',
+      last_seen: report.week_start, assigned_to: '', updated_at: report.submitted_at, updated_by: '', reporters: report.username || '',
       resolved_at: opts.status === 'archived' ? report.submitted_at : '', resolution: opts.resolution || '',
     };
     const prev = openMap[key(obj)];
@@ -441,9 +455,12 @@ function upsertIssues_(list, report, opts) {
       prev.qty = obj.qty || prev.qty;
       prev.description = obj.description;
       if (sevRank_(obj.severity) > sevRank_(prev.severity)) prev.severity = obj.severity;
+      const rps = splitList_(prev.reporters || prev.username);
+      if (report.username && rps.indexOf(report.username) < 0) rps.push(report.username);   // كل من بلّغت عنها تراها في متابعتها
+      prev.reporters = rps.join(',');
       if (prev._row) {
         setCells_(S.ISSUES, prev._row, { occurrences: prev.occurrences, last_seen: prev.last_seen, qty: prev.qty,
-          description: prev.description, severity: prev.severity, updated_at: report.submitted_at });
+          description: prev.description, severity: prev.severity, updated_at: report.submitted_at, reporters: prev.reporters });
       }
     } else {
       fresh.push(obj);
@@ -556,6 +573,7 @@ function apiHrOverview_(req, user) {
       stopped: roster.filter(r => r.state === 'inactive').length,
     },
     remindable: remindable,
+    hasLink: !!settings_().APP_URL, reminderKind: reminderKindNow_(cfg),
     remindedToday: roster.filter(r => r.thisWeek === 'missing' && String(r.lastReminder).slice(0, 10) === today).length,
     roster: roster.sort((a, b) => (ROSTER_ORDER[a.thisWeek] - ROSTER_ORDER[b.thisWeek]) || (a.compliance == null ? 101 : a.compliance) - (b.compliance == null ? 101 : b.compliance)),
     cardIssues: cardIssues,
@@ -569,53 +587,85 @@ function emailOf_(r) {
 
 /* ───────── تذكير الممرضات اللواتي لم يسلّمن ───────── */
 
+/** نص كل رسالة بحسب موعدها. الرابط لا يُرسل في رسالة الإغلاق (لم يعد التقديم متاحاً). */
+const REMINDER_KINDS = {
+  open: {
+    subject: 'التقديم مفتوح: التقرير الأسبوعي للعيادة | Weekly clinic report is open',
+    ar: w => ['فُتحت نافذة التقديم للتقرير الأسبوعي للعيادة. موعده السبت ' + w + '.'],
+    en: w => ['The weekly clinic report window is now open. The deadline is Saturday ' + w + '.'],
+  },
+  deadline: {
+    subject: 'اليوم موعد التقرير الأسبوعي | Today: weekly clinic report is due',
+    ar: w => ['اليوم السبت ' + w + ' هو موعد رفع التقرير الأسبوعي للعيادة، ولم يصلنا تقريرك بعد.', 'نرجو رفعه اليوم. يُقبل غداً الأحد كتقديم متأخر.'],
+    en: w => ['Today, Saturday ' + w + ', is the deadline for the weekly clinic report and we have not received yours yet.', 'Please submit it today. Tomorrow (Sunday) is accepted as late.'],
+  },
+  late: {
+    subject: 'لم تقدّمي تقرير هذا الأسبوع، اليوم آخر يوم | Weekly report not submitted, last day today',
+    ar: w => ['لم تقدّمي التقرير الأسبوعي لأسبوع السبت ' + w + '. اليوم الأحد آخر يوم للتقديم، ويُسجَّل متأخراً.', 'بعد اليوم تُغلق نافذة التقديم لهذا الأسبوع.'],
+    en: w => ['You have not submitted the weekly report for the week of Saturday ' + w + '. Today (Sunday) is the last day and it will be recorded as late.', 'After today the submission window for this week closes.'],
+  },
+  closed: {
+    subject: 'لم تقدّمي تقرير هذا الأسبوع | You did not submit this week\'s report',
+    ar: w => ['لم تقدّمي التقرير الأسبوعي لأسبوع السبت ' + w + '. أُغلقت نافذة التقديم، وسُجّل هذا الأسبوع «لم يُسلَّم».', 'للاستفسار تواصلي مع الموارد البشرية. تفتح النافذة القادمة من يوم الجمعة.'],
+    en: w => ['You did not submit the weekly report for the week of Saturday ' + w + '. The submission window is closed and this week is recorded as "not submitted".', 'For questions, please contact HR. The next window opens on Friday.'],
+    noLink: true,
+  },
+};
+
+/** نوع الرسالة المناسب لهذه اللحظة (للزر اليدوي) */
+function reminderKindNow_(cfg) {
+  const t = classifySubmission_(new Date(), cfg).timing;
+  return t === 'early' ? 'open' : t === 'on_time' ? 'deadline' : t === 'late' ? 'late' : 'closed';
+}
+
 function apiHrRemind_(req, user) {
   const cfg = settings_();
-  const res = sendReminders_(user, currentWeek_(cfg), cfg, 'missed');
-  log_(user.username, 'remind', res.sent.length + ' sent');
+  const res = sendReminders_(user, currentWeek_(cfg), cfg, reminderKindNow_(cfg));
+  log_(user.username, 'remind_' + res.kind, res.sent.length + ' sent');
   return res;
 }
 
-/** يرسل بريداً لكل ممرضة نشطة لم تسلّم تقرير الأسبوع. kind: 'deadline' (صباح السبت) أو 'missed' (متابعة) */
+/** يرسل بريداً لكل ممرضة نشطة لم تسلّم تقرير الأسبوع (ليست في إجازة ولا متوقفة) */
 function sendReminders_(scopeUser, week, cfg, kind) {
+  const K = REMINDER_KINDS[kind];
+  if (!K) throw err_('نوع تذكير غير معروف');
   const roster = buildRoster_(scopeUser, week, [week], cfg).filter(r => r.thisWeek === 'missing' && r.state === 'active');
   const withMail = roster.filter(emailOf_), noEmail = roster.filter(r => !emailOf_(r)).map(r => r.name);
-  if (!withMail.length) return { sent: [], noEmail: noEmail, failed: [], week: week };
+  const url = cfg.APP_URL ? String(cfg.APP_URL) : '';
+  const res = { sent: [], noEmail: noEmail, failed: [], week: week, kind: kind, hasLink: !!url };
+  if (!withMail.length) return res;
   const quota = MailApp.getRemainingDailyQuota();
   if (quota < withMail.length) throw err_('حصة البريد اليومية لا تكفي (المتبقي ' + quota + ' رسالة). حاول غداً.');
 
-  const url = cfg.APP_URL ? String(cfg.APP_URL) : '';
-  const subject = 'تذكير: التقرير الأسبوعي للعيادة | Weekly clinic report reminder';
-  const line = kind === 'deadline'
-    ? ['اليوم موعد رفع التقرير الأسبوعي للعيادة (السبت ' + week + ').', 'Today is the deadline for the weekly clinic report (Saturday ' + week + ').']
-    : ['لم يصلنا بعد تقرير العيادة لأسبوع السبت ' + week + '. نرجو رفعه في أقرب وقت.', 'We have not received your clinic report for the week of Saturday ' + week + ' yet. Please submit it as soon as possible.'];
   const users = {};
   rows_(S.USERS).forEach(u => { users[u.username] = u; });
-
-  const sent = [], failed = [];
   withMail.forEach(r => {
-    const body = ['مرحباً ' + r.name + '،', line[0], url ? 'رابط الدخول: ' + url : '', '',
-                  'Hello ' + r.name + ',', line[1], url ? 'Sign-in link: ' + url : '', '', 'ApexCare Clinics']
-      .filter((l, i, a) => l !== '' || (a[i - 1] !== '' && i > 0)).join('\n');
+    const link = url && !K.noLink;
+    const body = ['مرحباً ' + r.name + '،'].concat(K.ar(week),
+      link ? ['رابط التقديم: ' + url] : [], ['اسم المستخدم: ' + r.username], ['', 'Hello ' + r.name + ','], K.en(week),
+      link ? ['Submission link: ' + url] : [], ['Username: ' + r.username], ['', 'ApexCare Clinics']).join('\n');
     try {
-      MailApp.sendEmail({ to: emailOf_(r), subject: subject, body: body, name: 'ApexCare Nursing' });
-      sent.push(r.name);
+      MailApp.sendEmail({ to: emailOf_(r), subject: K.subject, body: body, name: 'ApexCare Nursing' });
+      res.sent.push(r.name);
       if (users[r.username]) setCell_(S.USERS, users[r.username]._row, 'last_reminder', nowStr_());
-    } catch (e) { failed.push(r.name); }
+    } catch (e) { res.failed.push(r.name); }
   });
-  return { sent: sent, noEmail: noEmail, failed: failed, week: week };
+  return res;
 }
 
-/** تذكير تلقائي (يعمل بالمشغّل الزمني، شغّل installReminderTriggers مرة واحدة لتفعيله) */
+/** المشغّلات التلقائية: السبت (موعد) · الأحد (متأخر) · الاثنين (أُغلقت النافذة) */
 function autoReminderSaturday() { const cfg = settings_(); sendReminders_({ role: 'admin', branch: 'ALL' }, currentWeek_(cfg), cfg, 'deadline'); }
-function autoReminderSunday() { const cfg = settings_(); sendReminders_({ role: 'admin', branch: 'ALL' }, currentWeek_(cfg), cfg, 'missed'); }
+function autoReminderSunday() { const cfg = settings_(); sendReminders_({ role: 'admin', branch: 'ALL' }, currentWeek_(cfg), cfg, 'late'); }
+function autoReminderMonday() { const cfg = settings_(); sendReminders_({ role: 'admin', branch: 'ALL' }, currentWeek_(cfg), cfg, 'closed'); }
 
 function installReminderTriggers() {
-  const names = ['autoReminderSaturday', 'autoReminderSunday'];
+  if (!settings_().APP_URL) throw new Error('ضع رابط المنصة في ورقة Settings ← APP_URL أولاً، ليصل الرابط للممرضات في التذكير');
+  const names = ['autoReminderSaturday', 'autoReminderSunday', 'autoReminderMonday'];
   ScriptApp.getProjectTriggers().filter(t => names.indexOf(t.getHandlerFunction()) >= 0).forEach(t => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('autoReminderSaturday').timeBased().onWeekDay(ScriptApp.WeekDay.SATURDAY).atHour(10).create();
   ScriptApp.newTrigger('autoReminderSunday').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(10).create();
-  SpreadsheetApp.getActive().toast('تم تفعيل التذكير التلقائي: السبت والأحد الساعة 10 صباحاً', APP.NAME, 8);
+  ScriptApp.newTrigger('autoReminderMonday').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(9).create();
+  SpreadsheetApp.getActive().toast('تم تفعيل التذكير: السبت 10ص (موعد)، الأحد 10ص (متأخر)، الاثنين 9ص (أُغلقت النافذة)', APP.NAME, 8);
 }
 
 /* ───────── حالة الممرضة: على رأس العمل / إجازة / متوقفة ───────── */
@@ -768,7 +818,53 @@ function apiQualityStats_(req, user) {
   const expectedTotal = nurseStats.reduce((s, n) => s + n.expected, 0);
   const submittedTotal = nurseStats.reduce((s, n) => s + Math.min(n.submitted, n.expected), 0);
 
+  // ── كل ما يخص الجودة: بطاقة أداء كل قسم، حرارة الثلاجات، سجل المخالفات، وطابور مشاكل الجودة ──
+  const avg1 = a => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length * 10) / 10 : null;
+  const clinicsScore = clinics.map(c => {
+    const rs = reports.filter(r => r.clinic_id === c.clinic_id);
+    const cnt = f => rs.filter(f).length;
+    const mine = openIssues.filter(i => i.clinic_id === c.clinic_id);
+    const wks = unique_(rs.map(r => r.week_start)).length;
+    return { clinic_id: c.clinic_id, name: c.name, branch: c.branch, type: c.type,
+      reports: rs.length, coverage: weeks.length ? Math.min(100, Math.round(wks / weeks.length * 100)) : null,
+      avgClean: avg1(rs.map(r => Number(r.cleanliness)).filter(x => x > 0)),
+      steril: cnt(r => r.sterilization_ok === 'no'), fridge: cnt(r => r.fridge === 'problem'),
+      expiryUnchecked: cnt(r => r.expiry_checked === 'no'), cards: cnt(r => r.employee_card === 'no'),
+      tools: cnt(r => r.missing_tools === 'yes'), openIssues: mine.length, highOpen: mine.filter(i => i.severity === 'high').length };
+  }).sort((a, b) => b.highOpen - a.highOpen || b.openIssues - a.openIssues || a.coverage - b.coverage);
+
+  const temps = reports.filter(r => r.fridge_temp !== '' && r.fridge_temp != null && isFinite(Number(r.fridge_temp)));
+  const outTemps = temps.filter(r => Number(r.fridge_temp) < cfg.FRIDGE_MIN || Number(r.fridge_temp) > cfg.FRIDGE_MAX);
+  const fridge = {
+    range: [cfg.FRIDGE_MIN, cfg.FRIDGE_MAX], readings: temps.length, outOfRange: outTemps.length,
+    avg: avg1(temps.map(r => Number(r.fridge_temp))), problems: reports.filter(r => r.fridge === 'problem').length,
+    outList: outTemps.sort((a, b) => a.submitted_at < b.submitted_at ? 1 : -1).slice(0, 30)
+      .map(r => ({ date: r.submitted_at, clinic: r.clinic_name, branch: r.branch, nurse: r.nurse_name, temp: Number(r.fridge_temp) })),
+  };
+
+  const incidents = [];
+  reports.forEach(r => {
+    const what = [];
+    if (r.expiry_checked === 'no') what.push('لم يُفحص تاريخ الانتهاء');
+    if (r.sterilization_ok === 'no') what.push('التعقيم/الأكياس');
+    if (r.fridge === 'problem') what.push('الثلاجة: مشكلة');
+    if (r.fridge_temp !== '' && r.fridge_temp != null && isFinite(Number(r.fridge_temp)) && (Number(r.fridge_temp) < cfg.FRIDGE_MIN || Number(r.fridge_temp) > cfg.FRIDGE_MAX)) what.push('حرارة الثلاجة ' + r.fridge_temp + '°');
+    if (r.employee_card === 'no') what.push('بطاقة الموظف');
+    if (Number(r.cleanliness) > 0 && Number(r.cleanliness) <= 3) what.push('النظافة ' + r.cleanliness + '/5');
+    if (r.missing_tools === 'yes') what.push('أدوات ناقصة');
+    if (r.other_issue) what.push('أخرى: ' + String(r.other_issue).slice(0, 60));
+    if (what.length) incidents.push({ date: r.submitted_at, clinic: r.clinic_name, branch: r.branch, nurse: r.nurse_name, what: what });
+  });
+  incidents.sort((a, b) => a.date < b.date ? 1 : -1);
+
+  const issuesByDept = { supply: 0, quality: 0, hr: 0 };
+  openIssues.forEach(i => { if (issuesByDept[i.department] != null) issuesByDept[i.department]++; });
+  const qualityQueue = openIssues.filter(i => i.department === 'quality')
+    .sort((a, b) => sevRank_(b.severity) - sevRank_(a.severity) || (a.created_at < b.created_at ? -1 : 1)).slice(0, 40).map(issueOut_);
+
   return {
+    clinicsScore: clinicsScore, fridge: fridge, incidents: incidents.slice(0, 150), incidentsTotal: incidents.length,
+    issuesByDept: issuesByDept, qualityQueue: qualityQueue,
     from: from, to: to, weeks: weeks, branches: branchKeys,
     kpi: {
       reports: reports.length,
@@ -880,6 +976,8 @@ function apiUserSave_(req, user) {
   const name = clean_(p.name, 80);
   const email = clean_(p.email, 120).toLowerCase();
   if (!name) throw err_('أدخل الاسم');
+  if (role === 'nurse' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw err_('أدخل بريداً إلكترونياً صحيحاً للممرضة، تصلها عليه تذكيرات التقرير');
+  if (p.newUsername && !/^[a-z0-9._@+-]{3,80}$/i.test(String(p.newUsername).trim())) throw err_('اسم المستخدم: أحرف إنجليزية وأرقام و . _ - فقط (3 خانات على الأقل)');
 
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
@@ -1205,6 +1303,11 @@ function reportOut_(r) {
     employee_card: r.employee_card, cleanliness: Number(r.cleanliness) || null, missing_tools: r.missing_tools,
     tools: tools, other_issue: r.other_issue, notes: r.notes, issues_count: Number(r.issues_count) || 0,
   };
+}
+
+/** هل بلّغت هذه الممرضة عن المشكلة (بنفسها)؟ */
+function reportedBy_(i, username) {
+  return i.username === username || splitList_(i.reporters).indexOf(username) >= 0;
 }
 
 function issueOut_(i) {

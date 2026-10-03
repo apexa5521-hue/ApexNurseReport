@@ -67,6 +67,20 @@ a{color:var(--accent)}
 .icon-btn .ico{width:19px;height:19px}
 .logo .ico{width:20px;height:20px}
 .is-demo .btn[onclick*="print"]{display:none}
+.sched{padding:14px}
+.sched-in{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.sch{position:relative;border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;background:var(--surface-2)}
+.sch b{font-size:14px}.sch span{font-size:12px;color:var(--ink-3)}.sch i{font-style:normal;font-size:11.5px;color:var(--ink-3)}
+.sch em{position:absolute;top:8px;inset-inline-end:8px;font-style:normal;font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:99px;background:var(--ink);color:var(--bg)}
+.sch.now{border-color:var(--accent);background:var(--accent-soft)}
+.sch.late.now{border-color:var(--warn);background:var(--warn-soft)}
+.sch.out.now{border-color:var(--crit);background:var(--crit-soft)}
+.sch.out{border-style:dashed}
+.mini{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.mini div{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface-2)}
+.mini b{display:block;font-size:20px;font-weight:600;font-family:Inter}.mini span{font-size:11.5px;color:var(--ink-3)}
+.chipline{display:flex;flex-wrap:wrap;gap:4px}
+select.input.demo-clock{height:36px;width:190px;flex:none;padding:0 10px;font-size:12.5px;border-color:var(--warn)}
 .prow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
 .prow:last-child{border-bottom:0}
 .pinfo{flex:1;min-width:0}.pinfo b{font-weight:500}.pinfo .muted{font-size:11.5px}
@@ -418,7 +432,7 @@ const T = {
     changeTitle: 'تعيين كلمة مرور جديدة', changeSub: 'هذا أول دخول لك، اختر كلمة مرور خاصة بك.', oldPass: 'كلمة المرور المؤقتة',
     newPass: 'كلمة المرور الجديدة (6 أحرف على الأقل)', confirmPass: 'تأكيد كلمة المرور', save: 'حفظ', mismatch: 'كلمتا المرور غير متطابقتين',
     hello: 'مرحباً', weekOf: 'تقرير أسبوع', dueToday: 'موعد التسليم اليوم', onTimeNow: 'التسليم الآن يُحسب في الوقت',
-    lateNow: 'التسليم الآن يُحسب متأخراً', veryLateNow: 'فات موعد التسليم — التقرير سيُسجّل متأخراً جداً', earlyNow: 'التسليم الآن يُحسب مبكراً لأسبوع',
+    lateNow: 'التسليم الآن يُحسب متأخراً', closedNow: 'نافذة التقديم مغلقة', veryLateNow: 'فات موعد التسليم — التقرير سيُسجّل متأخراً جداً', earlyNow: 'التسليم الآن يُحسب مبكراً لأسبوع',
     submittedOf: 'عيادات تم رفعها', q1: 'العيادة', q1h: 'اختر العيادة أو القسم الذي تكتب تقريره', submitted: 'تم الرفع',
     pick: 'اختر من القائمة…', gDental: 'عيادات الأسنان', gDerma: 'Derma', gSteril: 'التعقيم', gOther: 'أخرى',
     q2: 'هل تم فحص تواريخ انتهاء الأدوية والمواد داخل العيادة؟', q2h: 'سجّل أقرب تاريخ انتهاء بين المواد والأدوية',
@@ -433,9 +447,11 @@ const T = {
     q8: 'مشكلة تحتاج تدخل الإدارة (اختياري)', q8ph: 'اكتب المشكلة باختصار', notes: 'ملاحظات (اختياري)',
     yes: 'نعم', no: 'لا', progress: 'اكتمل', of: 'من', submit: 'رفع التقرير', sending: 'جارٍ الرفع…',
     doneTitle: 'تم رفع التقرير', doneIssues: 'بنود أُرسلت للمتابعة مع الأقسام المختصة', doneNone: 'لا توجد ملاحظات تحتاج متابعة. شكراً لك.',
-    another: 'رفع تقرير لعيادة أخرى', finish: 'تم', history: 'سجل التسليم — آخر 12 أسبوع', followUp: 'متابعة مشاكل عياداتك',
-    noFollow: 'لا توجد مشاكل مفتوحة في عياداتك.', allDone: 'تم رفع تقارير كل عياداتك لهذا الأسبوع', allDoneSub: 'شكراً لك، نراك السبت القادم.',
-    st_on_time: 'في الوقت', st_early: 'مبكر', st_late: 'متأخر', st_very_late: 'متأخر جداً', st_missing: 'لم تُسلّم', st_leave: 'إجازة', st_na: '—',
+    another: 'رفع تقرير لعيادة أخرى', finish: 'تم', history: 'سجل التسليم — آخر 12 أسبوع', followUp: 'متابعة بلاغاتك',
+    noFollow: 'لا توجد بلاغات مفتوحة باسمك.', reportedOn: 'تاريخ البلاغ', today: 'اليوم', schSat: 'السبت', schSun: 'الأحد', schMon: 'الاثنين',
+    schDeadline: 'موعد التقديم', schLate: 'متأخر', schOut: 'خارج نافذة التقديم', closedTitle: 'نافذة التقديم مغلقة',
+    closedBody: (o, d) => `التقديم يكون يوم السبت، ويُقبل الأحد كتقديم متأخر. تفتح النافذة القادمة يوم الجمعة ${o}، وموعدها السبت ${d}.`, allDone: 'تم رفع تقارير كل عياداتك لهذا الأسبوع', allDoneSub: 'شكراً لك، نراك السبت القادم.',
+    st_on_time: 'في الوقت', st_early: 'مبكر', st_late: 'متأخر', st_very_late: 'متأخر جداً', st_missing: 'لم تُسلّم', st_closed: 'مغلقة', st_leave: 'إجازة', st_na: '—',
     is_open: 'مفتوحة', is_in_progress: 'قيد المعالجة', is_resolved: 'تم الحل', is_archived: 'مؤرشفة',
     logout: 'خروج', theme: 'تبديل المظهر', required: 'أكمل الأسئلة المطلوبة', fillTools: 'أدخل اسم كل أداة ناقصة',
     netErr: 'تعذر الاتصال بالخادم. تحقق من الإنترنت وحاول مجدداً.',
@@ -446,7 +462,7 @@ const T = {
     changeTitle: 'Set a new password', changeSub: 'This is your first sign-in. Choose your own password.', oldPass: 'Temporary password',
     newPass: 'New password (min. 6 characters)', confirmPass: 'Confirm password', save: 'Save', mismatch: 'Passwords do not match',
     hello: 'Hello', weekOf: 'Weekly report', dueToday: 'Due today', onTimeNow: 'Submitting now counts as on time',
-    lateNow: 'Submitting now counts as late', veryLateNow: 'Deadline passed — this report will be marked very late', earlyNow: 'Submitting now counts as early for the week of',
+    lateNow: 'Submitting now counts as late', closedNow: 'Submission window is closed', veryLateNow: 'Deadline passed — this report will be marked very late', earlyNow: 'Submitting now counts as early for the week of',
     submittedOf: 'clinics submitted', q1: 'Clinic', q1h: 'Choose the clinic or unit you are reporting on', submitted: 'Submitted',
     pick: 'Select from the list…', gDental: 'Dental clinics', gDerma: 'Derma', gSteril: 'Sterilization', gOther: 'Other',
     q2: 'Have expiry dates of drugs and materials in the clinic been checked?', q2h: 'Record the earliest expiry date you found',
@@ -461,9 +477,11 @@ const T = {
     q8: 'Problem that needs management (optional)', q8ph: 'Describe the problem briefly', notes: 'Notes (optional)',
     yes: 'Yes', no: 'No', progress: 'Completed', of: 'of', submit: 'Submit report', sending: 'Submitting…',
     doneTitle: 'Report submitted', doneIssues: 'items were sent to the responsible departments for follow-up', doneNone: 'Nothing needs follow-up. Thank you!',
-    another: 'Report another clinic', finish: 'Done', history: 'Submission history — last 12 weeks', followUp: 'Follow-up on your clinics',
-    noFollow: 'No open issues in your clinics.', allDone: 'All your clinics are reported for this week', allDoneSub: 'Thank you — see you next Saturday.',
-    st_on_time: 'On time', st_early: 'Early', st_late: 'Late', st_very_late: 'Very late', st_missing: 'Missed', st_leave: 'On leave', st_na: '—',
+    another: 'Report another clinic', finish: 'Done', history: 'Submission history — last 12 weeks', followUp: 'Follow-up on your reports',
+    noFollow: 'You have no open reports.', reportedOn: 'Reported', today: 'Today', schSat: 'Saturday', schSun: 'Sunday', schMon: 'Monday',
+    schDeadline: 'Submission deadline', schLate: 'Late', schOut: 'Outside the submission window', closedTitle: 'Submission window is closed',
+    closedBody: (o, d) => `Reports are due on Saturday and accepted on Sunday as late. The next window opens on Friday ${o}; the deadline is Saturday ${d}.`, allDone: 'All your clinics are reported for this week', allDoneSub: 'Thank you — see you next Saturday.',
+    st_on_time: 'On time', st_early: 'Early', st_late: 'Late', st_very_late: 'Very late', st_missing: 'Missed', st_closed: 'Closed', st_leave: 'On leave', st_na: '—',
     is_open: 'Open', is_in_progress: 'In progress', is_resolved: 'Resolved', is_archived: 'Archived',
     logout: 'Sign out', theme: 'Toggle theme', required: 'Please answer the required questions', fillTools: 'Enter the name of each missing tool',
     netErr: 'Could not reach the server. Check your connection and try again.',
@@ -500,7 +518,7 @@ const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => 
 
 const TIMING = {
   on_time: ['good', 'check'], early: ['good', 'check'], late: ['warn', 'clock'],
-  very_late: ['serious', 'alert'], missing: ['crit', 'x'], leave: ['accent', 'clock'], na: ['', 'dash'],
+  very_late: ['serious', 'alert'], missing: ['crit', 'x'], closed: ['crit', 'x'], leave: ['accent', 'clock'], na: ['', 'dash'],
 };
 const timingPill = s => { const m = TIMING[s] || TIMING.na; return `<span class="pill ${m[0]}">${icon(m[1])}${t('st_' + (s || 'na'))}</span>`; };
 const SEV = { high: ['crit', 'alert', 'عالية'], medium: ['warn', 'clock', 'متوسطة'], low: ['', 'dash', 'منخفضة'] };
@@ -728,6 +746,14 @@ const DEMO_ACCOUNTS = [
   { u: 'layla.hassan@demo.apex', label: 'ممرضة' }, { u: 'hr', label: 'الموارد البشرية' },
   { u: 'quality', label: 'الجودة' }, { u: 'supply', label: 'التموين' }, { u: 'admin', label: 'المدير' },
 ];
+/** عرض تجريبي: محاكاة يوم من أيام الأسبوع الحالي لرؤية نافذة التقديم (سبت/أحد/اثنين/جمعة) */
+function demoSetClock(v) {
+  window.APEX_DEMO_CLOCK = v;
+  const sat = parseD(thisSaturday()), off = { sat: 0, sun: 1, mon: 2, fri: 6 }[v];
+  window.APEX_DEMO_SET_NOW(v ? new Date(sat.getFullYear(), sat.getMonth(), sat.getDate() + off, 10, 0, 0).getTime() : null);
+  route();
+}
+
 async function demoLogin(u) {
   try {
     const d = await api('login', { username: u, password: 'demo' });
@@ -799,7 +825,8 @@ function renderShell(page) {
       const l = PAGES[p].label; return `<a href="#${p}" ${p === page ? 'aria-current="page"' : ''}>${esc(typeof l === 'function' ? l(u) : l)}</a>`; }).join('')}</nav>` : ''}
     <div class="spacer"></div>
     ${nurse ? `<div class="lang-switch" style="margin:0" role="group" aria-label="Language"><button type="button" data-lang="ar" aria-pressed="${state.lang === 'ar'}">ع</button><button type="button" data-lang="en" aria-pressed="${state.lang === 'en'}">EN</button></div>` : ''}
- ${window.APEX_DEMO ? `<select class="input demo-switch" id="demo-switch" aria-label="تبديل الدور"><option value="">عرض تجريبي · تبديل الدور</option>${DEMO_ACCOUNTS.map(a => `<option value="${a.u}">${a.label}</option>`).join('')}</select>` : ''}
+ ${window.APEX_DEMO ? `<select class="input demo-clock" id="demo-clock" aria-label="محاكاة اليوم">${[['', 'اليوم: الوقت الحقيقي'], ['sat', 'محاكاة: السبت (موعد)'], ['sun', 'محاكاة: الأحد (متأخر)'], ['mon', 'محاكاة: الاثنين (مغلق)'], ['fri', 'محاكاة: الجمعة (يفتح)']].map(([v, l]) => `<option value="${v}" ${(window.APEX_DEMO_CLOCK || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : ''}
+    ${window.APEX_DEMO ? `<select class="input demo-switch" id="demo-switch" aria-label="تبديل الدور"><option value="">عرض تجريبي · تبديل الدور</option>${DEMO_ACCOUNTS.map(a => `<option value="${a.u}">${a.label}</option>`).join('')}</select>` : ''}
     <button class="icon-btn" id="theme-btn" title="${t('theme')}" aria-label="${t('theme')}">${icon(isDark() ? 'sun' : 'moon')}</button>
     <div class="who"><span class="avatar">${esc(initials(u.name))}</span><span class="meta"><b>${esc(u.name)}</b><span>${esc(nurse ? br(u.branch) : u.roleLabel + (u.branch && u.branch !== 'ALL' ? ' · ' + br(u.branch) : ''))}</span></span></div>
     <button class="icon-btn" id="logout-btn" title="${t('logout')}" aria-label="${t('logout')}">${icon('out')}</button>
@@ -807,6 +834,7 @@ function renderShell(page) {
   <main id="view"></main>`;
   $('#theme-btn').onclick = toggleTheme;
   $('#demo-switch') && ($('#demo-switch').onchange = e => e.target.value && demoLogin(e.target.value));
+  $('#demo-clock') && ($('#demo-clock').onchange = e => demoSetClock(e.target.value));
   $('#logout-btn').onclick = () => logout();
   $$('.topbar [data-lang]').forEach(b => b.onclick = () => { applyLang(b.dataset.lang); route(); });
   moveNavIndicator();
@@ -938,8 +966,9 @@ async function renderNurse(view) {
 
   const nowText = {
     on_time: t('onTimeNow'), late: t('lateNow'), very_late: t('veryLateNow'),
-    early: t('earlyNow') + ' ' + fmtDate(ctx.week),
+    early: t('earlyNow') + ' ' + fmtDate(ctx.week), closed: t('closedNow'),
   }[ctx.timingIfNow];
+  const closed = ctx.window.state === 'closed';
   const ratio = ctx.clinics.length ? done / ctx.clinics.length : 0;
   const R = 36, C = 2 * Math.PI * R;
 
@@ -962,7 +991,13 @@ async function renderNurse(view) {
       </div>
     </section>
 
-    ${pending.length ? `
+    <section class="card sched rise" style="--i:1;margin-top:12px" aria-label="${t('schDeadline')}"><div class="sched-in">
+      <div class="sch ${ctx.window.state === 'on_time' || ctx.window.state === 'early' ? 'now' : ''}"><b>${t('schSat')}</b><span>${t('schDeadline')}</span><i class="num">${fmtDay(ctx.window.saturday)}</i>${ctx.window.state === 'on_time' ? `<em>${t('today')}</em>` : ''}</div>
+      <div class="sch late ${ctx.window.state === 'late' ? 'now' : ''}"><b>${t('schSun')}</b><span>${t('schLate')}</span><i class="num">${fmtDay(ctx.window.sunday)}</i>${ctx.window.state === 'late' ? `<em>${t('today')}</em>` : ''}</div>
+      <div class="sch out ${closed ? 'now' : ''}"><b>${t('schMon')}</b><span>${t('schOut')}</span><i class="num">${fmtDay(ctx.window.monday)}</i>${closed ? `<em>${t('today')}</em>` : ''}</div>
+    </div></section>
+
+    ${pending.length && !closed ? `
     <form id="nform" novalidate style="display:grid;gap:12px;margin-top:16px">
       <section class="card step rise" style="--i:1" data-step="clinic"><span class="no">1</span><div>
         <h3>${t('q1')}</h3><p class="hint">${t('q1h')}</p>
@@ -1028,11 +1063,15 @@ async function renderNurse(view) {
     <div class="submit-bar"><div class="in">
       <div class="progress"><span id="prog-t"></span><div class="bar"><i id="prog-b" style="width:0"></i></div></div>
       <button class="btn primary lg" id="nsubmit" form="nform" type="submit">${t('submit')}</button>
-    </div></div>` : `
+    </div></div>` : (pending.length && closed ? `
+    <section class="card done-view rise" style="margin-top:16px">
+      <div class="check" style="background:var(--crit-soft)"><svg width="44" height="44" viewBox="0 0 44 44"><path d="M14 14l16 16M30 14L14 30" style="stroke:var(--crit);stroke-dashoffset:0"/></svg></div>
+      <h2>${t('closedTitle')}</h2><p>${t('closedBody')(fmtDate(ctx.window.opensOn, { day: 'numeric', month: 'long' }), fmtDate(ctx.window.nextDeadline, { day: 'numeric', month: 'long' }))}</p>
+    </section>` : `
     <section class="card done-view rise" style="margin-top:16px">
       <div class="check"><svg width="44" height="44" viewBox="0 0 44 44"><path d="M12 23l7 7 14-15"/></svg></div>
       <h2>${t('allDone')}</h2><p>${t('allDoneSub')}</p>
-    </section>`}
+    </section>`)}
 
     <section class="card rise" style="--i:9;margin-top:16px"><div class="card-h"><h3>${t('history')}</h3></div>
       <div class="card-b"><div class="hist">${ctx.history.map(h => `<div title="${fmtDate(h.week)} — ${t('st_' + h.timing)}">
@@ -1043,14 +1082,15 @@ async function renderNurse(view) {
     <section class="card rise" style="--i:10;margin-top:16px"><div class="card-h"><h3>${t('followUp')}</h3></div>
       ${ctx.openIssues.length ? tableHTML([
         { label: t('q1'), get: r => clinicLabel(r) },
-        { label: '', html: r => `<b>${esc(r.item || catLabel(r))}</b><div class="muted" style="font-size:12px">${esc(catLabel(r))}${r.item ? '' : ' · ' + esc(r.description)}</div>` },
+        { label: '', html: r => `<b>${esc(r.item || catLabel(r))}</b><div class="muted" style="font-size:12px">${esc(state.lang === 'ar' ? r.description : (r.item ? catLabel(r) : ''))}</div>` },
+        { label: t('reportedOn'), html: r => `<span class="num muted">${esc(fmtDay(r.created_at))}</span>` },
         { label: '', html: r => statusPill(r.status) },
       ], ctx.openIssues.slice(0, 10)) : `<div class="empty">${t('noFollow')}</div>`}
     </section>`;
 
   const hist = $('.hist', view);
   if (hist) hist.scrollLeft = document.dir === 'rtl' ? -hist.scrollWidth : hist.scrollWidth;
-  if (!pending.length) return;
+  if (!pending.length || closed) return;
   const form = $('#nform');
   const set = (k, v) => { f[k] = v; update(); };
 
@@ -1238,8 +1278,10 @@ async function renderHR(view) {
     const targets = missing.filter(r => r.email || String(r.username).indexOf('@') > 0);
     const already = targets.filter(r => String(r.lastReminder).slice(0, 10) === today).length;
     modal({
-      title: 'إرسال تذكير بالبريد',
-      body: `<p>سيصل تذكير بالتقرير الأسبوعي (بالعربي والإنجليزي) إلى <b class="num">${targets.length}</b> ممرضة لم تسلّم تقرير أسبوع السبت ${fmtDate(d.week, { day: 'numeric', month: 'long' })}:</p>
+      title: ({ open: 'تذكير: فُتح التقديم', deadline: 'تذكير: اليوم موعد التقديم', late: 'تذكير: اليوم آخر يوم (متأخر)', closed: 'إشعار: لم تقدّمي هذا الأسبوع' })[d.reminderKind] || 'إرسال تذكير بالبريد',
+      body: `<p>سيصل بريد (بالعربي والإنجليزي) إلى <b class="num">${targets.length}</b> ممرضة لم تسلّم تقرير أسبوع السبت ${fmtDate(d.week, { day: 'numeric', month: 'long' })}.
+        <span class="muted">${({ open: 'نص الرسالة: فُتحت نافذة التقديم وموعدها السبت.', deadline: 'نص الرسالة: اليوم موعد التقديم ولم يصلنا تقريرك، مع رابط التقديم.', late: 'نص الرسالة: لم تقدّمي، واليوم الأحد آخر يوم (متأخر)، مع رابط التقديم.', closed: 'نص الرسالة: لم تقدّمي هذا الأسبوع وأُغلقت نافذة التقديم.' })[d.reminderKind] || ''}</span></p>
+        ${!d.hasLink && d.reminderKind !== 'closed' ? '<div class="notice" style="margin-top:10px">لم يُضَف رابط المنصة في Settings ← APP_URL، فلن يظهر رابط التقديم في الرسالة.</div>' : ''}
         <div class="plist" style="margin:12px 0;max-height:200px">${targets.map(r => `<div class="prow"><span class="avatar sm">${esc(initials(r.name))}</span><div class="pinfo"><b>${esc(r.name)}</b><div class="muted" dir="ltr" style="text-align:start">${esc(r.email || r.username)}</div></div></div>`).join('')}</div>
         ${already ? `<div class="notice">تم تذكير ${already} منهن اليوم. سيصلهن تذكير آخر.</div>` : ''}<div id="rm-err"></div>`,
       foot: `<button class="btn" data-close>إلغاء</button><button class="btn primary" id="rm-send">${icon('bell')}إرسال الآن</button>`,
@@ -1405,6 +1447,21 @@ async function renderQuality(view) {
         <p class="muted" style="font-size:11.5px">الأخضر ≥ 95% · الأصفر ≥ 85% · الأحمر أقل من 85%</p></div></section>
   </div>
 
+  <section class="card rise" style="--i:8;margin-top:16px"><div class="card-h" style="flex-wrap:wrap"><h3>بطاقة أداء الأقسام</h3><span class="sub">الأكثر مشاكل مفتوحة أولاً</span><div class="spacer"></div><button class="btn sm" id="cs-csv">${icon('dl')}CSV</button></div>
+    <div id="cs-t"></div></section>
+
+  <div class="grid g-2e" style="margin-top:16px">
+    <section class="card rise" style="--i:8"><div class="card-h" style="flex-wrap:wrap"><h3>مشاكل الجودة المفتوحة</h3><span class="sub num">${d.qualityQueue.length}</span><div class="spacer"></div>
+      <div class="chipline"><span class="tag">الجودة ${d.issuesByDept.quality}</span><span class="tag">التموين ${d.issuesByDept.supply}</span><span class="tag">الموارد البشرية ${d.issuesByDept.hr}</span></div></div>
+      <div id="qq-t"></div></section>
+    <section class="card rise" style="--i:9"><div class="card-h"><h3>حرارة الثلاجات</h3><span class="sub">المقبول ${d.fridge.range[0]}–${d.fridge.range[1]}°</span></div>
+      <div class="card-b"><div class="mini">
+        <div><b>${d.fridge.readings}</b><span>قراءات مسجلة</span></div><div><b>${d.fridge.outOfRange}</b><span>خارج النطاق</span></div>
+        <div><b>${d.fridge.avg == null ? '—' : d.fridge.avg + '°'}</b><span>المتوسط</span></div><div><b>${d.fridge.problems}</b><span>مشاكل مبلّغة</span></div></div>
+        ${d.fridge.outList.length ? '' : '<div class="empty" style="padding:14px 0">كل القراءات ضمن النطاق</div>'}</div>
+      <div id="fr-t"></div></section>
+  </div>
+
   <div class="grid g-2e" style="margin-top:16px">
     <section class="card rise" style="--i:9"><div class="card-h"><h3>المشاكل حسب النوع</h3><div class="spacer"></div>
       ${legendHTML([{ label: 'أُبلغ عنها في الفترة', color: cssVar('--s1') }, { label: 'ما زالت مفتوحة', color: cssVar('--s2') }])}</div>
@@ -1429,6 +1486,9 @@ async function renderQuality(view) {
       ], d.recurring, { empty: 'لا توجد مشاكل متكررة' })}</section>
   </div>
 
+  <section class="card rise" style="--i:13;margin-top:16px"><div class="card-h" style="flex-wrap:wrap"><h3>سجل المخالفات</h3><span class="sub">${d.incidentsTotal} تقرير فيه بند يحتاج انتباه${d.incidentsTotal > d.incidents.length ? ` · آخر ${d.incidents.length}` : ''}</span><div class="spacer"></div><button class="btn sm" id="inc-csv">${icon('dl')}CSV</button></div>
+    <div id="inc-t"></div></section>
+
   <section class="card rise" style="--i:13;margin-top:16px"><div class="card-h"><h3>ترتيب الممرضات في الفترة</h3><div class="spacer"></div><button class="btn sm" id="n-csv">${icon('dl')}CSV</button></div>
     <div id="nurse-t"></div></section>`;
 
@@ -1447,6 +1507,46 @@ async function renderQuality(view) {
   ];
   $('#exp-t').innerHTML = tableHTML(expCols, d.expiry, { empty: 'لا توجد مواد قريبة الانتهاء' });
   $('#exp-csv').onclick = () => exportTable('صلاحيات-قريبة', expCols, d.expiry);
+
+  const flag = (v, cls = 'warn') => v ? `<span class="pill ${cls}">${v}</span>` : '<span class="muted">—</span>';
+  const csCols = [
+    { label: 'القسم', html: r => `<b style="font-weight:500">${esc(r.name)}</b>`, csv: r => r.name },
+    { label: 'الفرع', get: r => br(r.branch) },
+    { label: 'التقارير', key: 'reports' },
+    { label: 'التغطية', html: r => `<div style="display:flex;align-items:center;gap:8px;min-width:110px"><div class="meter" style="flex:1;margin:0"><i style="width:${r.coverage || 0}%"></i></div><b class="num">${pct(r.coverage)}</b></div>`, csv: r => pct(r.coverage) },
+    { label: 'النظافة', html: r => r.avgClean == null ? '—' : `<span class="num">${r.avgClean}</span><span class="muted">/5</span>`, csv: r => r.avgClean },
+    { label: 'تعقيم', html: r => flag(r.steril, 'crit'), csv: r => r.steril },
+    { label: 'ثلاجة', html: r => flag(r.fridge, 'crit'), csv: r => r.fridge },
+    { label: 'فحص الصلاحية', html: r => flag(r.expiryUnchecked), csv: r => r.expiryUnchecked },
+    { label: 'بطاقات', html: r => flag(r.cards), csv: r => r.cards },
+    { label: 'أدوات', html: r => flag(r.tools), csv: r => r.tools },
+    { label: 'مشاكل مفتوحة', html: r => r.openIssues ? `<span class="pill ${r.highOpen ? 'crit' : 'warn'}">${r.openIssues}${r.highOpen ? ` · ${r.highOpen} عالية` : ''}</span>` : '<span class="muted">—</span>', csv: r => r.openIssues },
+  ];
+  $('#cs-t').innerHTML = tableHTML(csCols, d.clinicsScore, { empty: 'لا توجد أقسام' });
+  $('#cs-csv').onclick = () => exportTable('بطاقة-أداء-الأقسام-' + d.from + '_' + d.to, csCols, d.clinicsScore);
+
+  $('#qq-t').innerHTML = tableHTML([
+    { label: 'القسم', get: r => r.clinic_name + ' — ' + br(r.branch) },
+    { label: 'المشكلة', html: r => `<b style="font-weight:500">${esc(r.item || r.categoryLabel)}</b><div class="muted" style="font-size:11.5px">${esc(r.categoryLabel)} · ${esc(r.description)}</div>` },
+    { label: 'الخطورة', html: r => sevPill(r.severity) },
+    { label: 'منذ', html: r => `<span class="num">${r.ageDays}</span> يوم` },
+    { label: '', html: r => `<button class="btn sm" data-qissue="${esc(r.issue_id)}">${r.status === 'in_progress' ? 'قيد المعالجة' : 'معالجة'}</button>` },
+  ], d.qualityQueue, { empty: 'لا توجد مشاكل جودة مفتوحة' });
+  $$('#qq-t [data-qissue]').forEach(b => b.onclick = () => issueDialog(d.qualityQueue.find(i => i.issue_id === b.dataset.qissue), () => renderQuality(view)));
+
+  $('#fr-t').innerHTML = d.fridge.outList.length ? tableHTML([
+    { label: 'التاريخ', get: r => fmtDT(r.date) }, { label: 'القسم', get: r => r.clinic + ' — ' + br(r.branch) }, { label: 'أبلغت', key: 'nurse' },
+    { label: 'الحرارة', html: r => `<span class="pill crit">${icon('alert')}${r.temp}°</span>`, csv: r => r.temp },
+  ], d.fridge.outList) : '';
+
+  const incCols = [
+    { label: 'التاريخ', get: r => fmtDT(r.date), csv: r => r.date },
+    { label: 'القسم', get: r => r.clinic + ' — ' + br(r.branch) },
+    { label: 'الممرضة', key: 'nurse' },
+    { label: 'المخالفات', html: r => `<div class="chipline">${r.what.map(w => `<span class="tag">${esc(w)}</span>`).join('')}</div>`, csv: r => r.what.join(' | ') },
+  ];
+  $('#inc-t').innerHTML = tableHTML(incCols, d.incidents, { empty: 'لا توجد مخالفات في هذه الفترة' });
+  $('#inc-csv').onclick = () => exportTable('سجل-المخالفات-' + d.from + '_' + d.to, incCols, d.incidents);
 
   const nCols = [
     { label: '#', get: (r) => d.nurses.indexOf(r) + 1 },
@@ -1720,9 +1820,9 @@ function userDialog(d, u, done) {
     title: isNew ? 'إضافة مستخدم' : 'تعديل: ' + u.name, wide: true,
     body: `<div class="grid g-2e" style="gap:0 14px">
       <div class="field"><label for="uf-n">الاسم</label><input class="input" id="uf-n" value="${esc(u.name || '')}"></div>
-      <div class="field"><label for="uf-e">البريد الإلكتروني (يُستخدم للدخول)</label><input class="input" id="uf-e" dir="ltr" value="${esc(u.email || '')}"></div>
+      <div class="field"><label for="uf-e">البريد الإلكتروني (إلزامي للممرضة: تصلها عليه تذكيرات التقرير)</label><input class="input" id="uf-e" dir="ltr" value="${esc(u.email || '')}"></div>
       ${admin ? `<div class="field"><label for="uf-r">الدور</label><select class="input" id="uf-r">${Object.keys(d.roles).map(r => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${d.roles[r]}</option>`).join('')}</select></div>` : ''}
-      ${admin && isNew ? `<div class="field"><label for="uf-u">اسم المستخدم (اختياري، للأقسام)</label><input class="input" id="uf-u" dir="ltr" placeholder="يُستخدم البريد إذا تُرك فارغاً"></div>` : ''}
+      ${isNew ? `<div class="field"><label for="uf-u">اسم المستخدم للدخول (اختياري)</label><input class="input" id="uf-u" dir="ltr" autocapitalize="off" placeholder="يُستخدم البريد إذا تُرك فارغاً"></div>` : ''}
       <div class="field"><label for="uf-b">الفرع</label><select class="input" id="uf-b">${branchOpts.map(b => `<option value="${b}" ${u.branch === b ? 'selected' : ''}>${br(b)}</option>`).join('')}</select></div>
       <div class="field"><label for="uf-sd">تاريخ بداية المسؤولية</label><input class="input" id="uf-sd" type="date" value="${esc(u.start_date || ymd(new Date()))}"></div>
     </div>
