@@ -432,8 +432,8 @@ const T = {
     changeTitle: 'تعيين كلمة مرور جديدة', changeSub: 'هذا أول دخول لك، اختر كلمة مرور خاصة بك.', oldPass: 'كلمة المرور المؤقتة',
     newPass: 'كلمة المرور الجديدة (6 أحرف على الأقل)', confirmPass: 'تأكيد كلمة المرور', save: 'حفظ', mismatch: 'كلمتا المرور غير متطابقتين',
     hello: 'مرحباً', weekOf: 'تقرير أسبوع', dueToday: 'موعد التسليم اليوم', onTimeNow: 'التسليم الآن يُحسب في الوقت',
-    lateNow: 'التسليم الآن يُحسب متأخراً', closedNow: 'نافذة التقديم مغلقة', closedDone: 'وقد رفعتِ تقارير كل أقسامك لهذا الأسبوع.', myStats: 'إحصائياتك', statCommit: 'التزامك', stat12: 'آخر 12 أسبوع', statOnTime: 'في الوقت', statLast: 'آخر تقديم', statOpen: 'بلاغات مفتوحة', statStreak: 'أسابيع بلا تقديم', recent: 'آخر تقاريرك', colDate: 'التاريخ', colUnit: 'القسم', colTiming: 'التوقيت', colItems: 'بنود للمتابعة', colNote: 'ملاحظتك', noRecent: 'لم ترفعي أي تقرير بعد.', onLeaveNote: (a, b) => `مسجّل لك إجازة من ${a} إلى ${b}، فلا يُطلب منك تقرير خلالها.`, veryLateNow: 'فات موعد التسليم — التقرير سيُسجّل متأخراً جداً', earlyNow: 'التسليم الآن يُحسب مبكراً لأسبوع',
-    submittedOf: 'عيادات تم رفعها', q1: 'العيادة', q1h: 'اختر العيادة أو القسم الذي تكتب تقريره', submitted: 'تم الرفع',
+    lateNow: 'التسليم الآن يُحسب متأخراً', closedNow: 'نافذة التقديم مغلقة', closedDone: n => `رفعتِ هذا الأسبوع ${n} تقرير.`, myStats: 'إحصائياتك', statCommit: 'التزامك', stat12: 'آخر 12 أسبوع', statOnTime: 'في الوقت', statLast: 'آخر تقديم', statOpen: 'بلاغات مفتوحة', statStreak: 'أسابيع بلا تقديم', recent: 'آخر تقاريرك', colDate: 'التاريخ', colUnit: 'القسم', colTiming: 'التوقيت', colItems: 'بنود للمتابعة', colNote: 'ملاحظتك', noRecent: 'لم ترفعي أي تقرير بعد.', onLeaveNote: (a, b) => `مسجّل لك إجازة من ${a} إلى ${b}، فلا يُطلب منك تقرير خلالها.`, veryLateNow: 'فات موعد التسليم — التقرير سيُسجّل متأخراً جداً', earlyNow: 'التسليم الآن يُحسب مبكراً لأسبوع',
+    submittedOf: 'عيادات تم رفعها', mySubmitted: 'تقاريرك هذا الأسبوع', q1: 'العيادة', q1h: 'اختر العيادة أو القسم الذي تكتب تقريره', submitted: 'تم الرفع',
     pick: 'اختر من القائمة…', gDental: 'عيادات الأسنان', gDerma: 'Derma', gSteril: 'التعقيم', gOther: 'أخرى',
     q2: 'هل تم فحص تواريخ انتهاء الأدوية والمواد داخل العيادة؟', q2h: 'سجّل أقرب تاريخ انتهاء بين المواد والأدوية',
     earliest: 'أقرب تاريخ انتهاء', earliestItem: 'اسم المادة أو الدواء', earliestItemPh: 'مثال: Adrenaline',
@@ -462,8 +462,8 @@ const T = {
     changeTitle: 'Set a new password', changeSub: 'This is your first sign-in. Choose your own password.', oldPass: 'Temporary password',
     newPass: 'New password (min. 6 characters)', confirmPass: 'Confirm password', save: 'Save', mismatch: 'Passwords do not match',
     hello: 'Hello', weekOf: 'Weekly report', dueToday: 'Due today', onTimeNow: 'Submitting now counts as on time',
-    lateNow: 'Submitting now counts as late', closedNow: 'Submission window is closed', closedDone: 'You have already reported all your units this week.', myStats: 'Your statistics', statCommit: 'Your commitment', stat12: 'last 12 weeks', statOnTime: 'On time', statLast: 'Last submission', statOpen: 'Open reports', statStreak: 'Weeks missed in a row', recent: 'Your latest reports', colDate: 'Date', colUnit: 'Unit', colTiming: 'Timing', colItems: 'Follow-up items', colNote: 'Your note', noRecent: 'You have not submitted a report yet.', onLeaveNote: (a, b) => `You are on leave from ${a} to ${b}; no report is required during this period.`, veryLateNow: 'Deadline passed — this report will be marked very late', earlyNow: 'Submitting now counts as early for the week of',
-    submittedOf: 'clinics submitted', q1: 'Clinic', q1h: 'Choose the clinic or unit you are reporting on', submitted: 'Submitted',
+    lateNow: 'Submitting now counts as late', closedNow: 'Submission window is closed', closedDone: n => `You submitted ${n} report${n > 1 ? 's' : ''} this week.`, myStats: 'Your statistics', statCommit: 'Your commitment', stat12: 'last 12 weeks', statOnTime: 'On time', statLast: 'Last submission', statOpen: 'Open reports', statStreak: 'Weeks missed in a row', recent: 'Your latest reports', colDate: 'Date', colUnit: 'Unit', colTiming: 'Timing', colItems: 'Follow-up items', colNote: 'Your note', noRecent: 'You have not submitted a report yet.', onLeaveNote: (a, b) => `You are on leave from ${a} to ${b}; no report is required during this period.`, veryLateNow: 'Deadline passed — this report will be marked very late', earlyNow: 'Submitting now counts as early for the week of',
+    submittedOf: 'clinics submitted', mySubmitted: 'Your reports this week', q1: 'Clinic', q1h: 'Choose the clinic or unit you are reporting on', submitted: 'Submitted',
     pick: 'Select from the list…', gDental: 'Dental clinics', gDerma: 'Derma', gSteril: 'Sterilization', gOther: 'Other',
     q2: 'Have expiry dates of drugs and materials in the clinic been checked?', q2h: 'Record the earliest expiry date you found',
     earliest: 'Earliest expiry date', earliestItem: 'Drug / material name', earliestItemPh: 'e.g. Adrenaline',
@@ -983,7 +983,7 @@ async function renderNurse(view) {
         <h2>${t('weekOf')} · ${fmtDate(ctx.week, { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
         <span class="pill">${icon(TIMING[ctx.timingIfNow][1])}${esc(nowText)}</span>
       </div>
-      ${ctx.user.clinics.length ? '' : `<div class="ring-alt"><b class="num">${done}</b><span>${t('submittedOf')}</span></div>`}
+      ${ctx.user.clinics.length ? '' : `<div class="ring-alt"><b class="num">${ctx.submittedThisWeek.length}</b><span>${t('mySubmitted')}</span></div>`}
       <div class="ring ${ctx.user.clinics.length ? '' : 'hidden'}" aria-label="${done} ${t('of')} ${ctx.clinics.length}">
         <svg width="84" height="84"><circle cx="42" cy="42" r="${R}" stroke="rgba(255,255,255,.15)" stroke-width="7" fill="none"/>
         <circle cx="42" cy="42" r="${R}" stroke="#5FD0C4" stroke-width="7" fill="none" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - ratio)}" style="transition:stroke-dashoffset 1s var(--ease)"/></svg>
@@ -1007,7 +1007,7 @@ async function renderNurse(view) {
           <option value="">${t('pick')}</option>
           ${[['dental', 'gDental'], ['derma', 'gDerma'], ['sterilization', 'gSteril']].map(([ty, g]) => {
             const list = ctx.clinics.filter(c => c.type === ty);
-            return list.length ? `<optgroup label="${t(g)}">${list.map(c => `<option value="${esc(c.clinic_id)}" ${c.submitted ? 'disabled' : ''} ${onlyPending && onlyPending.clinic_id === c.clinic_id ? 'selected' : ''}>${esc(c.name)}${c.submitted ? ` — ${t('submitted')}${c.submittedBy ? ' (' + esc(c.submittedBy) + ')' : ''}` : ''}</option>`).join('')}</optgroup>` : '';
+            return list.length ? `<optgroup label="${t(g)}">${list.map(c => `<option value="${esc(c.clinic_id)}" ${c.submitted ? 'disabled' : ''} ${onlyPending && onlyPending.clinic_id === c.clinic_id ? 'selected' : ''}>${esc(c.name)}${c.submitted ? ` — ${t('submitted')}` : ''}</option>`).join('')}</optgroup>` : '';
           }).join('')}
           ${(() => { const rest = ctx.clinics.filter(c => ['dental', 'derma', 'sterilization'].indexOf(c.type) < 0); return rest.length ? `<optgroup label="${t('gOther')}">${rest.map(c => `<option value="${esc(c.clinic_id)}" ${c.submitted ? 'disabled' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>` : ''; })()}
         </select>
@@ -1069,7 +1069,7 @@ async function renderNurse(view) {
     <section class="card done-view rise" style="margin-top:16px">
       <div class="check" style="background:var(--crit-soft)"><svg width="44" height="44" viewBox="0 0 44 44"><path d="M14 14l16 16M30 14L14 30" style="stroke:var(--crit);stroke-dashoffset:0"/></svg></div>
       <h2>${t('closedTitle')}</h2><p>${t('closedBody')(fmtDate(ctx.window.opensOn, { day: 'numeric', month: 'long' }), fmtDate(ctx.window.nextDeadline, { day: 'numeric', month: 'long' }))}</p>
-      ${pending.length ? '' : `<p class="muted" style="margin-top:6px">${t('closedDone')}</p>`}
+      ${ctx.submittedThisWeek.length ? `<p class="muted" style="margin-top:6px">${t('closedDone')(ctx.submittedThisWeek.length)}</p>` : ''}
     </section>` : `
     <section class="card done-view rise" style="margin-top:16px">
       <div class="check"><svg width="44" height="44" viewBox="0 0 44 44"><path d="M12 23l7 7 14-15"/></svg></div>
@@ -1847,7 +1847,7 @@ function userDialog(d, u, done) {
       <div class="field"><label for="uf-b">الفرع</label><select class="input" id="uf-b">${branchOpts.map(b => `<option value="${b}" ${u.branch === b ? 'selected' : ''}>${br(b)}</option>`).join('')}</select></div>
       <div class="field"><label for="uf-sd">تاريخ بداية المسؤولية</label><input class="input" id="uf-sd" type="date" value="${esc(u.start_date || ymd(new Date()))}"></div>
     </div>
-    <div class="field" id="uf-cl-wrap"><label>العيادات المسؤولة عنها <span class="muted">(اتركها فارغة لتظهر كل عيادات الفرع)</span></label><div class="chips" id="uf-cl"></div></div>
+    <div class="field" id="uf-cl-wrap"><label>العيادات المسؤولة عنها <span class="muted">(اتركها فارغة: تظهر كل أقسام الفرع ما عدا التعقيم. حدّد وحدة التعقيم لممرضة التعقيم فقط)</span></label><div class="chips" id="uf-cl"></div></div>
     <div id="uf-err"></div>`,
     foot: `<button class="btn" data-close>إلغاء</button><button class="btn primary" id="uf-save">حفظ</button>`,
     onMount(el, close) {

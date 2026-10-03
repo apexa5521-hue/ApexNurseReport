@@ -37,7 +37,7 @@ function seedDemo() {
   const slug = n => n.toLowerCase().replace(/\s+/g, '.');
   const users = NURSES.map(n => {
     const c = newUserRow_({ username: slug(n[0]) + '@demo.apex', name: n[0], email: slug(n[0]) + '@demo.apex', role: 'nurse',
-      branch: n[1], clinics: n[2].join(','), start_date: ago(n[4]), status: n[5] || 'active',
+      branch: n[1], clinics: n[2].length && n[2].every(c => /STERIL/.test(c)) ? n[2].join(',') : '', start_date: ago(n[4]), status: n[5] || 'active',
       end_date: n[5] === 'inactive' ? weeks[3] : '' });
     const salt = Utilities.getUuid();
     c.row.salt = salt; c.row.pass_hash = hash_(PW, salt); c.row.must_change = 'no';

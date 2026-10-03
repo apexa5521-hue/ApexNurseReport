@@ -318,7 +318,7 @@ function apiNurseContext_(req, user) {
     clinics: clinics.map(c => ({
       clinic_id: c.clinic_id, name: c.name, branch: c.branch, type: c.type, has_fridge: c.has_fridge === 'yes',
       submitted: weekAll.some(r => r.clinic_id === c.clinic_id),
-      submittedBy: (weekAll.find(r => r.clinic_id === c.clinic_id) || {}).nurse_name || '',
+      submittedByMe: thisWeek.some(r => r.clinic_id === c.clinic_id),
     })),
     stats: { weeks: 12, compliance: me.compliance == null ? null : me.compliance, onTime: me.onTimeRate == null ? null : me.onTimeRate,
              lastSubmission: me.lastSubmission || '', missedStreak: me.missedStreak || 0, openReports: openIssues.length,
@@ -337,7 +337,8 @@ function nurseClinics_(user) {
   const all = clinics_().filter(c => c.status === 'active');
   const assigned = splitList_(user.clinics);
   if (assigned.length) return all.filter(c => assigned.indexOf(c.clinic_id) >= 0);
-  return all.filter(c => !user.branch || user.branch === 'ALL' || c.branch === user.branch);
+  // الافتراضي: كل أقسام فرعها ما عدا التعقيم (وحدة التعقيم تُسند لممرضة التعقيم صراحةً من الموارد البشرية)
+  return all.filter(c => c.type !== 'sterilization' && (!user.branch || user.branch === 'ALL' || c.branch === user.branch));
 }
 
 function apiNurseSubmit_(req, user) {
@@ -385,7 +386,7 @@ function apiNurseSubmit_(req, user) {
     const when = new Date();
     const cls = classifySubmission_(when, cfg);
     const dup = rows_(S.REPORTS).find(x => x.week_start === cls.week && x.clinic_id === clinic.clinic_id);
-    if (dup) throw err_('تم رفع تقرير ' + clinic.name + ' لهذا الأسبوع مسبقاً (' + dup.nurse_name + ')');
+    if (dup) throw err_('تم رفع تقرير ' + clinic.name + ' لهذا الأسبوع مسبقاً');
 
     const report = Object.assign(r, {
       report_id: 'R' + Utilities.formatDate(when, APP.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 90 + 10),
@@ -1296,6 +1297,7 @@ function legacyClinicId_(raw, branch, forceOnizah) {
                  [/bleach|تشقير|تبييض|derma/, 'DERMA']];
   for (let i = 0; i < rules.length; i++) if (rules[i][0].test(t)) return pre + rules[i][1];
   const m = t.replace(/o(?=\d)/g, '0').match(/\d+/);
+  if (m && pre === 'BUR-' && Number(m[0]) === 14) return 'BUR-DERMA';   // «14» في بريدة كانت خطأ: هي Derma CLINIC
   return m ? pre + 'C' + Number(m[0]) : pre + 'OTHER';
 }
 
