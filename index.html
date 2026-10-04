@@ -124,6 +124,7 @@ select.input.demo-switch{height:36px;width:170px;flex:none;padding:0 10px;font-s
 .cycle div{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);backdrop-filter:blur(6px);border-radius:12px;padding:10px 14px;font-size:12.5px;color:#D5E9E6}
 .cycle b{display:block;font-size:13px;color:#fff;font-weight:600}
 .login-foot{font-size:12px;color:#8FB8B1}
+.login-sig{display:none;margin-top:28px;font-size:11.5px;color:var(--ink-3);text-align:center}
 .login-pane{display:flex;align-items:center;justify-content:center;padding:40px 24px}
 .login-box{width:100%;max-width:380px;animation:rise .7s var(--ease) both}
 .login-box h2{font-size:24px;font-weight:700;letter-spacing:-.01em}
@@ -350,6 +351,7 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
   .login-art{padding:28px 20px;min-height:auto}
   .login-art h1{font-size:26px}
   .cycle,.login-foot{display:none}
+  .login-sig{display:block}
   .topbar-in{padding:0 16px;height:auto;min-height:60px;flex-wrap:wrap;padding-top:8px;padding-bottom:8px}
   .nav{order:5;width:100%;margin:0;overflow-x:auto}
   .who .meta{display:none}
@@ -432,7 +434,7 @@ const T = {
     changeTitle: 'تعيين كلمة مرور جديدة', changeSub: 'هذا أول دخول لك، اختر كلمة مرور خاصة بك.', oldPass: 'كلمة المرور المؤقتة',
     newPass: 'كلمة المرور الجديدة (6 أحرف على الأقل)', confirmPass: 'تأكيد كلمة المرور', save: 'حفظ', mismatch: 'كلمتا المرور غير متطابقتين',
     hello: 'مرحباً', weekOf: 'تقرير أسبوع', dueToday: 'موعد التسليم اليوم', onTimeNow: 'التسليم الآن يُحسب في الوقت',
-    lateNow: 'التسليم الآن يُحسب متأخراً', closedNow: 'نافذة التقديم مغلقة', closedDone: n => `رفعتِ هذا الأسبوع ${n} تقرير.`, myStats: 'إحصائياتك', statCommit: 'التزامك', stat12: 'آخر 12 أسبوع', statOnTime: 'في الوقت', statLast: 'آخر تقديم', statOpen: 'بلاغات مفتوحة', statStreak: 'أسابيع بلا تقديم', recent: 'آخر تقاريرك', colDate: 'التاريخ', colUnit: 'القسم', colTiming: 'التوقيت', colItems: 'بنود للمتابعة', colNote: 'ملاحظتك', noRecent: 'لم ترفعي أي تقرير بعد.', onLeaveNote: (a, b) => `مسجّل لك إجازة من ${a} إلى ${b}، فلا يُطلب منك تقرير خلالها.`, veryLateNow: 'فات موعد التسليم — التقرير سيُسجّل متأخراً جداً', earlyNow: 'التسليم الآن يُحسب مبكراً لأسبوع',
+    lateNow: 'التسليم الآن يُحسب متأخراً', closedNow: 'نافذة التقديم مغلقة', closedDone: n => `رفعتِ هذا الأسبوع ${n} تقرير.`, myStats: 'إحصائياتك', statCommit: 'التزامك', stat12: 'آخر 12 أسبوع', statOnTime: 'في الوقت', statLast: 'آخر تقديم', statOpen: 'بلاغات مفتوحة', statStreak: 'أسابيع بلا تقديم', recent: 'آخر تقاريرك', colDate: 'التاريخ', colUnit: 'القسم', colTiming: 'التوقيت', colItems: 'بنود للمتابعة', colNote: 'ملاحظتك', noRecent: 'لم ترفعي أي تقرير بعد.', onLeaveNote: (a, b) => `مسجّل لك إجازة من ${a} إلى ${b}، فلا يُطلب منك تقرير خلالها.`, veryLateNow: 'خارج نافذة التقديم — سيُسجَّل التقرير خارج النافذة', earlyNow: 'التسليم الآن يُحسب مبكراً لأسبوع',
     submittedOf: 'عيادات تم رفعها', mySubmitted: 'تقاريرك هذا الأسبوع', q1: 'العيادة', q1h: 'اختر العيادة أو القسم الذي تكتب تقريره', submitted: 'تم الرفع',
     pick: 'اختر من القائمة…', gDental: 'عيادات الأسنان', gDerma: 'Derma', gSteril: 'التعقيم', gOther: 'أخرى',
     q2: 'هل تم فحص تواريخ انتهاء الأدوية والمواد داخل العيادة؟', q2h: 'سجّل أقرب تاريخ انتهاء بين المواد والأدوية',
@@ -451,7 +453,7 @@ const T = {
     noFollow: 'لا توجد بلاغات مفتوحة باسمك.', reportedOn: 'تاريخ البلاغ', today: 'اليوم', schSat: 'السبت', schSun: 'الأحد', schMon: 'الاثنين',
     schDeadline: 'موعد التقديم', schLate: 'متأخر', schOut: 'خارج نافذة التقديم', closedTitle: 'نافذة التقديم مغلقة',
     closedBody: (o, d) => `التقديم يكون يوم السبت، ويُقبل الأحد كتقديم متأخر. تفتح النافذة القادمة يوم الجمعة ${o}، وموعدها السبت ${d}.`, allDone: 'تم رفع تقارير كل عياداتك لهذا الأسبوع', allDoneSub: 'شكراً لك، نراك السبت القادم.',
-    st_on_time: 'في الوقت', st_early: 'مبكر', st_late: 'متأخر', st_very_late: 'متأخر جداً', st_missing: 'لم تُسلّم', st_closed: 'مغلقة', st_leave: 'إجازة', st_na: '—',
+    st_on_time: 'في الوقت', st_early: 'مبكر', st_late: 'متأخر', st_very_late: 'خارج نافذة التقديم', st_missing: 'لم تُسلّم', st_closed: 'مغلقة', st_leave: 'إجازة', st_na: '—',
     is_open: 'مفتوحة', is_in_progress: 'قيد المعالجة', is_resolved: 'تم الحل', is_archived: 'مؤرشفة',
     logout: 'خروج', theme: 'تبديل المظهر', required: 'أكمل الأسئلة المطلوبة', fillTools: 'أدخل اسم كل أداة ناقصة',
     netErr: 'تعذر الاتصال بالخادم. تحقق من الإنترنت وحاول مجدداً.',
@@ -462,7 +464,7 @@ const T = {
     changeTitle: 'Set a new password', changeSub: 'This is your first sign-in. Choose your own password.', oldPass: 'Temporary password',
     newPass: 'New password (min. 6 characters)', confirmPass: 'Confirm password', save: 'Save', mismatch: 'Passwords do not match',
     hello: 'Hello', weekOf: 'Weekly report', dueToday: 'Due today', onTimeNow: 'Submitting now counts as on time',
-    lateNow: 'Submitting now counts as late', closedNow: 'Submission window is closed', closedDone: n => `You submitted ${n} report${n > 1 ? 's' : ''} this week.`, myStats: 'Your statistics', statCommit: 'Your commitment', stat12: 'last 12 weeks', statOnTime: 'On time', statLast: 'Last submission', statOpen: 'Open reports', statStreak: 'Weeks missed in a row', recent: 'Your latest reports', colDate: 'Date', colUnit: 'Unit', colTiming: 'Timing', colItems: 'Follow-up items', colNote: 'Your note', noRecent: 'You have not submitted a report yet.', onLeaveNote: (a, b) => `You are on leave from ${a} to ${b}; no report is required during this period.`, veryLateNow: 'Deadline passed — this report will be marked very late', earlyNow: 'Submitting now counts as early for the week of',
+    lateNow: 'Submitting now counts as late', closedNow: 'Submission window is closed', closedDone: n => `You submitted ${n} report${n > 1 ? 's' : ''} this week.`, myStats: 'Your statistics', statCommit: 'Your commitment', stat12: 'last 12 weeks', statOnTime: 'On time', statLast: 'Last submission', statOpen: 'Open reports', statStreak: 'Weeks missed in a row', recent: 'Your latest reports', colDate: 'Date', colUnit: 'Unit', colTiming: 'Timing', colItems: 'Follow-up items', colNote: 'Your note', noRecent: 'You have not submitted a report yet.', onLeaveNote: (a, b) => `You are on leave from ${a} to ${b}; no report is required during this period.`, veryLateNow: 'Outside the submission window — this report will be recorded as outside the window', earlyNow: 'Submitting now counts as early for the week of',
     submittedOf: 'clinics submitted', mySubmitted: 'Your reports this week', q1: 'Clinic', q1h: 'Choose the clinic or unit you are reporting on', submitted: 'Submitted',
     pick: 'Select from the list…', gDental: 'Dental clinics', gDerma: 'Derma', gSteril: 'Sterilization', gOther: 'Other',
     q2: 'Have expiry dates of drugs and materials in the clinic been checked?', q2h: 'Record the earliest expiry date you found',
@@ -481,7 +483,7 @@ const T = {
     noFollow: 'You have no open reports.', reportedOn: 'Reported', today: 'Today', schSat: 'Saturday', schSun: 'Sunday', schMon: 'Monday',
     schDeadline: 'Submission deadline', schLate: 'Late', schOut: 'Outside the submission window', closedTitle: 'Submission window is closed',
     closedBody: (o, d) => `Reports are due on Saturday and accepted on Sunday as late. The next window opens on Friday ${o}; the deadline is Saturday ${d}.`, allDone: 'All your clinics are reported for this week', allDoneSub: 'Thank you — see you next Saturday.',
-    st_on_time: 'On time', st_early: 'Early', st_late: 'Late', st_very_late: 'Very late', st_missing: 'Missed', st_closed: 'Closed', st_leave: 'On leave', st_na: '—',
+    st_on_time: 'On time', st_early: 'Early', st_late: 'Late', st_very_late: 'Outside the window', st_missing: 'Missed', st_closed: 'Closed', st_leave: 'On leave', st_na: '—',
     is_open: 'Open', is_in_progress: 'In progress', is_resolved: 'Resolved', is_archived: 'Archived',
     logout: 'Sign out', theme: 'Toggle theme', required: 'Please answer the required questions', fillTools: 'Enter the name of each missing tool',
     netErr: 'Could not reach the server. Check your connection and try again.',
@@ -659,17 +661,17 @@ function renderLogin(error) {
       <svg class="grid" aria-hidden="true"><defs><pattern id="g" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#fff" stroke-width=".6"/></pattern></defs><rect width="100%" height="100%" fill="url(#g)"/></svg>
       <div class="brandmark"><span class="logo">${icon('logo')}</span><span>ApexCare Nursing</span></div>
       <div>
-        <h1>${state.lang === 'en' ? 'Weekly clinic report, in one place.' : 'التقرير الأسبوعي للعيادات في مكان واحد'}</h1>
+        <h1>${state.lang === 'en' ? 'Clinics report, in one place.' : 'تقرير العيادات في مكان واحد'}</h1>
         <p class="lead">${state.lang === 'en'
           ? 'Nurses submit every Saturday. HR tracks commitment, Quality reads the trends, and Supply closes the gaps.'
           : 'الممرضات يرفعن التقرير كل سبت، والموارد البشرية تتابع الالتزام، والجودة تقرأ المؤشرات، والتموين يغلق النواقص.'}</p>
         <div class="cycle">
           <div><b>${state.lang === 'en' ? 'Saturday' : 'السبت'}</b>${state.lang === 'en' ? 'on time' : 'في الوقت'}</div>
           <div><b>${state.lang === 'en' ? 'Sunday' : 'الأحد'}</b>${state.lang === 'en' ? 'late' : 'متأخر'}</div>
-          <div><b>${state.lang === 'en' ? 'After' : 'بعدها'}</b>${state.lang === 'en' ? 'very late' : 'متأخر جداً'}</div>
+          <div><b>${state.lang === 'en' ? 'After' : 'بعدها'}</b>${state.lang === 'en' ? 'outside the submission window' : 'خارج نافذة التقديم'}</div>
         </div>
       </div>
-      <div class="login-foot">ApexCare Clinics · ${state.lang === 'en' ? 'Buraydah & Unaizah' : 'بريدة وعنيزة'}</div>
+      <div class="login-foot" dir="ltr">Built and developed by Mr.Ibrahim Alluhaydi.</div>
     </aside>
     <section class="login-pane">
       <form class="login-box" id="login-form" novalidate>
@@ -686,6 +688,7 @@ function renderLogin(error) {
           <div class="chips">${DEMO_ACCOUNTS.map(a => `<button type="button" class="btn sm" data-demo="${a.u}">${a.label}</button>`).join('')}</div></div>` : ''}
         ${!API() && !window.APEX_DEMO ? `<div class="form-error">${esc(t('noApi'))}</div>` : ''}
         ${error ? `<div class="form-error">${esc(error)}</div>` : '<div id="le"></div>'}
+            <p class="login-sig" dir="ltr">Built and developed by Mr.Ibrahim Alluhaydi.</p>
       </form>
     </section>
   </div>`;
@@ -1278,7 +1281,7 @@ async function renderHR(view) {
     <div id="roster"></div>
     <div class="card-b legend" style="padding-top:10px">
       <span><span class="heat"><i class="on_time"></i></span>في الوقت</span><span><span class="heat"><i class="late"></i></span>متأخر</span>
-      <span><span class="heat"><i class="very_late"></i></span>متأخر جداً</span><span><span class="heat"><i class="missing"></i></span>لم تُسلّم</span>
+      <span><span class="heat"><i class="very_late"></i></span>خارج نافذة التقديم</span><span><span class="heat"><i class="missing"></i></span>لم تُسلّم</span>
       <span><span class="heat"><i class="leave"></i></span>إجازة</span><span><span class="heat"><i class="na"></i></span>غير مطلوب</span>
     </div>
   </section>
