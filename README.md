@@ -43,7 +43,7 @@
 
 | بريدة | عنيزة |
 |---|---|
-| Dental Clinic 1 – 13 | Dental Clinic 1 – 4 |
+| Dental Clinic 1 – 13 | Dental Clinic 1 – 10 |
 | Derma Hydrafacial · Derma Clarity · Derma Gentle Pro · Derma CLINIC | Sterilization - Unayzah |
 | Sterilization - Buraydah | |
 

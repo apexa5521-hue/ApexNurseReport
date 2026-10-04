@@ -87,7 +87,7 @@ const DEFAULT_CLINICS = (function () {
   list.push(['BUR-GENTLE', 'Derma Gentle Pro', 'BURIDAH', 'derma', 'no', 'active']);
   list.push(['BUR-DERMA', 'Derma CLINIC', 'BURIDAH', 'derma', 'no', 'active']);
   list.push(['BUR-STERIL', 'Sterilization - Buraydah', 'BURIDAH', 'sterilization', 'no', 'active']);
-  for (let i = 1; i <= 4; i++) list.push(['ONZ-C' + i, 'Dental Clinic ' + i, 'ONIZAH', 'dental', 'yes', 'active']);
+  for (let i = 1; i <= 10; i++) list.push(['ONZ-C' + i, 'Dental Clinic ' + i, 'ONIZAH', 'dental', 'yes', 'active']);
   list.push(['ONZ-STERIL', 'Sterilization - Unayzah', 'ONIZAH', 'sterilization', 'no', 'active']);
   return list;
 })();

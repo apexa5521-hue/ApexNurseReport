@@ -29,9 +29,10 @@ function seedDemo() {
     ['Dina Putri', 'BURIDAH', ['BUR-HYDRAFACIAL', 'BUR-CLARITY'], .9, 16],
     ['Hana Yusuf', 'BURIDAH', ['BUR-GENTLE', 'BUR-DERMA'], .8, 14],
     ['Grace Lim', 'BURIDAH', ['BUR-STERIL'], .9, 5],
-    ['Nora Ali', 'ONIZAH', ['ONZ-C1', 'ONZ-C2'], 1, 30],
-    ['Sana Malik', 'ONIZAH', ['ONZ-C3', 'ONZ-C4'], .85, 26],
+    ['Nora Ali', 'ONIZAH', ['ONZ-C1', 'ONZ-C2', 'ONZ-C3'], 1, 30],
+    ['Sana Malik', 'ONIZAH', ['ONZ-C4', 'ONZ-C5', 'ONZ-C6'], .85, 26],
     ['Lina Kareem', 'ONIZAH', ['ONZ-STERIL'], .7, 18],
+    ['Mary Cruz', 'ONIZAH', ['ONZ-C7', 'ONZ-C8', 'ONZ-C9', 'ONZ-C10'], .95, 28],
     ['Ayu Lestari', 'BURIDAH', [], 0, 30, 'inactive'],
   ];
   const slug = n => n.toLowerCase().replace(/\s+/g, '.');
