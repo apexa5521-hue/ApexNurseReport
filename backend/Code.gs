@@ -1095,9 +1095,18 @@ function importFormResponses() {
   const cfg = settings_();
   const srcId = (String(cfg.FORM_SOURCE || '').match(/\/d\/([a-zA-Z0-9-_]+)/) || [])[1] || String(cfg.FORM_SOURCE || '').trim();
   const ss = srcId ? SpreadsheetApp.openById(srcId) : ss_();
-  const src = ss.getSheetByName(cfg.FORM_TAB) ||
-    ss.getSheets().find(sh => /^(طابع زمني|timestamp)$/i.test(String(sh.getRange(1, 1).getValue()).trim()));
-  if (!src) throw new Error('لم أجد ورقة ردود النموذج. اكتب اسمها في Settings ← FORM_TAB');
+  const want = String(cfg.FORM_TAB || '').trim().toLowerCase();
+  const isFormTab = sh => {
+    const first = String(sh.getRange(1, 1).getValue()).trim();
+    return sh.getName().trim().toLowerCase() === want || /^(طابع زمني|timestamp)$/i.test(first);
+  };
+  const src = ss.getSheets().find(isFormTab);
+  if (!src) {
+    const tabs = ss.getSheets().map(sh => '«' + sh.getName() + '»').join('، ');
+    throw new Error(srcId
+      ? 'فتحت الشيت المربوط (' + ss.getName() + ') ولم أجد فيه ورقة ردود النموذج. الأوراق الموجودة: ' + tabs + '. اكتب اسم ورقة الردود بالضبط في Settings ← FORM_TAB.'
+      : 'هذا الشيت (' + ss.getName() + ') ليس فيه ورقة ردود النموذج. الأوراق الموجودة: ' + tabs + '. ضع رابط الشيت الأساسي الذي فيه ردود النموذج في Settings ← FORM_SOURCE ثم شغّل الدالة مرة أخرى.');
+  }
   const values = src.getDataRange().getValues();
   const h = values.shift().map(x => String(x).toLowerCase());
   // بعض الطوابع الزمنية مكتوبة يدوياً كنص — نحولها لتاريخ
