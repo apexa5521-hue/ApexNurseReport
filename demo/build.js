@@ -19,6 +19,12 @@ ${read('demo/seed.js')}
     seedDemo();
     return { call: req => { Object.keys(ROWS_CACHE_).forEach(k => delete ROWS_CACHE_[k]); return JSON.parse(doPost({ postData: { contents: JSON.stringify(req) } }).getContent()); } };
   })(svc.SpreadsheetApp, svc.PropertiesService, svc.CacheService, svc.LockService, svc.ContentService, svc.Utilities, svc.MailApp, svc.ScriptApp, svc.console, clock.DemoDate);
+  // يبدأ العرض على «السبت» ليجد المشاهد الاستمارة مفتوحة أياً كان اليوم الفعلي؛ ويمكن تغيير اليوم من القائمة العلوية
+  (function () {
+    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() - 6 + 7) % 7));
+    window.APEX_DEMO_CLOCK = 'sat';
+    clock.set(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 10, 0, 0).getTime());
+  })();
   return req => new Promise(res => setTimeout(() => res(server.call(req)), 120 + Math.random() * 180));
 })();
 </script>
