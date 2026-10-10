@@ -1,5 +1,5 @@
 /**
- * ApexCare — نظام التقرير الأسبوعي للتمريض
+ * نظام تقرير العيادات للتمريض
  * Backend: Google Apps Script (Web App API)
  *
  * طريقة التركيب مشروحة في README.md
@@ -15,7 +15,7 @@
 /* ════════════════════════════ CONFIG ════════════════════════════ */
 
 const APP = {
-  NAME: 'ApexCare Nursing',
+  NAME: 'Nursing',
   TZ: 'Asia/Riyadh',
   SESSION_SECONDS: 6 * 60 * 60, // أقصى مدة يسمح بها CacheService
   HASH_ROUNDS: 250,
@@ -550,7 +550,7 @@ function buildRoster_(user, week, weeks, cfg) {
       onTimeRate: counted.length ? Math.round(onTime.length / counted.length * 100) : null,
       missedStreak: streak,
       lastSubmission: mine.reduce((m, r) => r.submitted_at > m ? r.submitted_at : m, ''),
-      lastReminder: n.last_reminder || '',
+      lastReminder: n.last_reminder || '', remindedToday: String(n.last_reminder || '').slice(0, 10) === today,
     };
   });
 }
@@ -600,24 +600,24 @@ function emailOf_(r) {
 /** نص كل رسالة بحسب موعدها. الرابط لا يُرسل في رسالة الإغلاق (لم يعد التقديم متاحاً). */
 const REMINDER_KINDS = {
   open: {
-    subject: 'التقديم مفتوح: التقرير الأسبوعي للعيادة | Weekly clinic report is open',
-    ar: w => ['فُتحت نافذة التقديم للتقرير الأسبوعي للعيادة. موعده السبت ' + w + '.'],
-    en: w => ['The weekly clinic report window is now open. The deadline is Saturday ' + w + '.'],
+    subject: 'التقديم مفتوح: تقرير العيادة | Clinic report is open',
+    ar: w => ['فُتحت نافذة التقديم لتقرير العيادة. موعده السبت ' + w + '.'],
+    en: w => ['The clinic report window is now open. The deadline is Saturday ' + w + '.'],
   },
   deadline: {
-    subject: 'اليوم موعد التقرير الأسبوعي | Today: weekly clinic report is due',
-    ar: w => ['اليوم السبت ' + w + ' هو موعد رفع التقرير الأسبوعي للعيادة، ولم يصلنا تقريرك بعد.', 'نرجو رفعه اليوم. يُقبل غداً الأحد كتقديم متأخر.'],
-    en: w => ['Today, Saturday ' + w + ', is the deadline for the weekly clinic report and we have not received yours yet.', 'Please submit it today. Tomorrow (Sunday) is accepted as late.'],
+    subject: 'اليوم موعد تقرير العيادة | Today: clinic report is due',
+    ar: w => ['اليوم السبت ' + w + ' هو موعد رفع تقرير العيادة، ولم يصلنا تقريرك بعد.', 'نرجو رفعه اليوم. يُقبل غداً الأحد كتقديم متأخر.'],
+    en: w => ['Today, Saturday ' + w + ', is the deadline for the clinic report and we have not received yours yet.', 'Please submit it today. Tomorrow (Sunday) is accepted as late.'],
   },
   late: {
-    subject: 'لم تقدّمي تقرير هذا الأسبوع، اليوم آخر يوم | Weekly report not submitted, last day today',
-    ar: w => ['لم تقدّمي التقرير الأسبوعي لأسبوع السبت ' + w + '. اليوم الأحد آخر يوم للتقديم، ويُسجَّل متأخراً.', 'بعد اليوم تُغلق نافذة التقديم لهذا الأسبوع.'],
-    en: w => ['You have not submitted the weekly report for the week of Saturday ' + w + '. Today (Sunday) is the last day and it will be recorded as late.', 'After today the submission window for this week closes.'],
+    subject: 'لم تقدّمي تقرير هذا الأسبوع، اليوم آخر يوم | Clinic report not submitted, last day today',
+    ar: w => ['لم تقدّمي تقرير العيادة لأسبوع السبت ' + w + '. اليوم الأحد آخر يوم للتقديم، ويُسجَّل متأخراً.', 'بعد اليوم تُغلق نافذة التقديم لهذا الأسبوع.'],
+    en: w => ['You have not submitted the clinic report for the week of Saturday ' + w + '. Today (Sunday) is the last day and it will be recorded as late.', 'After today the submission window for this week closes.'],
   },
   closed: {
     subject: 'لم تقدّمي تقرير هذا الأسبوع | You did not submit this week\'s report',
-    ar: w => ['لم تقدّمي التقرير الأسبوعي لأسبوع السبت ' + w + '. أُغلقت نافذة التقديم، وسُجّل هذا الأسبوع «لم يُسلَّم».', 'للاستفسار تواصلي مع الموارد البشرية. تفتح النافذة القادمة من يوم الجمعة.'],
-    en: w => ['You did not submit the weekly report for the week of Saturday ' + w + '. The submission window is closed and this week is recorded as "not submitted".', 'For questions, please contact HR. The next window opens on Friday.'],
+    ar: w => ['لم تقدّمي تقرير العيادة لأسبوع السبت ' + w + '. أُغلقت نافذة التقديم، وسُجّل هذا الأسبوع «لم يُسلَّم».', 'للاستفسار تواصلي مع الموارد البشرية. تفتح النافذة القادمة من يوم الجمعة.'],
+    en: w => ['You did not submit the clinic report for the week of Saturday ' + w + '. The submission window is closed and this week is recorded as "not submitted".', 'For questions, please contact HR. The next window opens on Friday.'],
     noLink: true,
   },
 };
@@ -653,9 +653,9 @@ function sendReminders_(scopeUser, week, cfg, kind) {
     const link = url && !K.noLink;
     const body = ['مرحباً ' + r.name + '،'].concat(K.ar(week),
       link ? ['رابط التقديم: ' + url] : [], ['اسم المستخدم: ' + r.username], ['', 'Hello ' + r.name + ','], K.en(week),
-      link ? ['Submission link: ' + url] : [], ['Username: ' + r.username], ['', 'ApexCare Clinics']).join('\n');
+      link ? ['Submission link: ' + url] : [], ['Username: ' + r.username]).join('\n');
     try {
-      MailApp.sendEmail({ to: emailOf_(r), subject: K.subject, body: body, name: 'ApexCare Nursing' });
+      MailApp.sendEmail({ to: emailOf_(r), subject: K.subject, body: body, name: 'Nursing' });
       res.sent.push(r.name);
       if (users[r.username]) setCell_(S.USERS, users[r.username]._row, 'last_reminder', nowStr_());
     } catch (e) { res.failed.push(r.name); }

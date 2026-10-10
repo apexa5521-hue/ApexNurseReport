@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ApexCare Nursing</title>
-<meta name="description" content="نظام التقرير الأسبوعي للتمريض — ApexCare">
+<title>Nursing</title>
+<meta name="description" content="نظام تقرير العيادات للتمريض">
 <meta name="theme-color" content="#0E6B66">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -433,7 +433,7 @@ const T = {
     pass: 'كلمة المرور', enter: 'دخول', noApi: 'لم يتم ربط الصفحة بالخادم بعد. ضع رابط Web App في CONFIG.API_URL.',
     changeTitle: 'تعيين كلمة مرور جديدة', changeSub: 'هذا أول دخول لك، اختر كلمة مرور خاصة بك.', oldPass: 'كلمة المرور المؤقتة',
     newPass: 'كلمة المرور الجديدة (6 أحرف على الأقل)', confirmPass: 'تأكيد كلمة المرور', save: 'حفظ', mismatch: 'كلمتا المرور غير متطابقتين',
-    hello: 'مرحباً', weekOf: 'تقرير أسبوع', dueToday: 'موعد التسليم اليوم', onTimeNow: 'التسليم الآن يُحسب في الوقت',
+    hello: 'مرحباً', weekOf: 'تقرير العيادات', dueToday: 'موعد التسليم اليوم', onTimeNow: 'التسليم الآن يُحسب في الوقت',
     lateNow: 'التسليم الآن يُحسب متأخراً', closedNow: 'نافذة التقديم مغلقة', closedDone: n => `رفعتِ هذا الأسبوع ${n} تقرير.`, myStats: 'إحصائياتك', statCommit: 'التزامك', stat12: 'آخر 12 أسبوع', statOnTime: 'في الوقت', statLast: 'آخر تقديم', statOpen: 'بلاغات مفتوحة', statStreak: 'أسابيع بلا تقديم', recent: 'آخر تقاريرك', colDate: 'التاريخ', colUnit: 'القسم', colTiming: 'التوقيت', colItems: 'بنود للمتابعة', colNote: 'ملاحظتك', noRecent: 'لم ترفعي أي تقرير بعد.', onLeaveNote: (a, b) => `مسجّل لك إجازة من ${a} إلى ${b}، فلا يُطلب منك تقرير خلالها.`, veryLateNow: 'خارج نافذة التقديم — سيُسجَّل التقرير خارج النافذة', earlyNow: 'التسليم الآن يُحسب مبكراً لأسبوع',
     submittedOf: 'عيادات تم رفعها', mySubmitted: 'تقاريرك هذا الأسبوع', q1: 'العيادة', q1h: 'اختر العيادة أو القسم الذي تكتب تقريره', submitted: 'تم الرفع',
     pick: 'اختر من القائمة…', gDental: 'عيادات الأسنان', gDerma: 'Derma', gSteril: 'التعقيم', gOther: 'أخرى',
@@ -463,7 +463,7 @@ const T = {
     pass: 'Password', enter: 'Sign in', noApi: 'This page is not connected to the server yet (CONFIG.API_URL is empty).',
     changeTitle: 'Set a new password', changeSub: 'This is your first sign-in. Choose your own password.', oldPass: 'Temporary password',
     newPass: 'New password (min. 6 characters)', confirmPass: 'Confirm password', save: 'Save', mismatch: 'Passwords do not match',
-    hello: 'Hello', weekOf: 'Weekly report', dueToday: 'Due today', onTimeNow: 'Submitting now counts as on time',
+    hello: 'Hello', weekOf: 'Clinics report', dueToday: 'Due today', onTimeNow: 'Submitting now counts as on time',
     lateNow: 'Submitting now counts as late', closedNow: 'Submission window is closed', closedDone: n => `You submitted ${n} report${n > 1 ? 's' : ''} this week.`, myStats: 'Your statistics', statCommit: 'Your commitment', stat12: 'last 12 weeks', statOnTime: 'On time', statLast: 'Last submission', statOpen: 'Open reports', statStreak: 'Weeks missed in a row', recent: 'Your latest reports', colDate: 'Date', colUnit: 'Unit', colTiming: 'Timing', colItems: 'Follow-up items', colNote: 'Your note', noRecent: 'You have not submitted a report yet.', onLeaveNote: (a, b) => `You are on leave from ${a} to ${b}; no report is required during this period.`, veryLateNow: 'Outside the submission window — this report will be recorded as outside the window', earlyNow: 'Submitting now counts as early for the week of',
     submittedOf: 'clinics submitted', mySubmitted: 'Your reports this week', q1: 'Clinic', q1h: 'Choose the clinic or unit you are reporting on', submitted: 'Submitted',
     pick: 'Select from the list…', gDental: 'Dental clinics', gDerma: 'Derma', gSteril: 'Sterilization', gOther: 'Other',
@@ -659,12 +659,9 @@ function renderLogin(error) {
   <div id="login">
     <aside class="login-art">
       <svg class="grid" aria-hidden="true"><defs><pattern id="g" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#fff" stroke-width=".6"/></pattern></defs><rect width="100%" height="100%" fill="url(#g)"/></svg>
-      <div class="brandmark"><span class="logo">${icon('logo')}</span><span>ApexCare Nursing</span></div>
+      <div class="brandmark"><span class="logo">${icon('logo')}</span><span>Nursing</span></div>
       <div>
         <h1>${state.lang === 'en' ? 'Clinics report, in one place.' : 'تقرير العيادات في مكان واحد'}</h1>
-        <p class="lead">${state.lang === 'en'
-          ? 'Nurses submit every Saturday. HR tracks commitment, Quality reads the trends, and Supply closes the gaps.'
-          : 'الممرضات يرفعن التقرير كل سبت، والموارد البشرية تتابع الالتزام، والجودة تقرأ المؤشرات، والتموين يغلق النواقص.'}</p>
         <div class="cycle">
           <div><b>${state.lang === 'en' ? 'Saturday' : 'السبت'}</b>${state.lang === 'en' ? 'on time' : 'في الوقت'}</div>
           <div><b>${state.lang === 'en' ? 'Sunday' : 'الأحد'}</b>${state.lang === 'en' ? 'late' : 'متأخر'}</div>
@@ -719,7 +716,7 @@ function renderChangePassword() {
   $('#app').innerHTML = `
   <div class="login-pane" style="min-height:100vh">
     <form class="login-box card" style="padding:28px" id="cp-form" novalidate>
-      <div class="brandmark" style="margin-bottom:22px"><span class="logo">${icon('logo')}</span><span>ApexCare</span></div>
+      <div class="brandmark" style="margin-bottom:22px"><span class="logo">${icon('logo')}</span><span>Nursing</span></div>
       <h2>${t('changeTitle')}</h2>
       <p class="sub">${t('changeSub')}</p>
       <div class="field"><label for="c0">${t('oldPass')}</label><input class="input" id="c0" type="password" dir="ltr" autocomplete="current-password"></div>
@@ -823,7 +820,7 @@ function renderShell(page) {
   const nurse = u.role === 'nurse';
   $('#app').innerHTML = `
   <header class="topbar"><div class="topbar-in">
-    <div class="brandmark"><span class="logo">${icon('logo')}</span><span>ApexCare<small>${nurse ? (state.lang === 'en' ? 'Nursing weekly report' : 'التقرير الأسبوعي للتمريض') : 'منصة متابعة التمريض'}</small></span></div>
+    <div class="brandmark"><span class="logo">${icon('logo')}</span><span>${nurse ? (state.lang === 'en' ? 'Clinics report' : 'تقرير العيادات') : 'متابعة التمريض'}</span></div>
     ${pages.length > 1 ? `<nav class="nav" aria-label="الأقسام"><span class="ind"></span>${pages.map(p => {
       const l = PAGES[p].label; return `<a href="#${p}" ${p === page ? 'aria-current="page"' : ''}>${esc(typeof l === 'function' ? l(u) : l)}</a>`; }).join('')}</nav>` : ''}
     <div class="spacer"></div>
@@ -1242,7 +1239,7 @@ async function renderHR(view) {
 
   view.innerHTML = `
   <div class="page-head rise">
-    <div><h1>التزام الممرضات بالتقرير الأسبوعي</h1><p>أسبوع السبت ${fmtDate(d.week, { day: 'numeric', month: 'long', year: 'numeric' })}</p></div>
+    <div><h1>التزام الممرضات بتقرير العيادات</h1><p>أسبوع السبت ${fmtDate(d.week, { day: 'numeric', month: 'long', year: 'numeric' })}</p></div>
     <div class="spacer"></div>
     <div class="toolbar">
       <button class="icon-btn" id="wk-prev" aria-label="الأسبوع السابق">${icon('chev')}</button>
@@ -1262,7 +1259,7 @@ async function renderHR(view) {
     <section class="card rise" style="--i:5"><div class="card-h" style="flex-wrap:wrap"><h3>غير الملتزمات</h3><span class="sub num">${missing.length}</span><div class="spacer"></div>
       ${d.isCurrent ? (d.remindable ? `<button class="btn primary sm" id="remind-btn">${icon('bell')}إرسال تذكير (${d.remindable})</button>` : '') : '<span class="sub">التذكير متاح للأسبوع الحالي فقط</span>'}</div>
       <div class="card-b" style="padding-top:6px">${missing.length ? `<div class="plist">${missing.map(r => person(r,
-        `${String(r.lastReminder).slice(0, 10) === today ? '<span class="tag">تم تذكيرها اليوم</span>' : ''}${r.missedStreak >= 3 ? `<span class="repeat">${icon('alert')}متكرر</span>` : ''}${!r.email && String(r.username).indexOf('@') < 0 ? '<span class="tag" title="لا يوجد بريد لإرسال التذكير">بدون بريد</span>' : ''}`)).join('')}</div>`
+        `${r.remindedToday ? '<span class="tag">تم تذكيرها اليوم</span>' : ''}${r.missedStreak >= 3 ? `<span class="repeat">${icon('alert')}متكرر</span>` : ''}${!r.email && String(r.username).indexOf('@') < 0 ? '<span class="tag" title="لا يوجد بريد لإرسال التذكير">بدون بريد</span>' : ''}`)).join('')}</div>`
         : '<div class="empty"><b>الجميع ملتزم</b>لا توجد ممرضة متأخرة هذا الأسبوع</div>'}</div></section>
     <section class="card rise" style="--i:6"><div class="card-h"><h3>الملتزمات</h3><span class="sub num">${submitted.length}</span></div>
       <div class="card-b" style="padding-top:6px">${submitted.length ? `<div class="plist">${submitted.map(r => person(r,
@@ -1300,7 +1297,7 @@ async function renderHR(view) {
   const remind = $('#remind-btn');
   if (remind) remind.onclick = () => {
     const targets = missing.filter(r => r.email || String(r.username).indexOf('@') > 0);
-    const already = targets.filter(r => String(r.lastReminder).slice(0, 10) === today).length;
+    const already = targets.filter(r => r.remindedToday).length;
     modal({
       title: ({ open: 'تذكير: فُتح التقديم', deadline: 'تذكير: اليوم موعد التقديم', late: 'تذكير: اليوم آخر يوم (متأخر)', closed: 'إشعار: لم تقدّمي هذا الأسبوع' })[d.reminderKind] || 'إرسال تذكير بالبريد',
       body: `<p>سيصل بريد (بالعربي والإنجليزي) إلى <b class="num">${targets.length}</b> ممرضة لم تسلّم تقرير أسبوع السبت ${fmtDate(d.week, { day: 'numeric', month: 'long' })}.
@@ -1385,7 +1382,7 @@ function leaveDialog(r, done, onCancel) {
     body: `<div class="grid g-2e" style="gap:0 14px">
         <div class="field"><label for="lv-f">من</label><input class="input" id="lv-f" type="date" value="${from0}"></div>
         <div class="field"><label for="lv-t">إلى</label><input class="input" id="lv-t" type="date" value="${cur ? cur.to : addDays(from0, 6)}"></div></div>
-      <p class="muted" style="font-size:12.5px">لا يُحسب عليها التقرير الأسبوعي خلال هذه الفترة. إذا طالت الإجازة عدّل تاريخ النهاية من نفس الصف.</p><div id="lv-err"></div>`,
+      <p class="muted" style="font-size:12.5px">لا يُحسب عليها تقرير العيادات خلال هذه الفترة. إذا طالت الإجازة عدّل تاريخ النهاية من نفس الصف.</p><div id="lv-err"></div>`,
     foot: `<button class="btn" data-close>إلغاء</button><button class="btn primary" id="lv-save">${icon('check')}حفظ الإجازة</button>`,
     onClose: () => { if (!saved && onCancel) onCancel(); },
     onMount(el, close) {
@@ -1884,7 +1881,7 @@ function userDialog(d, u, done) {
 }
 
 function showTemp(name, username, pass) {
-  const msg = `ApexCare Nursing\nUsername: ${username}\nTemporary password: ${pass}\nYou will be asked to set your own password on first sign-in.\n${location.origin + location.pathname}`;
+  const msg = `Nursing\nUsername: ${username}\nTemporary password: ${pass}\nYou will be asked to set your own password on first sign-in.\n${location.origin + location.pathname}`;
   modal({
     title: 'كلمة المرور المؤقتة',
     body: `<p style="margin-bottom:12px">أرسل بيانات الدخول إلى <b>${esc(name)}</b>. ستُطلب منها كلمة مرور جديدة عند أول دخول. لن تظهر هذه الكلمة مرة أخرى.</p>
