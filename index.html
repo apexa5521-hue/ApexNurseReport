@@ -1801,7 +1801,7 @@ async function renderUsers(view) {
   if ($('#u-r')) $('#u-r').value = uState.role;
   $('#u-s').value = uState.status;
   const cols = [
-    { label: 'الاسم', html: u => `<div style="display:flex;gap:10px;align-items:center"><span class="avatar" style="width:28px;height:28px;font-size:11px">${esc(initials(u.name))}</span><div><b style="font-weight:600">${esc(u.name)}</b><div class="muted" dir="ltr" style="font-size:11.5px;text-align:start">${esc(u.email || u.username)}</div></div></div>` },
+    { label: 'الاسم', html: u => `<div style="display:flex;gap:10px;align-items:center"><span class="avatar" style="width:28px;height:28px;font-size:11px">${esc(initials(u.name))}</span><div><b style="font-weight:600">${esc(u.name)}</b><div class="muted" dir="ltr" style="font-size:11.5px;text-align:start">${u.login ? `<b style="color:var(--ink-2)">${esc(u.login)}</b> · ` : ''}${esc(u.email || u.username)}</div></div></div>` },
     { label: 'الدور', get: u => d.roles[u.role] || u.role },
     { label: 'الفرع', get: u => br(u.branch) },
     { label: 'العيادات', get: u => u.clinics.length ? u.clinics.length + ' عيادة' : (u.role === 'nurse' ? 'كل عيادات الفرع' : '—') },
