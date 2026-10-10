@@ -46,7 +46,7 @@ const S = {
 
 const HEADERS = {
   Users: ['username', 'name', 'email', 'role', 'branch', 'clinics', 'status', 'start_date',
-          'pass_hash', 'salt', 'must_change', 'created_at', 'last_login', 'aliases', 'end_date', 'last_reminder'],
+          'pass_hash', 'salt', 'must_change', 'created_at', 'last_login', 'aliases', 'end_date', 'last_reminder', 'login'],
   Clinics: ['clinic_id', 'name', 'branch', 'type', 'has_fridge', 'status'],
   Reports: ['report_id', 'submitted_at', 'week_start', 'timing', 'username', 'nurse_name', 'branch',
             'clinic_id', 'clinic_name', 'expiry_checked', 'earliest_expiry', 'expiry_item',
@@ -163,13 +163,16 @@ function apiLogin_(req) {
   const pw = String(req.password || '');
   if (!id || !pw) throw err_('أدخل اسم المستخدم وكلمة المرور');
 
+  const u = rows_(S.USERS).find(x =>
+    String(x.username).toLowerCase() === id ||
+    (x.email && String(x.email).toLowerCase() === id) ||
+    (x.login && String(x.login).toLowerCase() === id));
+
+  // العدّاد على الحساب نفسه: لا يمكن مضاعفة المحاولات بالتبديل بين الاسم والإيميل
   const cache = CacheService.getScriptCache();
-  const failKey = 'fail_' + id;
+  const failKey = 'fail_' + (u ? String(u.username).toLowerCase() : id);
   const fails = Number(cache.get(failKey) || 0);
   if (fails >= APP.MAX_LOGIN_FAILS) throw err_('تم إيقاف المحاولة مؤقتاً. حاول بعد ' + APP.LOCK_MINUTES + ' دقائق');
-
-  const u = rows_(S.USERS).find(x =>
-    String(x.username).toLowerCase() === id || (x.email && String(x.email).toLowerCase() === id));
 
   if (!u || u.status !== 'active' || hash_(pw, u.salt) !== u.pass_hash) {
     cache.put(failKey, String(fails + 1), APP.LOCK_MINUTES * 60);
@@ -653,7 +656,7 @@ function sendReminders_(scopeUser, week, cfg, kind) {
     const link = url && !K.noLink;
     const body = ['مرحباً ' + r.name + '،'].concat(K.ar(week),
       link ? ['رابط التقديم: ' + url] : [], ['اسم المستخدم: ' + r.username], ['', 'Hello ' + r.name + ','], K.en(week),
-      link ? ['Submission link: ' + url] : [], ['Username: ' + r.username]).join('\n');
+      link ? ['Submission link: ' + url] : [], ['Username: ' + ((users[r.username] || {}).login || r.username)]).join('\n');
     try {
       MailApp.sendEmail({ to: emailOf_(r), subject: K.subject, body: body, name: 'Nursing' });
       res.sent.push(r.name);
@@ -676,6 +679,155 @@ function installReminderTriggers() {
   ScriptApp.newTrigger('autoReminderSunday').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(10).create();
   ScriptApp.newTrigger('autoReminderMonday').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(9).create();
   SpreadsheetApp.getActive().toast('تم تفعيل التذكير: السبت 10ص (موعد)، الأحد 10ص (متأخر)، الاثنين 9ص (أُغلقت النافذة)', APP.NAME, 8);
+}
+
+/* ───────── أسماء دخول قصيرة وأرقام سرية (اختياري) ───────── */
+
+function editDistance_(a, b) {
+  const d = [];
+  for (let i = 0; i <= a.length; i++) { d[i] = [i]; }
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+
+/**
+ * يطابق اسماً مكتوباً («Emilia») بحساب ممرضة. مطابقة حذرة:
+ * الاسم الكامل أو الاسم المستعار أو البريد أو اسم الدخول، أو أول كلمة من اسم الحساب (إن كانت وحيدة).
+ * لا يخمّن أكثر من ذلك: عند الشك يرجع الأسباب مع أقرب الحسابات، ويُكتب الحساب الصحيح في عمود account.
+ */
+function matchNurseByName_(raw, nurses) {
+  const q = normText_(raw);
+  if (!q) return { err: 'اسم فارغ' };
+  const first = u => normText_(String(u.name || '').trim().split(/\s+/)[0]);
+  let hits = nurses.filter(u => [u.name].concat(splitList_(u.aliases)).some(k => normText_(k) === q) ||
+    normText_(u.email) === q || normText_(u.username) === q || normText_(u.login) === q);
+  if (!hits.length) hits = nurses.filter(u => first(u) === q || (q.length >= 4 && normText_(u.name).indexOf(q) === 0));
+  if (hits.length > 1) { const act = hits.filter(u => u.status === 'active'); if (act.length && act.length < hits.length) hits = act; }
+  if (hits.length === 1) return { user: hits[0] };
+  if (hits.length) return { err: 'أكثر من حساب: ' + hits.map(u => u.name + ' (' + (u.email || u.username) + ')').join(' / ') + ' — اكتب بريد الصحيح في عمود account' };
+  const near = nurses.filter(u => { const f = first(u); return f && (editDistance_(f, q) <= (q.length <= 5 ? 1 : 2) || (f.slice(0, 4) === q.slice(0, 4) && q.length >= 4)); });
+  return { err: 'لا يوجد حساب مطابق' + (near.length ? '. أقرب: ' + near.slice(0, 3).map(u => u.name + ' (' + (u.email || u.username) + ')').join(' / ') + ' — إن كانت هي، اكتب بريدها في عمود account' : '. لإنشاء حساب جديد أضف عمودي email وbranch') };
+}
+
+/** اسم دخول قصير غير مكرر: الاسم الأول، وإن تكرر فالاسمان الأول والثاني (sidra.arshad) */
+function loginNameFor_(user, taken, wanted) {
+  const clean = x => String(x || '').toLowerCase().replace(/[^a-z0-9._-]/g, '');
+  const words = String(user.name || '').trim().split(/\s+/).map(clean).filter(Boolean);
+  const tries = wanted ? [clean(wanted)] : [words[0], words.slice(0, 2).join('.'), words.join('.')];
+  for (let i = 0; i < tries.length; i++) if (tries[i] && tries[i].length >= 3 && !taken[tries[i]]) return tries[i];
+  return '';
+}
+
+function loginsTaken_(exceptUsername) {
+  const t = {};
+  rows_(S.USERS).forEach(u => {
+    if (u.username === exceptUsername) return;
+    [u.username, u.email, u.login].forEach(v => { if (v) t[String(v).toLowerCase()] = 1; });
+  });
+  return t;
+}
+
+function passwordFields_(pw, mustChange, login) {
+  const salt = Utilities.getUuid();
+  return { pass_hash: hash_(pw, salt), salt: salt, must_change: mustChange ? 'yes' : 'no', login: login };
+}
+
+/**
+ * أسماء دخول قصيرة وأرقام سرية يحددها المدير. لا تُحفظ الأرقام في الكود، بل في ورقة مؤقتة:
+ * أنشئ ورقة باسم Credentials، أعمدتها: name | password | username | account | email | branch | change
+ *   name      الاسم كما تعرفه (Emilia …)
+ *   password  الرقم السري أو كلمة المرور (3 خانات على الأقل)
+ *   username  اسم الدخول القصير (اختياري، الافتراضي الاسم الأول)
+ *   account   بريد الحساب الصحيح إن لم يتعرف الاسم عليه أو تطابق أكثر من حساب (اختياري)
+ *   email + branch   لإنشاء ممرضة جديدة ليس لها حساب (BURIDAH أو ONIZAH) (اختياري)
+ *   change    yes = تُطلب منها كلمة مرور جديدة عند أول دخول (الافتراضي no)
+ * 1) شغّل previewCredentials: يكتب في عمود result لمن ستُطبَّق كل كلمة، بدون أي تغيير.
+ * 2) إذا صحّت، شغّل applyCredentials. ثم احذف الورقة لأن فيها كلمات المرور.
+ * الحساب غير النشط يُفعَّل عند إعطائه كلمة مرور.
+ */
+function previewCredentials() { return processCredentials_(true); }
+function applyCredentials() { return processCredentials_(false); }
+
+function processCredentials_(dryRun) {
+  const sh = ss_().getSheetByName('Credentials');
+  if (!sh) throw new Error('أنشئ ورقة باسم Credentials وضع فيها الأعمدة: name | password | username | account | email | branch | change');
+  const data = sh.getDataRange().getValues();
+  const head = data.shift().map(h => String(h).trim().toLowerCase());
+  const col = k => head.indexOf(k);
+  if (col('name') < 0 || col('password') < 0) throw new Error('العمودان name وpassword مطلوبان في الصف الأول');
+  let resCol = col('result'); if (resCol < 0) { resCol = head.length; sh.getRange(1, resCol + 1).setValue('result'); }
+
+  const nurses = rows_(S.USERS).filter(u => u.role === 'nurse');
+  const usedLogins = {}, usedAccounts = {};
+  let ok = 0, bad = 0;
+  data.forEach((row, i) => {
+    const get = k => col(k) < 0 ? '' : String(row[col(k)] == null ? '' : row[col(k)]).trim();
+    if (!get('name') && !get('password')) return;
+    const say = msg => sh.getRange(i + 2, resCol + 1).setValue(msg);
+    const fail = msg => { bad++; say(msg); };
+    const pw = get('password');
+    if (pw.length < 3 || pw.length > 60) return fail('كلمة المرور يجب أن تكون 3 خانات على الأقل');
+
+    let m = matchNurseByName_(get('account') || get('name'), nurses);
+    const email = get('email').toLowerCase(), branch = get('branch').toUpperCase();
+    let create = false;
+    if (m.err && !get('account') && email && BRANCHES[branch]) {
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail('البريد غير صحيح');
+      if (loginsTaken_()[email]) return fail('هذا البريد مستخدم لحساب آخر');
+      create = true; m = { user: { name: get('name'), username: email, email: email, branch: branch, role: 'nurse', status: 'active' } };
+    }
+    if (m.err) return fail(m.err);
+    if (!create && usedAccounts[m.user.username]) return fail('نفس الحساب (' + m.user.name + ') سبق ذكره في الصف ' + usedAccounts[m.user.username] + '. اكتب بريد الصحيح في عمود account');
+
+    const taken = Object.assign(create ? loginsTaken_() : loginsTaken_(m.user.username), usedLogins);
+    const login = loginNameFor_(m.user, taken, get('username'));
+    if (!login) return fail('اسم الدخول مكرر أو قصير (3 خانات على الأقل): اكتب اسماً آخر في عمود username');
+    usedLogins[login] = 1; if (!create) usedAccounts[m.user.username] = i + 2;
+
+    const wasInactive = !create && m.user.status !== 'active';
+    const label = (create ? 'حساب جديد: ' : '') + m.user.name + ' ← ' + login + (wasInactive ? ' (كان غير نشط وسيُفعَّل)' : '');
+    if (dryRun) { ok++; return say('سيُطبَّق على: ' + label); }
+
+    const f = passwordFields_(pw, get('change').toLowerCase() === 'yes', login);
+    if (create) {
+      const base = newUserRow_({ username: m.user.username, name: m.user.name, email: email, role: 'nurse', branch: branch }).row;
+      const row2 = Object.assign(base, f);
+      appendObjects_(S.USERS, [row2]); nurses.push(row2);
+    } else {
+      setCells_(S.USERS, m.user._row, Object.assign(f, wasInactive ? { status: 'active', end_date: '' } : {}));
+    }
+    log_('admin', 'credentials_set', m.user.username + ' → ' + login);
+    ok++; say('تم: ' + label);
+  });
+  SpreadsheetApp.getActive().toast((dryRun ? 'معاينة: ' : 'تم: ') + ok + ' صحيح · ' + bad + ' يحتاج مراجعة. انظر عمود result' + (dryRun ? '' : ' ثم احذف ورقة Credentials'), APP.NAME, 12);
+  return { ok: ok, failed: bad, dryRun: !!dryRun };
+}
+
+/**
+ * يولّد لكل ممرضة نشطة لم تسجّل دخولها بعد (ما زالت على كلمتها المؤقتة) اسم دخول قصيراً ورقماً سرياً من 4 خانات،
+ * ويكتبها في ورقة Logins لتوزيعها. من غيّرت كلمتها بنفسها لا تُمَس. احذف الورقة بعد التوزيع.
+ */
+function generateNursePins() {
+  const nurses = rows_(S.USERS).filter(u => u.role === 'nurse' && u.status === 'active' && u.must_change === 'yes');
+  const used = {}, out = [['name', 'username', 'password', 'branch']];
+  nurses.forEach(u => {
+    const login = loginNameFor_(u, Object.assign(loginsTaken_(u.username), used), u.login);
+    if (!login) return;
+    used[login] = 1;
+    const pin = String(1000 + parseInt(Utilities.getUuid().replace(/-/g, '').slice(0, 8), 16) % 9000);
+    setCells_(S.USERS, u._row, passwordFields_(pin, false, login));
+    out.push([u.name, login, pin, u.branch]);
+  });
+  const ss = ss_();
+  const old = ss.getSheetByName('Logins');
+  const sh = old || ss.insertSheet('Logins');
+  sh.getRange(1, 1, Math.max(sh.getMaxRows(), 1), 4).clearContent();
+  sh.getRange(1, 1, out.length, 4).setNumberFormat('@').setValues(out);
+  log_('admin', 'pins_generated', String(out.length - 1));
+  SpreadsheetApp.getActive().toast('تم توليد ' + (out.length - 1) + ' حساب. وزّعها من ورقة Logins ثم احذفها', APP.NAME, 12);
+  return { count: out.length - 1 };
 }
 
 /* ───────── حالة الممرضة: على رأس العمل / إجازة / متوقفة ───────── */
@@ -968,7 +1120,7 @@ function apiUsersList_(req, user) {
     .filter(u => branchAllowed_(user, u.branch) || u.branch === 'ALL' && user.role === 'admin')
     .map(u => {
       const st = nurseState_(u, lm[u.username], today);
-      return { username: u.username, name: u.name, email: u.email, role: u.role, branch: u.branch,
+      return { username: u.username, login: u.login || '', name: u.name, email: u.email, role: u.role, branch: u.branch,
                clinics: splitList_(u.clinics), status: u.status, state: u.role === 'nurse' ? st.state : u.status, leave: st.leave,
                start_date: dateStr_(parseDate_(u.start_date)) || '', last_login: u.last_login, must_change: u.must_change === 'yes' };
     });
