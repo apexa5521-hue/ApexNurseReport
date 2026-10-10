@@ -30,7 +30,8 @@ ${read('demo/seed.js')}
 </script>
 `;
 let html = read('index.html')
-  .replace('<title>ApexCare Nursing</title>', '<title>ApexCare Nursing Demo</title>')
+  .replace('<title>Nursing</title>', '<title>Nursing Demo</title>')
+  .replace(/API_URL: '[^']*'/, "API_URL: ''")   // العرض التجريبي لا يحمل رابط الخادم الحقيقي
   .replace('<script>\n\'use strict\';', () => demoScript + '<script>\n\'use strict\';');
 if (!html.includes('window.APEX_DEMO = true')) throw new Error('inject failed');
 // --artifact: remove the document wrapper (html/head/body, charset, viewport) for hosts that add their own skeleton

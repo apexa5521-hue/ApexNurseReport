@@ -1,5 +1,5 @@
 /**
- * ApexCare — نظام تقرير العيادات للتمريض
+ * نظام تقرير العيادات للتمريض
  * Backend: Google Apps Script (Web App API)
  *
  * طريقة التركيب مشروحة في README.md
@@ -15,7 +15,7 @@
 /* ════════════════════════════ CONFIG ════════════════════════════ */
 
 const APP = {
-  NAME: 'ApexCare Nursing',
+  NAME: 'Nursing',
   TZ: 'Asia/Riyadh',
   SESSION_SECONDS: 6 * 60 * 60, // أقصى مدة يسمح بها CacheService
   HASH_ROUNDS: 250,
@@ -653,9 +653,9 @@ function sendReminders_(scopeUser, week, cfg, kind) {
     const link = url && !K.noLink;
     const body = ['مرحباً ' + r.name + '،'].concat(K.ar(week),
       link ? ['رابط التقديم: ' + url] : [], ['اسم المستخدم: ' + r.username], ['', 'Hello ' + r.name + ','], K.en(week),
-      link ? ['Submission link: ' + url] : [], ['Username: ' + r.username], ['', 'ApexCare Clinics']).join('\n');
+      link ? ['Submission link: ' + url] : [], ['Username: ' + r.username]).join('\n');
     try {
-      MailApp.sendEmail({ to: emailOf_(r), subject: K.subject, body: body, name: 'ApexCare Nursing' });
+      MailApp.sendEmail({ to: emailOf_(r), subject: K.subject, body: body, name: 'Nursing' });
       res.sent.push(r.name);
       if (users[r.username]) setCell_(S.USERS, users[r.username]._row, 'last_reminder', nowStr_());
     } catch (e) { res.failed.push(r.name); }
