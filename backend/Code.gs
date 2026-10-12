@@ -857,6 +857,113 @@ function processCredentials_(dryRun) {
 }
 
 /**
+ * دمج حسابات مكررة وربط الأسماء المختلفة بصاحبتها، بدون تعديل يدوي على Users أو Reports.
+ * أنشئ ورقة باسم Merges، أعمدتها: from | into
+ *   into  الممرضة الصحيحة (إيميلها أو اسم الدخول أو اسمها كما في Users)
+ *   from  الحساب المكرر، أو اسم/إيميل كُتب به في النموذج (مثل Ma.Clarissa Tugano أو tugano34@gmail.com)
+ * 1) previewMerges: يكتب في عمود result ما سيحدث، بدون أي تغيير.
+ * 2) applyMerges: ينقل تقارير الحساب المكرر وبلاغاته وإجازاته إلى الصحيحة، ويضيف الاسم/الإيميل إلى aliases،
+ *    ويوقف الحساب المكرر (لا يُحذف)، ثم يعيد ربط ردود النموذج المعلّقة.
+ */
+function previewMerges() { return processMerges_(true); }
+function applyMerges() { return processMerges_(false); }
+
+/** مطابقة حرفية فقط (اسم المستخدم، الإيميل، اسم الدخول، الاسم أو أحد الأسماء البديلة) */
+function findNurseExact_(raw, nurses) {
+  const q = normText_(raw);
+  if (!q) return [];
+  return nurses.filter(u => [u.username, u.email, u.login, u.name].concat(splitList_(u.aliases)).some(k => k && normText_(k) === q));
+}
+
+function processMerges_(dryRun) {
+  const sh = ss_().getSheetByName('Merges');
+  if (!sh) throw new Error('أنشئ ورقة باسم Merges وفيها العمودان: from | into');
+  const data = sh.getDataRange().getValues();
+  const head = data.shift().map(h => String(h).trim().toLowerCase());
+  const cf = head.indexOf('from'), ci = head.indexOf('into');
+  if (cf < 0 || ci < 0) throw new Error('العمودان from وinto مطلوبان في الصف الأول');
+  let resCol = head.indexOf('result'); if (resCol < 0) { resCol = head.length; sh.getRange(1, resCol + 1).setValue('result'); }
+
+  const nurses = rows_(S.USERS).filter(u => u.role === 'nurse');
+  const moves = {};        // اسم المستخدم القديم ← الحساب الصحيح
+  const aliasAdd = {};     // اسم المستخدم الصحيح ← أسماء/إيميلات تُضاف إلى aliases
+  let ok = 0, bad = 0;
+  data.forEach((row, i) => {
+    const from = String(row[cf] || '').trim(), into = String(row[ci] || '').trim();
+    if (!from && !into) return;
+    const say = m => sh.getRange(i + 2, resCol + 1).setValue(m);
+    const fail = m => { bad++; say(m); };
+    const t = findNurseExact_(into, nurses);
+    if (t.length !== 1) return fail(t.length ? 'into يطابق أكثر من حساب: ' + t.map(u => u.name + ' (' + (u.email || u.username) + ')').join(' / ') + '. اكتب الإيميل' : 'into: لا يوجد حساب بهذا الاسم أو الإيميل');
+    const target = t[0];
+    const src = findNurseExact_(from, nurses).filter(u => u.username !== target.username);
+    if (src.length > 1) return fail('from يطابق أكثر من حساب: ' + src.map(u => u.name + ' (' + (u.email || u.username) + ')').join(' / ') + '. اكتب الإيميل');
+    const add = aliasAdd[target.username] = aliasAdd[target.username] || [];
+    if (src.length) {
+      const f = src[0];
+      if (moves[f.username]) return fail('هذا الحساب مذكور في صف سابق');
+      const n = rows_(S.REPORTS).filter(r => r.username === f.username).length;
+      moves[f.username] = target;
+      add.push(f.name); if (f.email) add.push(f.email); else if (f.username.indexOf('@') > 0) add.push(f.username);
+      splitList_(f.aliases).forEach(a => add.push(a));
+      ok++; say((dryRun ? 'سيُدمج' : 'تم دمج') + ' حساب ' + f.name + ' (' + n + ' تقرير) في ' + target.name);
+    } else {
+      if (findNurseExact_(from, [target]).length) { ok++; return say('مربوط بها مسبقاً: ' + target.name); }
+      add.push(from);
+      ok++; say((dryRun ? 'سيُضاف' : 'أُضيف') + ' «' + from + '» كاسم بديل لـ ' + target.name + ' (ردود النموذج بهذا الاسم تُنسب لها)');
+    }
+  });
+  if (dryRun) {
+    SpreadsheetApp.getActive().toast('معاينة: ' + ok + ' صحيح · ' + bad + ' يحتاج مراجعة. انظر عمود result', APP.NAME, 12);
+    return { ok: ok, failed: bad, dryRun: true };
+  }
+
+  // نقل التقارير والبلاغات والإجازات دفعة واحدة لكل ورقة
+  const rewrite = (name, cols) => {
+    const sheet = sh_(name), last = sheet.getLastRow();
+    if (last < 2) return;
+    const h = HEADERS[name], ui = h.indexOf('username'), ni = h.indexOf('nurse_name');
+    const rg = sheet.getRange(2, 1, last - 1, h.length), vals = rg.getValues();
+    let changed = false;
+    const ri = h.indexOf('reporters');
+    vals.forEach(v => {
+      const t = moves[String(v[ui]).trim()];
+      if (t) { v[ui] = t.username; if (ni >= 0) v[ni] = t.name; changed = true; }
+      if (ri >= 0 && v[ri]) { const rp = unique_(splitList_(v[ri]).map(x => moves[x] ? moves[x].username : x)).join(','); if (rp !== v[ri]) { v[ri] = rp; changed = true; } }
+    });
+    if (changed) [ui, ni, ri].filter(c => c >= 0).forEach(c => sheet.getRange(2, c + 1, vals.length, 1).setValues(vals.map(v => [v[c]])));
+    delete ROWS_CACHE_[name];
+  };
+  if (Object.keys(moves).length) [S.REPORTS, S.ISSUES, S.LEAVES].forEach(n => rewrite(n));
+
+  rows_(S.USERS).forEach(u => {
+    const add = aliasAdd[u.username];
+    if (add) {
+      const have = splitList_(u.aliases);
+      const mine = [u.name, u.email, u.username].map(normText_);
+      add.forEach(a => { if (a && mine.indexOf(normText_(a)) < 0 && !have.some(x => normText_(x) === normText_(a))) have.push(a); });
+      const upd = { aliases: have.join(', ') };
+      // إن كان للحساب المكرر اسم دخول ورقم سري ولم يكن للصحيح، ينتقلان إليه
+      Object.keys(moves).forEach(old => {
+        if (moves[old].username !== u.username || u.login) return;
+        const f = nurses.find(x => x.username === old);
+        if (f && f.login) Object.assign(upd, { login: f.login, pass_hash: f.pass_hash, salt: f.salt, must_change: f.must_change });
+      });
+      const f0 = Object.keys(moves).map(o => nurses.find(x => x.username === o)).filter(f => f && moves[f.username].username === u.username);
+      f0.forEach(f => { if (f.start_date && (!u.start_date || String(f.start_date) < String(u.start_date))) upd.start_date = f.start_date; });
+      setCells_(S.USERS, u._row, upd);
+    }
+    if (moves[u.username]) {
+      setCells_(S.USERS, u._row, { username: 'merged:' + u.username, role: 'merged', status: 'inactive', login: '', pass_hash: '', email: '',
+        aliases: 'دُمج في ' + moves[u.username].username });
+    }
+  });
+  log_('admin', 'merge_nurses', Object.keys(moves).map(k => k + ' → ' + moves[k].username).join('; ') + ' | aliases: ' + Object.keys(aliasAdd).length);
+  importFormResponses();   // يربط ردود النموذج المعلّقة بالأسماء البديلة الجديدة
+  return { ok: ok, failed: bad, dryRun: false };
+}
+
+/**
  * يولّد لكل ممرضة نشطة لم تسجّل دخولها بعد (ما زالت على كلمتها المؤقتة) اسم دخول قصيراً ورقماً سرياً من 4 خانات،
  * ويكتبها في ورقة Logins لتوزيعها. من غيّرت كلمتها بنفسها لا تُمَس. احذف الورقة بعد التوزيع.
  */
@@ -1168,7 +1275,7 @@ function apiIssueUpdate_(req, user) {
 function apiUsersList_(req, user) {
   const lm = leavesMap_(), today = dateStr_(new Date());
   const list = rows_(S.USERS)
-    .filter(u => user.role === 'admin' || u.role === 'nurse')
+    .filter(u => u.role !== 'merged' && (user.role === 'admin' || u.role === 'nurse'))
     .filter(u => branchAllowed_(user, u.branch) || u.branch === 'ALL' && user.role === 'admin')
     .map(u => {
       const st = nurseState_(u, lm[u.username], today);
