@@ -1218,14 +1218,14 @@ function showNurseDone(view, d, more) {
 /* ══════════════════════════════════════════════════════════
    HR — الموارد البشرية
    ══════════════════════════════════════════════════════════ */
-const hrState = { week: '', q: '', branch: 'ALL', filter: 'all' };
+const hrState = { week: '', q: '', branch: 'ALL', filter: 'all', span: 'all' };
 const STATE_LABEL = { active: 'على رأس العمل', leave: 'إجازة', inactive: 'متوقفة عن العمل' };
 const fmtDay = s => fmtDate(s, { day: 'numeric', month: 'short' });
 
 async function renderHR(view) {
   skeleton(view, [120, 300, 460]);
   let d;
-  try { d = await api('hr.overview', { week: hrState.week, weeks: 12 }); }
+  try { d = await api('hr.overview', { week: hrState.week, weeks: hrState.span }); }
   catch (e) { return errorBlock(view, e, () => renderHR(view)); }
   if (!view.isConnected) return;
   hrState.week = d.week;
@@ -1272,6 +1272,7 @@ async function renderHR(view) {
       <div class="toolbar">
         <input class="input" id="r-q" placeholder="بحث بالاسم" value="${esc(hrState.q)}" style="min-width:150px">
         <select class="input" id="r-br"><option value="ALL">كل الفروع</option><option value="BURIDAH">بريدة</option><option value="ONIZAH">عنيزة</option></select>
+        <select class="input" id="r-span" aria-label="فترة الالتزام"><option value="all">الالتزام: كل المدة</option><option value="26">الالتزام: آخر 6 أشهر</option><option value="12">الالتزام: آخر 12 أسبوع</option></select>
         <select class="input" id="r-f"><option value="all">العاملات والإجازات</option><option value="missing">غير الملتزمات</option><option value="leave">في إجازة</option><option value="inactive">المتوقفات عن العمل</option></select>
         <button class="btn sm" id="r-csv">${icon('dl')}CSV</button>
       </div></div>
@@ -1287,7 +1288,8 @@ async function renderHR(view) {
     <div id="cards"></div></section>`;
 
   countUp(view);
-  $('#r-br').value = hrState.branch; $('#r-f').value = hrState.filter;
+  $('#r-br').value = hrState.branch; $('#r-f').value = hrState.filter; $('#r-span').value = hrState.span;
+  $('#r-span').onchange = e => { hrState.span = e.target.value; renderHR(view); };
   const go = w => { hrState.week = w; renderHR(view); };
   $('#wk').onchange = e => e.target.value && go(e.target.value);
   $('#wk-prev').onclick = () => go(addDays(d.week, -7));
@@ -1322,6 +1324,8 @@ async function renderHR(view) {
   };
 
   /* ───── جدول الحالة ───── */
+  const fy = w => fmtDate(w, { day: 'numeric', month: 'short', year: 'numeric' });
+  const spanLabel = 'الالتزام' + (d.weeks.length ? ' (' + fy(d.weeks[0]) + ' – ' + fy(d.weeks[d.weeks.length - 1]) + ')' : '');
   const statusCell = r => `<select class="input status-select st-${r.state}" data-status="${esc(r.username)}" aria-label="حالة ${esc(r.name)}">
       ${['active', 'leave', 'inactive'].map(k => `<option value="${k}" ${r.state === k ? 'selected' : ''}>${STATE_LABEL[k]}</option>`).join('')}</select>
       ${r.leave ? `<div class="leave-note"><span class="num">${esc(fmtDay(r.leave.from))} → ${esc(fmtDay(r.leave.to))}</span><button class="linkbtn" data-leave-edit="${esc(r.username)}">تعديل / تمديد</button></div>` : ''}`;
@@ -1329,8 +1333,9 @@ async function renderHR(view) {
     { label: 'الممرضة', html: r => `<div style="display:flex;align-items:center;gap:10px"><span class="avatar sm">${esc(initials(r.name))}</span><div><b style="font-weight:600">${esc(r.name)}</b><div class="muted" style="font-size:11.5px" dir="ltr">${esc(r.email || '')}</div></div></div>`, csv: r => r.name },
     { label: 'الفرع', get: r => br(r.branch) },
     { label: 'هذا الأسبوع', html: r => r.state === 'inactive' ? '<span class="muted">—</span>' : timingPill(r.thisWeek), csv: r => r.state === 'inactive' ? '' : t('st_' + r.thisWeek) },
-    { label: 'آخر 12 أسبوع', html: r => `<div class="heat">${r.cells.map((c, i) => `<i class="${c}" title="${fmtShort(d.weeks[i])} — ${t('st_' + c)}"></i>`).join('')}</div>`, csv: r => r.cells.map(c => t('st_' + c)).join(' | ') },
-    { label: 'الالتزام', html: r => `<span class="num strong">${pct(r.compliance)}</span>`, csv: r => pct(r.compliance) },
+    { label: 'آخر 12 أسبوع', html: r => { const off = Math.max(0, r.cells.length - 12); return `<div class="heat">${r.cells.slice(off).map((c, i) => `<i class="${c}" title="${fmtShort(d.weeks[off + i])} — ${t('st_' + c)}"></i>`).join('')}</div>`; }, csv: r => r.cells.slice(-12).map(c => t('st_' + c)).join(' | ') },
+    { label: spanLabel, html: r => `<span class="num strong">${pct(r.compliance)}</span><div class="muted num" style="font-size:11.5px">${r.doneWeeks} من ${r.expectedWeeks} أسبوع</div>`, csv: r => pct(r.compliance) },
+    { label: 'التقارير', html: r => `<span class="num">${r.reports}</span>`, csv: r => r.reports },
     { label: 'الحالة', html: statusCell, csv: r => STATE_LABEL[r.state] + (r.leave ? ` (${r.leave.from} → ${r.leave.to})` : '') },
   ];
   const filtered = () => d.roster.filter(r =>
@@ -1403,7 +1408,7 @@ function leaveDialog(r, done, onCancel) {
 /* ══════════════════════════════════════════════════════════
    QUALITY — الجودة والإحصائيات
    ══════════════════════════════════════════════════════════ */
-const qState = { period: '12w', month: '', branch: 'ALL' };
+const qState = { period: 'all', month: '', branch: 'ALL' };
 
 function thisSaturday() {
   const d = new Date(); d.setHours(0, 0, 0, 0);
@@ -1416,6 +1421,7 @@ function periodRange(p, month) {
   if (p === '4w') return { from: addDays(to, -21), to, label: 'آخر 4 أسابيع' };
   if (p === '12w') return { from: addDays(to, -77), to, label: 'آخر 12 أسبوع' };
   if (p === '26w') return { from: addDays(to, -175), to, label: 'آخر 6 أشهر' };
+  if (p === 'all') return { from: 'all', to, label: 'كل المدة' };
   // شهر محدد: كل أسابيع السبت التي تقع داخل الشهر
   const [y, m] = (month || to.slice(0, 7)).split('-').map(Number);
   const first = new Date(y, m - 1, 1); first.setDate(first.getDate() + ((6 - first.getDay() + 7) % 7));
@@ -1441,7 +1447,7 @@ async function renderQuality(view) {
     <div class="toolbar">
       <select class="input" id="q-p">
         <option value="week">هذا الأسبوع</option><option value="4w">آخر 4 أسابيع</option><option value="12w">آخر 12 أسبوع</option>
-        <option value="26w">آخر 6 أشهر</option><option value="month">شهر محدد</option></select>
+        <option value="26w">آخر 6 أشهر</option><option value="all">كل المدة</option><option value="month">شهر محدد</option></select>
       <input class="input ${qState.period === 'month' ? '' : 'hidden'}" type="month" id="q-m" value="${qState.month || thisSaturday().slice(0, 7)}">
       <select class="input" id="q-b"><option value="ALL">كل الفروع</option><option value="BURIDAH">بريدة</option><option value="ONIZAH">عنيزة</option></select>
       <button class="btn sm" onclick="window.print()">${icon('print')}طباعة التقرير</button>
@@ -1736,7 +1742,7 @@ async function renderReports(view) {
   <div class="page-head rise"><div><h1>سجل التقارير</h1><p>${esc(range.label)} · <span class="num">${d.reports.length}</span> تقرير</p></div><div class="spacer"></div>
     <div class="toolbar">
       <input class="input" id="rp-q" placeholder="بحث" value="${esc(rState.q)}">
-      <select class="input" id="rp-p"><option value="week">هذا الأسبوع</option><option value="4w">آخر 4 أسابيع</option><option value="12w">آخر 12 أسبوع</option><option value="month">شهر محدد</option></select>
+      <select class="input" id="rp-p"><option value="week">هذا الأسبوع</option><option value="4w">آخر 4 أسابيع</option><option value="12w">آخر 12 أسبوع</option><option value="26w">آخر 6 أشهر</option><option value="all">كل المدة</option><option value="month">شهر محدد</option></select>
       <input class="input ${rState.period === 'month' ? '' : 'hidden'}" type="month" id="rp-m" value="${rState.month || thisSaturday().slice(0, 7)}">
       <select class="input" id="rp-b"><option value="ALL">كل الفروع</option><option value="BURIDAH">بريدة</option><option value="ONIZAH">عنيزة</option></select>
       <button class="btn sm" id="rp-csv">${icon('dl')}CSV</button>

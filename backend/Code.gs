@@ -533,10 +533,32 @@ function onLeave_(leaves, week) {
 function expectedOn_(n, w, leaves, cfg) {
   if (n.start_date) { const st = dateStr_(parseDate_(n.start_date)); if (st && w < weekOf_(st, cfg)) return false; }
   if (n.status !== 'active') {
-    const end = n.end_date ? dateStr_(parseDate_(n.end_date)) : '';
-    if (!end || w > end) return false;   // متوقفة عن العمل
+    // متوقفة عن العمل: مطلوبة حتى تاريخ التوقف، وإن لم يُكتب فحتى آخر أسبوع سلّمت فيه (حتى لا يضيع سجلها القديم)
+    const end = n.end_date ? dateStr_(parseDate_(n.end_date)) : (lastWeekMap_()[n.username] || '');
+    if (!end || w > end) return false;
   }
   return !onLeave_(leaves, w);
+}
+
+/** آخر أسبوع سلّمت فيه كل ممرضة */
+function lastWeekMap_() {
+  const m = {};
+  rows_(S.REPORTS).forEach(r => { if (r.week_start > (m[r.username] || '')) m[r.username] = r.week_start; });
+  return m;
+}
+
+/** أول أسبوع فيه تقرير ضمن نطاق المستخدم (بداية «كل المدة») */
+function firstWeek_(user, fallback) {
+  let f = '';
+  rows_(S.REPORTS).forEach(r => { if (r.week_start && branchAllowed_(user, r.branch) && (!f || r.week_start < f)) f = r.week_start; });
+  return f && f < fallback ? f : fallback;
+}
+
+/** أسابيع السبت من from إلى to */
+function weeksBetween_(from, to) {
+  const out = [];
+  for (let d = parseDate_(from); dateStr_(d) <= to; d = addDays_(d, 7)) out.push(dateStr_(d));
+  return out;
 }
 
 /** الحالة الحالية: على رأس العمل / إجازة (حالية أو قادمة) / متوقفة */
@@ -576,6 +598,7 @@ function buildRoster_(user, week, weeks, cfg) {
       username: n.username, name: n.name, email: n.email, branch: n.branch, status: n.status,
       state: st.state, leave: st.leave,
       thisWeek: cells[cells.length - 1], cells: cells,
+      expectedWeeks: counted.length, doneWeeks: done.length, reports: mine.length,
       compliance: counted.length ? Math.round(done.length / counted.length * 100) : null,
       onTimeRate: counted.length ? Math.round(onTime.length / counted.length * 100) : null,
       missedStreak: streak,
@@ -588,7 +611,8 @@ function buildRoster_(user, week, weeks, cfg) {
 function apiHrOverview_(req, user) {
   const cfg = settings_();
   const week = normalizeWeek_(req.week, cfg);
-  const weeks = weeksBack_(week, Math.min(52, Math.max(4, Number(req.weeks) || 12)));
+  const weeks = req.weeks === 'all' ? weeksBetween_(firstWeek_(user, week), week)
+    : weeksBack_(week, Math.min(52, Math.max(4, Number(req.weeks) || 12)));
   const roster = buildRoster_(user, week, weeks, cfg);
 
   const expected = roster.filter(r => r.thisWeek !== 'na' && r.thisWeek !== 'leave');
@@ -911,9 +935,10 @@ function apiUserSetStatus_(req, user) {
 function apiQualityStats_(req, user) {
   const cfg = settings_();
   const to = normalizeWeek_(req.to || req.week, cfg);
-  const from = req.from ? normalizeWeek_(req.from, cfg) : dateStr_(addDays_(parseDate_(to), -7 * 11));
   const branch = req.branch && req.branch !== 'ALL' ? req.branch : null;
   const inScope = b => branchAllowed_(user, b) && (!branch || b === branch);
+  const from = req.from === 'all' ? firstWeek_({ role: user.role, branch: branch || user.branch }, to)
+    : req.from ? normalizeWeek_(req.from, cfg) : dateStr_(addDays_(parseDate_(to), -7 * 11));
 
   const weeks = [];
   for (let d = parseDate_(from); dateStr_(d) <= to; d = addDays_(d, 7)) weeks.push(dateStr_(d));
@@ -1073,7 +1098,7 @@ function apiQualityStats_(req, user) {
 function apiReportsList_(req, user) {
   const cfg = settings_();
   const to = normalizeWeek_(req.to || req.week, cfg);
-  const from = req.from ? normalizeWeek_(req.from, cfg) : to;
+  const from = req.from === 'all' ? firstWeek_(user, to) : req.from ? normalizeWeek_(req.from, cfg) : to;
   const list = rows_(S.REPORTS)
     .filter(r => branchAllowed_(user, r.branch) && r.week_start >= from && r.week_start <= to)
     .filter(r => !req.branch || req.branch === 'ALL' || r.branch === req.branch)
@@ -1364,8 +1389,19 @@ function importFormResponses() {
   }
   const resolveUser = v => { const k = keysOf(v); return k.length ? known[find(k[0])] : null; };
 
-  const done = {};
-  rows_(S.REPORTS).forEach(r => { if (String(r.source).indexOf('legacy:') === 0) done[r.source] = 1; });
+  const done = {}, orphan = {};
+  rows_(S.REPORTS).forEach(r => {
+    if (String(r.source).indexOf('legacy:') !== 0) return;
+    done[r.source] = 1;
+    if (!r.username) orphan[r.source] = r;   // تقرير منقول سابقاً بلا ممرضة: نعيد محاولة ربطه
+  });
+  const unmatched = {};   // ما بقي بلا ممرضة، لعرضه في ورقة Unmatched
+  const noteUnmatched = (v, when) => {
+    const nm = String(v[C.name] || '').trim(), em = String(v[C.email] || '').trim().toLowerCase();
+    const k = nm + '|' + em, g = unmatched[k] = unmatched[k] || { name: nm, email: em, count: 0, first: when, last: when };
+    g.count++; if (when < g.first) g.first = when; if (when > g.last) g.last = when;
+  };
+  let relinked = 0;
   const clinics = clinics_();
   const clinicById = {};
   clinics.forEach(c => clinicById[c.clinic_id] = c);
@@ -1381,9 +1417,19 @@ function importFormResponses() {
     const source = v[C.ts] instanceof Date
       ? 'legacy:' + Utilities.formatDate(v[C.ts], APP.TZ, 'yyyyMMddHHmmss') + ':' + normText_(v[C.email] || v[C.name]).slice(0, 24)
       : 'legacy:row' + (idx + 2);
-    if (done[source] || !(v[C.ts] instanceof Date)) return;
+    if (!(v[C.ts] instanceof Date)) return;
+    if (done[source]) {
+      const o = orphan[source];
+      if (o) {
+        const ou = resolveUser(v);
+        if (ou) { setCells_(S.REPORTS, o._row, { username: ou.username, nurse_name: ou.name }); relinked++; }
+        else noteUnmatched(v, o.submitted_at);
+      }
+      return;
+    }
     const rawName = String(v[C.name] || '').trim();
     const u = resolveUser(v);
+    if (!u) noteUnmatched(v, Utilities.formatDate(v[C.ts], APP.TZ, 'yyyy-MM-dd HH:mm'));
     let branch = String(v[C.branch] || '').toUpperCase().indexOf('ONIZAH') >= 0 && String(v[C.branch]).toUpperCase().indexOf('BURIDAH') < 0
       ? 'ONIZAH' : String(v[C.branch] || '').toUpperCase().indexOf('BURIDAH') >= 0 ? 'BURIDAH' : (u ? u.branch : '');
     if (!branch) branch = 'BURIDAH';
@@ -1436,8 +1482,22 @@ function importFormResponses() {
     const f = first[u.username];
     if (u.role === 'nurse' && f && (!u.start_date || dateStr_(parseDate_(u.start_date)) > f)) setCell_(S.USERS, u._row, 'start_date', f);
   });
-  SpreadsheetApp.getActive().toast('تم نقل ' + reports.length + ' تقرير، وإنشاء ' + createdUsers.length +
-    ' حساب ممرضة (راجع ورقة Users وورقة Temp_Passwords)', APP.NAME, 10);
+  // ورقة Unmatched: ردود لم تُنسب لأي ممرضة. أضف الاسم/الإيميل في عمود aliases للحساب الصحيح ثم أعد تشغيل الاستيراد
+  const um = Object.keys(unmatched).map(k => unmatched[k]).sort((a, b) => b.count - a.count);
+  const db = ss_();
+  let ush = db.getSheetByName('Unmatched');
+  if (um.length) {
+    if (!ush) ush = db.insertSheet('Unmatched');
+    ush.clearContents();
+    const rowsOut = [['الاسم في النموذج', 'الإيميل في النموذج', 'عدد الردود', 'أول رد', 'آخر رد', 'ماذا أفعل']]
+      .concat(um.map(g => [g.name || '(بدون اسم)', g.email || '(بدون إيميل)', g.count, g.first, g.last,
+        'اكتب الاسم أو الإيميل في عمود aliases للممرضة الصحيحة في Users، ثم شغّل importFormResponses']));
+    ush.getRange(1, 1, rowsOut.length, rowsOut[0].length).setValues(rowsOut);
+  } else if (ush) db.deleteSheet(ush);
+  const unCount = um.reduce((x, g) => x + g.count, 0);
+  SpreadsheetApp.getActive().toast('تم نقل ' + reports.length + ' تقرير، وإنشاء ' + createdUsers.length + ' حساب ممرضة' +
+    (relinked ? '، وربط ' + relinked + ' تقرير قديم بصاحبته' : '') +
+    (unCount ? '. يوجد ' + unCount + ' رد بلا ممرضة: راجع ورقة Unmatched' : ''), APP.NAME, 12);
 }
 
 
