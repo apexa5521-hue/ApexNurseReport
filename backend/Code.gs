@@ -1461,6 +1461,15 @@ function importFormResponses() {
   Object.keys(byEmail).forEach(e => claim('e:' + e, byEmail[e]));
   Object.keys(byName).forEach(n => claim('n:' + n, byName[n]));
 
+  // كل رد في النموذج يُعرف بوقته (حتى الثانية). لو عُدّل الاسم في الشيت الأساسي بعد النقل
+  // يبقى نفس التقرير ويُعاد ربطه، ولا يُنقل مرة ثانية
+  const tsKey = v => 'legacy:' + Utilities.formatDate(v[C.ts], APP.TZ, 'yyyyMMddHHmmss');
+  const byTs = {};
+  rows_(S.REPORTS).forEach(r => {
+    const m = String(r.source || '').match(/^(legacy:\d{14})/);
+    if (m) (byTs[m[1]] = byTs[m[1]] || []).push(r);
+  });
+
   // مجموعات بدون حساب معروف ⇐ ممرضات غير موجودات في القائمة: ننشئ لهن حسابات
   const recentCut = dateStr_(addDays_(new Date(), -35));
   const groups = {};
@@ -1469,6 +1478,7 @@ function importFormResponses() {
     if (!(v[C.ts] instanceof Date) || !k.length) return;
     const root = find(k[0]);
     if (known[root]) return;
+    if ((byTs[tsKey(v)] || []).some(r => r.username)) return;   // رد منقول ومنسوب سابقاً: تعديل اسمه لا ينشئ حساباً جديداً
     const g = groups[root] = groups[root] || { emails: {}, names: {}, last: '', branch: {}, total: 0 };
     const email = String(v[C.email] || '').trim().toLowerCase();
     const nm = String(v[C.name] || '').trim();
@@ -1496,12 +1506,26 @@ function importFormResponses() {
   }
   const resolveUser = v => { const k = keysOf(v); return k.length ? known[find(k[0])] : null; };
 
-  const done = {}, orphan = {};
-  rows_(S.REPORTS).forEach(r => {
-    if (String(r.source).indexOf('legacy:') !== 0) return;
-    done[r.source] = 1;
-    if (!r.username) orphan[r.source] = r;   // تقرير منقول سابقاً بلا ممرضة: نعيد محاولة ربطه
+  const dupRows = [];   // نسخ مكررة من نفس الرد (من نقل سابق بعد تعديل الاسم): تُحذف
+  // ربط كل صف في النموذج بتقريره المنقول: أولاً بالمفتاح نفسه، ثم بنفس الوقت (رد عُدّل اسمه).
+  // قد يرد ردّان في نفس الثانية من ممرضتين، لذلك لا نعتمد على الوقت وحده إلا لما بقي
+  const claimed = {}, used = new Set(), seenTs = {};
+  const srcOf = (v, idx) => 'legacy:' + Utilities.formatDate(v[C.ts], APP.TZ, 'yyyyMMddHHmmss') + ':' + normText_(v[C.email] || v[C.name]).slice(0, 24);
+  values.forEach((v, idx) => {
+    if (!(v[C.ts] instanceof Date)) return;
+    const k = tsKey(v); seenTs[k] = 1;
+    const r = (byTs[k] || []).find(x => !used.has(x) && x.source === srcOf(v, idx));
+    if (r) { claimed[idx] = r; used.add(r); }
   });
+  values.forEach((v, idx) => {
+    if (!(v[C.ts] instanceof Date) || claimed[idx]) return;
+    const free = (byTs[tsKey(v)] || []).filter(x => !used.has(x));
+    if (!free.length) return;
+    const ou = resolveUser(v);
+    const r = (ou && free.find(x => x.username === ou.username)) || free.find(x => x.username) || free[0];
+    claimed[idx] = r; used.add(r);
+  });
+  Object.keys(seenTs).forEach(k => (byTs[k] || []).forEach(x => { if (!used.has(x)) dupRows.push(x); }));
   const unmatched = {};   // ما بقي بلا ممرضة، لعرضه في ورقة Unmatched
   const noteUnmatched = (v, when) => {
     const nm = String(v[C.name] || '').trim(), em = String(v[C.email] || '').trim().toLowerCase();
@@ -1525,13 +1549,14 @@ function importFormResponses() {
       ? 'legacy:' + Utilities.formatDate(v[C.ts], APP.TZ, 'yyyyMMddHHmmss') + ':' + normText_(v[C.email] || v[C.name]).slice(0, 24)
       : 'legacy:row' + (idx + 2);
     if (!(v[C.ts] instanceof Date)) return;
-    if (done[source]) {
-      const o = orphan[source];
-      if (o) {
-        const ou = resolveUser(v);
-        if (ou) { setCells_(S.REPORTS, o._row, { username: ou.username, nurse_name: ou.name }); relinked++; }
-        else noteUnmatched(v, o.submitted_at);
-      }
+    const keep = claimed[idx];
+    if (keep) {
+      const ou = resolveUser(v);
+      const upd = {};
+      if (ou && ou.username !== keep.username) { upd.username = ou.username; upd.nurse_name = ou.name; relinked++; }
+      if (keep.source !== source && (ou || !keep.username)) upd.source = source;
+      if (Object.keys(upd).length) setCells_(S.REPORTS, keep._row, upd);
+      if (!ou && !keep.username) noteUnmatched(v, keep.submitted_at);
       return;
     }
     const rawName = String(v[C.name] || '').trim();
@@ -1580,6 +1605,14 @@ function importFormResponses() {
   });
 
   if (newClinics.length) appendObjects_(S.CLINICS, newClinics);
+  if (dupRows.length) {
+    // احذف النسخ المكررة وبلاغاتها التي أُنشئت معها (من الأسفل للأعلى حتى لا تتغير أرقام الصفوف)
+    const dupIds = {}; dupRows.forEach(r => dupIds[r.report_id] = 1);
+    const isRows = rows_(S.ISSUES).filter(i => dupIds[i.report_id]).map(i => i._row);
+    isRows.sort((a, b) => b - a).forEach(r => sh_(S.ISSUES).deleteRow(r));
+    dupRows.map(r => r._row).sort((a, b) => b - a).forEach(r => sh_(S.REPORTS).deleteRow(r));
+    delete ROWS_CACHE_[S.ISSUES]; delete ROWS_CACHE_[S.REPORTS];
+  }
   if (reports.length) appendObjects_(S.REPORTS, reports);
 
   // تاريخ بداية المسؤولية = أول تقرير للممرضة (إذا كان فارغاً أو أحدث من أول تقرير)
@@ -1604,6 +1637,7 @@ function importFormResponses() {
   const unCount = um.reduce((x, g) => x + g.count, 0);
   SpreadsheetApp.getActive().toast('تم نقل ' + reports.length + ' تقرير، وإنشاء ' + createdUsers.length + ' حساب ممرضة' +
     (relinked ? '، وربط ' + relinked + ' تقرير قديم بصاحبته' : '') +
+    (dupRows.length ? '، وحذف ' + dupRows.length + ' نسخة مكررة' : '') +
     (unCount ? '. يوجد ' + unCount + ' رد بلا ممرضة: راجع ورقة Unmatched' : ''), APP.NAME, 12);
 }
 
