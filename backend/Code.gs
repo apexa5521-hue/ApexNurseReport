@@ -533,10 +533,32 @@ function onLeave_(leaves, week) {
 function expectedOn_(n, w, leaves, cfg) {
   if (n.start_date) { const st = dateStr_(parseDate_(n.start_date)); if (st && w < weekOf_(st, cfg)) return false; }
   if (n.status !== 'active') {
-    const end = n.end_date ? dateStr_(parseDate_(n.end_date)) : '';
-    if (!end || w > end) return false;   // متوقفة عن العمل
+    // متوقفة عن العمل: مطلوبة حتى تاريخ التوقف، وإن لم يُكتب فحتى آخر أسبوع سلّمت فيه (حتى لا يضيع سجلها القديم)
+    const end = n.end_date ? dateStr_(parseDate_(n.end_date)) : (lastWeekMap_()[n.username] || '');
+    if (!end || w > end) return false;
   }
   return !onLeave_(leaves, w);
+}
+
+/** آخر أسبوع سلّمت فيه كل ممرضة */
+function lastWeekMap_() {
+  const m = {};
+  rows_(S.REPORTS).forEach(r => { if (r.week_start > (m[r.username] || '')) m[r.username] = r.week_start; });
+  return m;
+}
+
+/** أول أسبوع فيه تقرير ضمن نطاق المستخدم (بداية «كل المدة») */
+function firstWeek_(user, fallback) {
+  let f = '';
+  rows_(S.REPORTS).forEach(r => { if (r.week_start && branchAllowed_(user, r.branch) && (!f || r.week_start < f)) f = r.week_start; });
+  return f && f < fallback ? f : fallback;
+}
+
+/** أسابيع السبت من from إلى to */
+function weeksBetween_(from, to) {
+  const out = [];
+  for (let d = parseDate_(from); dateStr_(d) <= to; d = addDays_(d, 7)) out.push(dateStr_(d));
+  return out;
 }
 
 /** الحالة الحالية: على رأس العمل / إجازة (حالية أو قادمة) / متوقفة */
@@ -576,6 +598,7 @@ function buildRoster_(user, week, weeks, cfg) {
       username: n.username, name: n.name, email: n.email, branch: n.branch, status: n.status,
       state: st.state, leave: st.leave,
       thisWeek: cells[cells.length - 1], cells: cells,
+      expectedWeeks: counted.length, doneWeeks: done.length, reports: mine.length,
       compliance: counted.length ? Math.round(done.length / counted.length * 100) : null,
       onTimeRate: counted.length ? Math.round(onTime.length / counted.length * 100) : null,
       missedStreak: streak,
@@ -588,7 +611,8 @@ function buildRoster_(user, week, weeks, cfg) {
 function apiHrOverview_(req, user) {
   const cfg = settings_();
   const week = normalizeWeek_(req.week, cfg);
-  const weeks = weeksBack_(week, Math.min(52, Math.max(4, Number(req.weeks) || 12)));
+  const weeks = req.weeks === 'all' ? weeksBetween_(firstWeek_(user, week), week)
+    : weeksBack_(week, Math.min(52, Math.max(4, Number(req.weeks) || 12)));
   const roster = buildRoster_(user, week, weeks, cfg);
 
   const expected = roster.filter(r => r.thisWeek !== 'na' && r.thisWeek !== 'leave');
@@ -833,6 +857,113 @@ function processCredentials_(dryRun) {
 }
 
 /**
+ * دمج حسابات مكررة وربط الأسماء المختلفة بصاحبتها، بدون تعديل يدوي على Users أو Reports.
+ * أنشئ ورقة باسم Merges، أعمدتها: from | into
+ *   into  الممرضة الصحيحة (إيميلها أو اسم الدخول أو اسمها كما في Users)
+ *   from  الحساب المكرر، أو اسم/إيميل كُتب به في النموذج (مثل Ma.Clarissa Tugano أو tugano34@gmail.com)
+ * 1) previewMerges: يكتب في عمود result ما سيحدث، بدون أي تغيير.
+ * 2) applyMerges: ينقل تقارير الحساب المكرر وبلاغاته وإجازاته إلى الصحيحة، ويضيف الاسم/الإيميل إلى aliases،
+ *    ويوقف الحساب المكرر (لا يُحذف)، ثم يعيد ربط ردود النموذج المعلّقة.
+ */
+function previewMerges() { return processMerges_(true); }
+function applyMerges() { return processMerges_(false); }
+
+/** مطابقة حرفية فقط (اسم المستخدم، الإيميل، اسم الدخول، الاسم أو أحد الأسماء البديلة) */
+function findNurseExact_(raw, nurses) {
+  const q = normText_(raw);
+  if (!q) return [];
+  return nurses.filter(u => [u.username, u.email, u.login, u.name].concat(splitList_(u.aliases)).some(k => k && normText_(k) === q));
+}
+
+function processMerges_(dryRun) {
+  const sh = ss_().getSheetByName('Merges');
+  if (!sh) throw new Error('أنشئ ورقة باسم Merges وفيها العمودان: from | into');
+  const data = sh.getDataRange().getValues();
+  const head = data.shift().map(h => String(h).trim().toLowerCase());
+  const cf = head.indexOf('from'), ci = head.indexOf('into');
+  if (cf < 0 || ci < 0) throw new Error('العمودان from وinto مطلوبان في الصف الأول');
+  let resCol = head.indexOf('result'); if (resCol < 0) { resCol = head.length; sh.getRange(1, resCol + 1).setValue('result'); }
+
+  const nurses = rows_(S.USERS).filter(u => u.role === 'nurse');
+  const moves = {};        // اسم المستخدم القديم ← الحساب الصحيح
+  const aliasAdd = {};     // اسم المستخدم الصحيح ← أسماء/إيميلات تُضاف إلى aliases
+  let ok = 0, bad = 0;
+  data.forEach((row, i) => {
+    const from = String(row[cf] || '').trim(), into = String(row[ci] || '').trim();
+    if (!from && !into) return;
+    const say = m => sh.getRange(i + 2, resCol + 1).setValue(m);
+    const fail = m => { bad++; say(m); };
+    const t = findNurseExact_(into, nurses);
+    if (t.length !== 1) return fail(t.length ? 'into يطابق أكثر من حساب: ' + t.map(u => u.name + ' (' + (u.email || u.username) + ')').join(' / ') + '. اكتب الإيميل' : 'into: لا يوجد حساب بهذا الاسم أو الإيميل');
+    const target = t[0];
+    const src = findNurseExact_(from, nurses).filter(u => u.username !== target.username);
+    if (src.length > 1) return fail('from يطابق أكثر من حساب: ' + src.map(u => u.name + ' (' + (u.email || u.username) + ')').join(' / ') + '. اكتب الإيميل');
+    const add = aliasAdd[target.username] = aliasAdd[target.username] || [];
+    if (src.length) {
+      const f = src[0];
+      if (moves[f.username]) return fail('هذا الحساب مذكور في صف سابق');
+      const n = rows_(S.REPORTS).filter(r => r.username === f.username).length;
+      moves[f.username] = target;
+      add.push(f.name); if (f.email) add.push(f.email); else if (f.username.indexOf('@') > 0) add.push(f.username);
+      splitList_(f.aliases).forEach(a => add.push(a));
+      ok++; say((dryRun ? 'سيُدمج' : 'تم دمج') + ' حساب ' + f.name + ' (' + n + ' تقرير) في ' + target.name);
+    } else {
+      if (findNurseExact_(from, [target]).length) { ok++; return say('مربوط بها مسبقاً: ' + target.name); }
+      add.push(from);
+      ok++; say((dryRun ? 'سيُضاف' : 'أُضيف') + ' «' + from + '» كاسم بديل لـ ' + target.name + ' (ردود النموذج بهذا الاسم تُنسب لها)');
+    }
+  });
+  if (dryRun) {
+    SpreadsheetApp.getActive().toast('معاينة: ' + ok + ' صحيح · ' + bad + ' يحتاج مراجعة. انظر عمود result', APP.NAME, 12);
+    return { ok: ok, failed: bad, dryRun: true };
+  }
+
+  // نقل التقارير والبلاغات والإجازات دفعة واحدة لكل ورقة
+  const rewrite = (name, cols) => {
+    const sheet = sh_(name), last = sheet.getLastRow();
+    if (last < 2) return;
+    const h = HEADERS[name], ui = h.indexOf('username'), ni = h.indexOf('nurse_name');
+    const rg = sheet.getRange(2, 1, last - 1, h.length), vals = rg.getValues();
+    let changed = false;
+    const ri = h.indexOf('reporters');
+    vals.forEach(v => {
+      const t = moves[String(v[ui]).trim()];
+      if (t) { v[ui] = t.username; if (ni >= 0) v[ni] = t.name; changed = true; }
+      if (ri >= 0 && v[ri]) { const rp = unique_(splitList_(v[ri]).map(x => moves[x] ? moves[x].username : x)).join(','); if (rp !== v[ri]) { v[ri] = rp; changed = true; } }
+    });
+    if (changed) [ui, ni, ri].filter(c => c >= 0).forEach(c => sheet.getRange(2, c + 1, vals.length, 1).setValues(vals.map(v => [v[c]])));
+    delete ROWS_CACHE_[name];
+  };
+  if (Object.keys(moves).length) [S.REPORTS, S.ISSUES, S.LEAVES].forEach(n => rewrite(n));
+
+  rows_(S.USERS).forEach(u => {
+    const add = aliasAdd[u.username];
+    if (add) {
+      const have = splitList_(u.aliases);
+      const mine = [u.name, u.email, u.username].map(normText_);
+      add.forEach(a => { if (a && mine.indexOf(normText_(a)) < 0 && !have.some(x => normText_(x) === normText_(a))) have.push(a); });
+      const upd = { aliases: have.join(', ') };
+      // إن كان للحساب المكرر اسم دخول ورقم سري ولم يكن للصحيح، ينتقلان إليه
+      Object.keys(moves).forEach(old => {
+        if (moves[old].username !== u.username || u.login) return;
+        const f = nurses.find(x => x.username === old);
+        if (f && f.login) Object.assign(upd, { login: f.login, pass_hash: f.pass_hash, salt: f.salt, must_change: f.must_change });
+      });
+      const f0 = Object.keys(moves).map(o => nurses.find(x => x.username === o)).filter(f => f && moves[f.username].username === u.username);
+      f0.forEach(f => { if (f.start_date && (!u.start_date || String(f.start_date) < String(u.start_date))) upd.start_date = f.start_date; });
+      setCells_(S.USERS, u._row, upd);
+    }
+    if (moves[u.username]) {
+      setCells_(S.USERS, u._row, { username: 'merged:' + u.username, role: 'merged', status: 'inactive', login: '', pass_hash: '', email: '',
+        aliases: 'دُمج في ' + moves[u.username].username });
+    }
+  });
+  log_('admin', 'merge_nurses', Object.keys(moves).map(k => k + ' → ' + moves[k].username).join('; ') + ' | aliases: ' + Object.keys(aliasAdd).length);
+  importFormResponses();   // يربط ردود النموذج المعلّقة بالأسماء البديلة الجديدة
+  return { ok: ok, failed: bad, dryRun: false };
+}
+
+/**
  * يولّد لكل ممرضة نشطة لم تسجّل دخولها بعد (ما زالت على كلمتها المؤقتة) اسم دخول قصيراً ورقماً سرياً من 4 خانات،
  * ويكتبها في ورقة Logins لتوزيعها. من غيّرت كلمتها بنفسها لا تُمَس. احذف الورقة بعد التوزيع.
  */
@@ -911,9 +1042,10 @@ function apiUserSetStatus_(req, user) {
 function apiQualityStats_(req, user) {
   const cfg = settings_();
   const to = normalizeWeek_(req.to || req.week, cfg);
-  const from = req.from ? normalizeWeek_(req.from, cfg) : dateStr_(addDays_(parseDate_(to), -7 * 11));
   const branch = req.branch && req.branch !== 'ALL' ? req.branch : null;
   const inScope = b => branchAllowed_(user, b) && (!branch || b === branch);
+  const from = req.from === 'all' ? firstWeek_({ role: user.role, branch: branch || user.branch }, to)
+    : req.from ? normalizeWeek_(req.from, cfg) : dateStr_(addDays_(parseDate_(to), -7 * 11));
 
   const weeks = [];
   for (let d = parseDate_(from); dateStr_(d) <= to; d = addDays_(d, 7)) weeks.push(dateStr_(d));
@@ -1073,7 +1205,7 @@ function apiQualityStats_(req, user) {
 function apiReportsList_(req, user) {
   const cfg = settings_();
   const to = normalizeWeek_(req.to || req.week, cfg);
-  const from = req.from ? normalizeWeek_(req.from, cfg) : to;
+  const from = req.from === 'all' ? firstWeek_(user, to) : req.from ? normalizeWeek_(req.from, cfg) : to;
   const list = rows_(S.REPORTS)
     .filter(r => branchAllowed_(user, r.branch) && r.week_start >= from && r.week_start <= to)
     .filter(r => !req.branch || req.branch === 'ALL' || r.branch === req.branch)
@@ -1143,7 +1275,7 @@ function apiIssueUpdate_(req, user) {
 function apiUsersList_(req, user) {
   const lm = leavesMap_(), today = dateStr_(new Date());
   const list = rows_(S.USERS)
-    .filter(u => user.role === 'admin' || u.role === 'nurse')
+    .filter(u => u.role !== 'merged' && (user.role === 'admin' || u.role === 'nurse'))
     .filter(u => branchAllowed_(user, u.branch) || u.branch === 'ALL' && user.role === 'admin')
     .map(u => {
       const st = nurseState_(u, lm[u.username], today);
@@ -1329,6 +1461,15 @@ function importFormResponses() {
   Object.keys(byEmail).forEach(e => claim('e:' + e, byEmail[e]));
   Object.keys(byName).forEach(n => claim('n:' + n, byName[n]));
 
+  // كل رد في النموذج يُعرف بوقته (حتى الثانية). لو عُدّل الاسم في الشيت الأساسي بعد النقل
+  // يبقى نفس التقرير ويُعاد ربطه، ولا يُنقل مرة ثانية
+  const tsKey = v => 'legacy:' + Utilities.formatDate(v[C.ts], APP.TZ, 'yyyyMMddHHmmss');
+  const byTs = {};
+  rows_(S.REPORTS).forEach(r => {
+    const m = String(r.source || '').match(/^(legacy:\d{14})/);
+    if (m) (byTs[m[1]] = byTs[m[1]] || []).push(r);
+  });
+
   // مجموعات بدون حساب معروف ⇐ ممرضات غير موجودات في القائمة: ننشئ لهن حسابات
   const recentCut = dateStr_(addDays_(new Date(), -35));
   const groups = {};
@@ -1337,6 +1478,7 @@ function importFormResponses() {
     if (!(v[C.ts] instanceof Date) || !k.length) return;
     const root = find(k[0]);
     if (known[root]) return;
+    if ((byTs[tsKey(v)] || []).some(r => r.username)) return;   // رد منقول ومنسوب سابقاً: تعديل اسمه لا ينشئ حساباً جديداً
     const g = groups[root] = groups[root] || { emails: {}, names: {}, last: '', branch: {}, total: 0 };
     const email = String(v[C.email] || '').trim().toLowerCase();
     const nm = String(v[C.name] || '').trim();
@@ -1364,8 +1506,33 @@ function importFormResponses() {
   }
   const resolveUser = v => { const k = keysOf(v); return k.length ? known[find(k[0])] : null; };
 
-  const done = {};
-  rows_(S.REPORTS).forEach(r => { if (String(r.source).indexOf('legacy:') === 0) done[r.source] = 1; });
+  const dupRows = [];   // نسخ مكررة من نفس الرد (من نقل سابق بعد تعديل الاسم): تُحذف
+  // ربط كل صف في النموذج بتقريره المنقول: أولاً بالمفتاح نفسه، ثم بنفس الوقت (رد عُدّل اسمه).
+  // قد يرد ردّان في نفس الثانية من ممرضتين، لذلك لا نعتمد على الوقت وحده إلا لما بقي
+  const claimed = {}, used = new Set(), seenTs = {};
+  const srcOf = (v, idx) => 'legacy:' + Utilities.formatDate(v[C.ts], APP.TZ, 'yyyyMMddHHmmss') + ':' + normText_(v[C.email] || v[C.name]).slice(0, 24);
+  values.forEach((v, idx) => {
+    if (!(v[C.ts] instanceof Date)) return;
+    const k = tsKey(v); seenTs[k] = 1;
+    const r = (byTs[k] || []).find(x => !used.has(x) && x.source === srcOf(v, idx));
+    if (r) { claimed[idx] = r; used.add(r); }
+  });
+  values.forEach((v, idx) => {
+    if (!(v[C.ts] instanceof Date) || claimed[idx]) return;
+    const free = (byTs[tsKey(v)] || []).filter(x => !used.has(x));
+    if (!free.length) return;
+    const ou = resolveUser(v);
+    const r = (ou && free.find(x => x.username === ou.username)) || free.find(x => x.username) || free[0];
+    claimed[idx] = r; used.add(r);
+  });
+  Object.keys(seenTs).forEach(k => (byTs[k] || []).forEach(x => { if (!used.has(x)) dupRows.push(x); }));
+  const unmatched = {};   // ما بقي بلا ممرضة، لعرضه في ورقة Unmatched
+  const noteUnmatched = (v, when) => {
+    const nm = String(v[C.name] || '').trim(), em = String(v[C.email] || '').trim().toLowerCase();
+    const k = nm + '|' + em, g = unmatched[k] = unmatched[k] || { name: nm, email: em, count: 0, first: when, last: when };
+    g.count++; if (when < g.first) g.first = when; if (when > g.last) g.last = when;
+  };
+  let relinked = 0;
   const clinics = clinics_();
   const clinicById = {};
   clinics.forEach(c => clinicById[c.clinic_id] = c);
@@ -1381,9 +1548,20 @@ function importFormResponses() {
     const source = v[C.ts] instanceof Date
       ? 'legacy:' + Utilities.formatDate(v[C.ts], APP.TZ, 'yyyyMMddHHmmss') + ':' + normText_(v[C.email] || v[C.name]).slice(0, 24)
       : 'legacy:row' + (idx + 2);
-    if (done[source] || !(v[C.ts] instanceof Date)) return;
+    if (!(v[C.ts] instanceof Date)) return;
+    const keep = claimed[idx];
+    if (keep) {
+      const ou = resolveUser(v);
+      const upd = {};
+      if (ou && ou.username !== keep.username) { upd.username = ou.username; upd.nurse_name = ou.name; relinked++; }
+      if (keep.source !== source && (ou || !keep.username)) upd.source = source;
+      if (Object.keys(upd).length) setCells_(S.REPORTS, keep._row, upd);
+      if (!ou && !keep.username) noteUnmatched(v, keep.submitted_at);
+      return;
+    }
     const rawName = String(v[C.name] || '').trim();
     const u = resolveUser(v);
+    if (!u) noteUnmatched(v, Utilities.formatDate(v[C.ts], APP.TZ, 'yyyy-MM-dd HH:mm'));
     let branch = String(v[C.branch] || '').toUpperCase().indexOf('ONIZAH') >= 0 && String(v[C.branch]).toUpperCase().indexOf('BURIDAH') < 0
       ? 'ONIZAH' : String(v[C.branch] || '').toUpperCase().indexOf('BURIDAH') >= 0 ? 'BURIDAH' : (u ? u.branch : '');
     if (!branch) branch = 'BURIDAH';
@@ -1427,6 +1605,14 @@ function importFormResponses() {
   });
 
   if (newClinics.length) appendObjects_(S.CLINICS, newClinics);
+  if (dupRows.length) {
+    // احذف النسخ المكررة وبلاغاتها التي أُنشئت معها (من الأسفل للأعلى حتى لا تتغير أرقام الصفوف)
+    const dupIds = {}; dupRows.forEach(r => dupIds[r.report_id] = 1);
+    const isRows = rows_(S.ISSUES).filter(i => dupIds[i.report_id]).map(i => i._row);
+    isRows.sort((a, b) => b - a).forEach(r => sh_(S.ISSUES).deleteRow(r));
+    dupRows.map(r => r._row).sort((a, b) => b - a).forEach(r => sh_(S.REPORTS).deleteRow(r));
+    delete ROWS_CACHE_[S.ISSUES]; delete ROWS_CACHE_[S.REPORTS];
+  }
   if (reports.length) appendObjects_(S.REPORTS, reports);
 
   // تاريخ بداية المسؤولية = أول تقرير للممرضة (إذا كان فارغاً أو أحدث من أول تقرير)
@@ -1436,8 +1622,23 @@ function importFormResponses() {
     const f = first[u.username];
     if (u.role === 'nurse' && f && (!u.start_date || dateStr_(parseDate_(u.start_date)) > f)) setCell_(S.USERS, u._row, 'start_date', f);
   });
-  SpreadsheetApp.getActive().toast('تم نقل ' + reports.length + ' تقرير، وإنشاء ' + createdUsers.length +
-    ' حساب ممرضة (راجع ورقة Users وورقة Temp_Passwords)', APP.NAME, 10);
+  // ورقة Unmatched: ردود لم تُنسب لأي ممرضة. أضف الاسم/الإيميل في عمود aliases للحساب الصحيح ثم أعد تشغيل الاستيراد
+  const um = Object.keys(unmatched).map(k => unmatched[k]).sort((a, b) => b.count - a.count);
+  const db = ss_();
+  let ush = db.getSheetByName('Unmatched');
+  if (um.length) {
+    if (!ush) ush = db.insertSheet('Unmatched');
+    ush.clearContents();
+    const rowsOut = [['الاسم في النموذج', 'الإيميل في النموذج', 'عدد الردود', 'أول رد', 'آخر رد', 'ماذا أفعل']]
+      .concat(um.map(g => [g.name || '(بدون اسم)', g.email || '(بدون إيميل)', g.count, g.first, g.last,
+        'اكتب الاسم أو الإيميل في عمود aliases للممرضة الصحيحة في Users، ثم شغّل importFormResponses']));
+    ush.getRange(1, 1, rowsOut.length, rowsOut[0].length).setValues(rowsOut);
+  } else if (ush) db.deleteSheet(ush);
+  const unCount = um.reduce((x, g) => x + g.count, 0);
+  SpreadsheetApp.getActive().toast('تم نقل ' + reports.length + ' تقرير، وإنشاء ' + createdUsers.length + ' حساب ممرضة' +
+    (relinked ? '، وربط ' + relinked + ' تقرير قديم بصاحبته' : '') +
+    (dupRows.length ? '، وحذف ' + dupRows.length + ' نسخة مكررة' : '') +
+    (unCount ? '. يوجد ' + unCount + ' رد بلا ممرضة: راجع ورقة Unmatched' : ''), APP.NAME, 12);
 }
 
 
