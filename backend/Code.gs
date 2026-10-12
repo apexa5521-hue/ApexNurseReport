@@ -187,6 +187,33 @@ function apiLogin_(req) {
   return { token: token, user: publicUser_(u) };
 }
 
+/**
+ * يفك القفل المؤقت عن حسابات الدخول فوراً (بدل انتظار LOCK_MINUTES). شغّله من المحرر عند الحاجة.
+ * clearLoginLocks() يفك الجميع، أو clearLoginLocks('admin') لحساب واحد.
+ */
+function clearLoginLocks(username) {
+  const cache = CacheService.getScriptCache();
+  const keys = username ? [String(username)] : rows_(S.USERS).map(u => String(u.username));
+  keys.forEach(k => cache.remove('fail_' + k.toLowerCase()));
+  SpreadsheetApp.getActive().toast('تم فك القفل عن ' + (username || 'جميع الحسابات'), APP.NAME, 6);
+}
+
+/**
+ * يضبط كلمة مرور حساب بنفسك ويفك قفله ويفحص الدخول من الداخل. شغّله من المحرر: resetPassword('admin', 'كلمتك').
+ * يكتب نتيجة الفحص في Logs (View ← Logs أو Execution log).
+ */
+function resetPassword(username, newPassword) {
+  const id = String(username || '').trim().toLowerCase();
+  if (!id || String(newPassword || '').length < 6) throw new Error('resetPassword("admin", "كلمة من 6 خانات على الأقل")');
+  const u = rows_(S.USERS).find(x => String(x.username).toLowerCase() === id);
+  if (!u) throw new Error('لا يوجد حساب باسم ' + id + '. الموجود: ' + rows_(S.USERS).filter(x => x.role !== 'nurse').map(x => x.username).join(', '));
+  setCells_(S.USERS, u._row, Object.assign(passwordFields_(String(newPassword), false, u.login || ''), { status: 'active' }));
+  CacheService.getScriptCache().remove('fail_' + id);
+  const r = apiLogin_({ username: id, password: String(newPassword) });
+  Logger.log('تم. الدخول يعمل الآن بـ ' + id + ' (الدور: ' + r.user.role + ')');
+  SpreadsheetApp.getActive().toast('تم ضبط كلمة مرور ' + id + ' ونجح الفحص', APP.NAME, 8);
+}
+
 function apiLogout_(req) {
   if (req.token) CacheService.getScriptCache().remove('s_' + req.token);
   return {};
