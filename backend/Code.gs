@@ -187,6 +187,17 @@ function apiLogin_(req) {
   return { token: token, user: publicUser_(u) };
 }
 
+/**
+ * يفك القفل المؤقت عن حسابات الدخول فوراً (بدل انتظار LOCK_MINUTES). شغّله من المحرر عند الحاجة.
+ * clearLoginLocks() يفك الجميع، أو clearLoginLocks('admin') لحساب واحد.
+ */
+function clearLoginLocks(username) {
+  const cache = CacheService.getScriptCache();
+  const keys = username ? [String(username)] : rows_(S.USERS).map(u => String(u.username));
+  keys.forEach(k => cache.remove('fail_' + k.toLowerCase()));
+  SpreadsheetApp.getActive().toast('تم فك القفل عن ' + (username || 'جميع الحسابات'), APP.NAME, 6);
+}
+
 function apiLogout_(req) {
   if (req.token) CacheService.getScriptCache().remove('s_' + req.token);
   return {};
