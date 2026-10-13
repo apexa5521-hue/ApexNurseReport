@@ -42,6 +42,7 @@ const S = {
   LOG: 'Audit_Log',
   TEMP: 'Temp_Passwords',
   LEAVES: 'Leaves',
+  NOTICES: 'Notices',
 };
 
 const HEADERS = {
@@ -59,6 +60,7 @@ const HEADERS = {
   Settings: ['key', 'value', 'description'],
   Audit_Log: ['at', 'user', 'action', 'details'],
   Temp_Passwords: ['name', 'username', 'role', 'temp_password', 'created_at'],
+  Notices: ['notice_id', 'username', 'nurse_name', 'branch', 'weeks', 'streak', 'compliance', 'issued_at', 'issued_by'],
   Leaves: ['leave_id', 'username', 'from_date', 'to_date', 'cancelled', 'created_at', 'created_by'],
 };
 
@@ -141,6 +143,7 @@ const ACTIONS = {
 
   'hr.overview':    { roles: ['hr', 'admin'], fn: apiHrOverview_ },
   'hr.remind':      { roles: ['hr', 'admin'], fn: apiHrRemind_ },
+  'hr.notice':      { roles: ['hr', 'admin'], fn: apiHrNotice_ },
   // الموارد البشرية لا ترى الإحصائيات الفنية (تعقيم، أدوية، ثلاجة…) ولا تفاصيل التقارير
   'quality.stats':  { roles: ['quality', 'admin'], fn: apiQualityStats_ },
   'reports.list':   { roles: ['quality', 'admin'], fn: apiReportsList_ },
@@ -603,6 +606,7 @@ function buildRoster_(user, week, weeks, cfg) {
       onTimeRate: counted.length ? Math.round(onTime.length / counted.length * 100) : null,
       missedStreak: streak,
       lastSubmission: mine.reduce((m, r) => r.submitted_at > m ? r.submitted_at : m, ''),
+      notices: (noticesMap_()[n.username] || []).length, lastNotice: ((noticesMap_()[n.username] || []).slice(-1)[0] || {}).issued_at || '',
       lastReminder: n.last_reminder || '', remindedToday: String(n.last_reminder || '').slice(0, 10) === today,
     };
   });
@@ -614,6 +618,13 @@ function apiHrOverview_(req, user) {
   const weeks = req.weeks === 'all' ? weeksBetween_(firstWeek_(user, week), week)
     : weeksBack_(week, Math.min(52, Math.max(4, Number(req.weeks) || 12)));
   const roster = buildRoster_(user, week, weeks, cfg);
+  // أسابيع متتالية بلا تسليم حتى آخر أسبوع انتهت نافذته (شرط إشعار عدم الالتزام)
+  const closedIdx = weeks.indexOf(lastClosedWeek_(cfg));
+  roster.forEach(r => {
+    let k = 0;
+    for (let i = closedIdx; i >= 0; i--) { const c = r.cells[i]; if (c === 'missing') k++; else if (c !== 'na' && c !== 'leave') break; }
+    r.noticeStreak = r.state === 'inactive' ? 0 : k;
+  });
 
   const expected = roster.filter(r => r.thisWeek !== 'na' && r.thisWeek !== 'leave');
   const count = t => expected.filter(r => r.thisWeek === t).length;
@@ -642,6 +653,56 @@ function apiHrOverview_(req, user) {
     roster: roster.sort((a, b) => (ROSTER_ORDER[a.thisWeek] - ROSTER_ORDER[b.thisWeek]) || (a.compliance == null ? 101 : a.compliance) - (b.compliance == null ? 101 : b.compliance)),
     cardIssues: cardIssues,
   };
+}
+
+/* ───────── إشعار عدم الالتزام (يُطبع وتوقّعه الممرضة) ───────── */
+
+let NOTICES_CACHE_ = null;
+function noticesMap_() {
+  if (NOTICES_CACHE_) return NOTICES_CACHE_;
+  const m = {};
+  rows_(S.NOTICES).forEach(n => (m[n.username] = m[n.username] || []).push(n));
+  Object.keys(m).forEach(k => m[k].sort((a, b) => a.issued_at < b.issued_at ? -1 : 1));
+  return (NOTICES_CACHE_ = m);
+}
+
+/** آخر أسبوع انتهت نافذته (أثناء السبت والأحد يكون أسبوع اليوم ما زال مفتوحاً) */
+function lastClosedWeek_(cfg) {
+  const cls = classifySubmission_(new Date(), cfg);
+  return cls.timing === 'on_time' || cls.timing === 'late' || cls.timing === 'early'
+    ? dateStr_(addDays_(parseDate_(cls.week), -7)) : cls.week;
+}
+
+/**
+ * يسجّل إشعاراً لكل ممرضة لم تسلّم أسبوعين متتاليين أو أكثر (حتى آخر أسبوع مغلق)، ويعيد بيانات الطباعة.
+ * req.usernames: قائمة الممرضات، أو فارغة = كل من تنطبق عليها القاعدة
+ */
+function apiHrNotice_(req, user) {
+  const cfg = settings_();
+  const week = lastClosedWeek_(cfg);
+  const weeks = weeksBack_(week, 52);
+  const roster = buildRoster_(user, week, weeks, cfg).filter(r => r.state !== 'inactive');
+  const want = (req.usernames || []).map(String);
+  const pick = want.length ? roster.filter(r => want.indexOf(r.username) >= 0) : roster.filter(r => r.missedStreak >= 2);
+  const out = [], skipped = [];
+  const stamp = nowStr_();
+  const prior = noticesMap_();
+  pick.forEach(r => {
+    if (r.missedStreak < 2) { skipped.push(r.name); return; }
+    const missed = weeks.slice(weeks.length - r.missedStreak);
+    const prev = prior[r.username] || [];
+    const id = 'N' + Utilities.formatDate(new Date(), APP.TZ, 'yyMMdd') + '-' + String(rows_(S.NOTICES).length + out.length + 1).padStart(4, '0');
+    out.push({ notice_id: id, username: r.username, nurse_name: r.name, branch: r.branch, weeks: missed.join(','),
+               streak: r.missedStreak, compliance: r.compliance == null ? '' : r.compliance, issued_at: stamp, issued_by: user.name,
+               previous: prev.length, lastPrevious: prev.length ? prev[prev.length - 1].issued_at : '',
+               doneWeeks: r.doneWeeks, expectedWeeks: r.expectedWeeks });
+  });
+  if (out.length) {
+    appendObjects_(S.NOTICES, out.map(n => { const o = {}; HEADERS[S.NOTICES].forEach(k => o[k] = n[k]); return o; }));
+    NOTICES_CACHE_ = null;
+    log_(user.username, 'notice', out.map(n => n.notice_id + ' ' + n.username).join('; '));
+  }
+  return { notices: out, skipped: skipped, asOf: week };
 }
 
 function emailOf_(r) {

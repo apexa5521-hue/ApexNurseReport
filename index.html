@@ -372,6 +372,63 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
   .card{box-shadow:none;break-inside:avoid}
   .tbl-wrap{max-height:none;overflow:visible}
 }
+/* ══════════ PRINTED REPORTS ══════════ */
+#print-root{display:none}
+@media print{
+  body.printing>*:not(#print-root){display:none!important}
+  body.printing #print-root{display:block}
+  body.printing{background:#fff!important}
+}
+@page{size:A4;margin:12mm 11mm 14mm;@bottom-center{content:counter(page) " / " counter(pages);font:9pt Inter,sans-serif;color:#7a8394}}
+.pr{--pn:#1e2a44;--pa:#2f6f8f;--pl:#d9dee5;--ps:#f3f5f8;--pg:#2e7d5b;--pw:#a86a12;--pb:#a8382c;--pt:#5b6475;
+  color:#1b2230;background:#fff;font-family:var(--font);font-size:9.6pt;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact;direction:rtl}
+.pr *{box-sizing:border-box}
+.pr .frame{width:100%;border-collapse:collapse}
+.pr .frame>thead>tr>td,.pr .frame>tbody>tr>td{padding:0}
+.pr .ph{display:flex;align-items:flex-end;gap:12px;border-bottom:2pt solid var(--pn);padding-bottom:6px;margin-bottom:12px}
+.pr .ph .t{font-size:15pt;font-weight:700;color:var(--pn);line-height:1.2}
+.pr .ph .t small{display:block;font-family:Inter,sans-serif;font-size:9pt;font-weight:500;color:var(--pa);letter-spacing:.02em}
+.pr .ph .meta{margin-inline-start:auto;text-align:end;font-size:8.6pt;color:var(--pt);line-height:1.45}
+.pr .ph .meta b{color:var(--pn);font-weight:600}
+.pr h2{display:flex;align-items:baseline;gap:8px;font-size:11.5pt;color:var(--pn);margin:16px 0 7px;padding-bottom:3px;border-bottom:.6pt solid var(--pl);break-after:avoid}
+.pr h2 small{font-family:Inter,sans-serif;font-size:8.4pt;font-weight:500;color:var(--pa);margin-inline-start:auto}
+.pr h2 .n{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:4px;background:var(--pn);color:#fff;font:600 8pt Inter,sans-serif}
+.pr .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.pr .kpi{border:.6pt solid var(--pl);border-top:2.4pt solid var(--pa);border-radius:4px;padding:7px 9px;break-inside:avoid}
+.pr .kpi .v{font:600 16pt Inter,sans-serif;color:var(--pn);line-height:1.1}
+.pr .kpi .l{font-size:8.4pt;color:var(--pt)}.pr .kpi .l i{display:block;font-style:normal;font-family:Inter,sans-serif;font-size:7.4pt;color:#8a92a1}
+.pr .kpi.good{border-top-color:var(--pg)}.pr .kpi.warn{border-top-color:var(--pw)}.pr .kpi.bad{border-top-color:var(--pb)}
+.pr table.t{width:100%;border-collapse:collapse;font-size:8.6pt;margin-top:2px}
+.pr table.t th{background:var(--pn);color:#fff;font-weight:600;text-align:start;padding:4px 6px;font-size:8pt;line-height:1.25}
+.pr table.t th small{display:block;font-family:Inter,sans-serif;font-weight:400;font-size:6.8pt;opacity:.8}
+.pr table.t td{padding:3.5px 6px;border-bottom:.5pt solid var(--pl);vertical-align:top}
+.pr table.t tr:nth-child(even) td{background:var(--ps)}
+.pr table.t tr{break-inside:avoid}
+.pr table.t td.n,.pr table.t th.n{text-align:center;font-family:Inter,sans-serif;font-variant-numeric:tabular-nums}
+.pr .bar{display:flex;align-items:center;gap:6px}.pr .bar i{flex:1;height:5px;background:var(--pl);border-radius:3px;overflow:hidden;display:block}
+.pr .bar i b{display:block;height:100%;background:var(--pa)}.pr .bar i b.good{background:var(--pg)}.pr .bar i b.warn{background:var(--pw)}.pr .bar i b.bad{background:var(--pb)}
+.pr .bar span{font:600 8.4pt Inter,sans-serif;min-width:30px;text-align:end}
+.pr .tag{display:inline-block;padding:0 5px;border-radius:3px;font-size:7.6pt;font-weight:600;border:.5pt solid}
+.pr .tag.good{color:var(--pg);border-color:var(--pg)}.pr .tag.warn{color:var(--pw);border-color:var(--pw)}.pr .tag.bad{color:var(--pb);border-color:var(--pb)}
+.pr .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pr .checks .row{display:grid;grid-template-columns:120px 1fr;gap:8px;align-items:center;padding:2px 0}
+.pr .checks .row em{font-style:normal;font-family:Inter,sans-serif;font-size:7.4pt;color:#8a92a1;display:block;line-height:1.1}
+.pr .muted{color:var(--pt)}.pr .empty{color:var(--pt);font-style:italic;padding:4px 0}
+.pr ol.recs{margin:4px 0 0;padding-inline-start:18px}.pr ol.recs li{margin:3px 0;break-inside:avoid}
+.pr .sig{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:22px;break-inside:avoid}
+.pr .sig>div{border:.6pt solid var(--pl);border-radius:4px;padding:8px 10px;min-height:86px}
+.pr .sig .h{font-weight:600;color:var(--pn);font-size:9pt}.pr .sig .h small{font-family:Inter,sans-serif;font-weight:500;color:var(--pa);margin-inline-start:6px}
+.pr .sig .line{display:flex;gap:8px;margin-top:10px;font-size:8.4pt;color:var(--pt)}.pr .sig .line span{flex:1;border-bottom:.6pt dotted #9aa3b2;min-height:14px;color:#1b2230}
+.pr .note{border-inline-start:2.4pt solid var(--pa);background:var(--ps);padding:6px 9px;font-size:8.6pt;margin:6px 0;break-inside:avoid}
+.pr .page{break-after:page}.pr .page:last-child{break-after:auto}
+.pr .en{direction:ltr;text-align:left;font-family:Inter,sans-serif}
+.pr .ntc .ttl{text-align:center;margin:6px 0 14px}.pr .ntc .ttl b{display:block;font-size:15pt;color:var(--pn)}.pr .ntc .ttl span{font:500 10pt Inter,sans-serif;color:var(--pa)}
+.pr .ntc .facts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
+.pr .ntc .facts div{border:.6pt solid var(--pl);border-radius:4px;padding:5px 8px}.pr .ntc .facts small{display:block;font-size:7.6pt;color:var(--pt)}.pr .ntc .facts b{font-size:10pt;color:var(--pn)}
+.pr .ntc .body2{display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:9.4pt}
+.pr .ntc .weeks{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}.pr .ntc .weeks span{border:.6pt solid var(--pb);color:var(--pb);border-radius:3px;padding:1px 6px;font:600 8.4pt Inter,sans-serif}
+.pr .ntc .ack{border:.8pt solid var(--pn);border-radius:4px;padding:9px 11px;margin-top:14px;break-inside:avoid}
+.pr .ntc .ack p{margin:0 0 4px}
 </style>
 </head>
 <body>
@@ -1233,6 +1290,7 @@ async function renderHR(view) {
   const today = ymd(new Date());
   const missing = d.roster.filter(r => r.thisWeek === 'missing' && r.state === 'active');
   const submitted = d.roster.filter(r => ['on_time', 'early', 'late', 'very_late'].includes(r.thisWeek));
+  const noticeable = d.roster.filter(r => r.noticeStreak >= 2);
 
   const person = (r, tail) => `<div class="prow"><span class="avatar sm">${esc(initials(r.name))}</span>
     <div class="pinfo"><b>${esc(r.name)}</b><div class="muted">${br(r.branch)}${r.missedStreak > 1 && r.thisWeek === 'missing' ? ` · ${r.missedStreak} أسابيع متتالية` : ''}</div></div>${tail}</div>`;
@@ -1257,9 +1315,10 @@ async function renderHR(view) {
 
   <div class="grid g-2e" style="margin-top:16px">
     <section class="card rise" style="--i:5"><div class="card-h" style="flex-wrap:wrap"><h3>غير الملتزمات</h3><span class="sub num">${missing.length}</span><div class="spacer"></div>
-      ${d.isCurrent ? (d.remindable ? `<button class="btn primary sm" id="remind-btn">${icon('bell')}إرسال تذكير (${d.remindable})</button>` : '') : '<span class="sub">التذكير متاح للأسبوع الحالي فقط</span>'}</div>
+      ${d.isCurrent ? (d.remindable ? `<button class="btn primary sm" id="remind-btn">${icon('bell')}إرسال تذكير (${d.remindable})</button>` : '') : '<span class="sub">التذكير متاح للأسبوع الحالي فقط</span>'}
+      ${noticeable.length ? `<button class="btn sm" id="notice-all" title="ممرضات لم يسلّمن أسبوعين متتاليين أو أكثر">${icon('print')}إشعارات عدم الالتزام (${noticeable.length})</button>` : ''}</div>
       <div class="card-b" style="padding-top:6px">${missing.length ? `<div class="plist">${missing.map(r => person(r,
-        `${r.remindedToday ? '<span class="tag">تم تذكيرها اليوم</span>' : ''}${r.missedStreak >= 3 ? `<span class="repeat">${icon('alert')}متكرر</span>` : ''}${!r.email && String(r.username).indexOf('@') < 0 ? '<span class="tag" title="لا يوجد بريد لإرسال التذكير">بدون بريد</span>' : ''}`)).join('')}</div>`
+        `${r.notices ? `<span class="tag" title="آخر إشعار ${esc(fmtDay(r.lastNotice))}">${r.notices} إشعار</span>` : ''}${r.noticeStreak >= 2 ? `<button class="btn sm" data-notice="${esc(r.username)}" title="طباعة إشعار عدم التزام">${icon('print')}إشعار</button>` : ''}${r.remindedToday ? '<span class="tag">تم تذكيرها اليوم</span>' : ''}${r.missedStreak >= 3 ? `<span class="repeat">${icon('alert')}متكرر</span>` : ''}${!r.email && String(r.username).indexOf('@') < 0 ? '<span class="tag" title="لا يوجد بريد لإرسال التذكير">بدون بريد</span>' : ''}`)).join('')}</div>`
         : '<div class="empty"><b>الجميع ملتزم</b>لا توجد ممرضة متأخرة هذا الأسبوع</div>'}</div></section>
     <section class="card rise" style="--i:6"><div class="card-h"><h3>الملتزمات</h3><span class="sub num">${submitted.length}</span></div>
       <div class="card-b" style="padding-top:6px">${submitted.length ? `<div class="plist">${submitted.map(r => person(r,
@@ -1294,6 +1353,19 @@ async function renderHR(view) {
   $('#wk').onchange = e => e.target.value && go(e.target.value);
   $('#wk-prev').onclick = () => go(addDays(d.week, -7));
   $('#wk-next').onclick = () => go(addDays(d.week, 7));
+
+  /* ───── إشعار عدم الالتزام (أسبوعان متتاليان) ───── */
+  const na = $('#notice-all');
+  if (na) na.onclick = async () => {
+    if (!await confirmDialog(`سيُسجَّل إشعار لكل ممرضة لم تسلّم أسبوعين متتاليين أو أكثر حتى آخر أسبوع مغلق، ثم تُفتح الطباعة (صفحة لكل ممرضة).`)) return;
+    issueNotices(noticeable.map(r => r.username), na, () => renderHR(view));
+  };
+  const bindNotices = scope => $$('[data-notice]', scope).forEach(b => b.onclick = async () => {
+    const r = d.roster.find(x => x.username === b.dataset.notice);
+    if (!await confirmDialog(`سيُسجَّل إشعار عدم التزام لـ ${r.name} (لم تسلّم ${r.noticeStreak} أسابيع متتالية${r.notices ? `، ولديها ${r.notices} إشعار سابق` : ''}) ثم تُفتح الطباعة.`)) return;
+    issueNotices([r.username], b, () => renderHR(view));
+  });
+  bindNotices(view);
 
   /* ───── إرسال تذكير السبت ───── */
   const remind = $('#remind-btn');
@@ -1330,7 +1402,7 @@ async function renderHR(view) {
       ${['active', 'leave', 'inactive'].map(k => `<option value="${k}" ${r.state === k ? 'selected' : ''}>${STATE_LABEL[k]}</option>`).join('')}</select>
       ${r.leave ? `<div class="leave-note"><span class="num">${esc(fmtDay(r.leave.from))} → ${esc(fmtDay(r.leave.to))}</span><button class="linkbtn" data-leave-edit="${esc(r.username)}">تعديل / تمديد</button></div>` : ''}`;
   const cols = [
-    { label: 'الممرضة', html: r => `<div style="display:flex;align-items:center;gap:10px"><span class="avatar sm">${esc(initials(r.name))}</span><div><b style="font-weight:600">${esc(r.name)}</b><div class="muted" style="font-size:11.5px" dir="ltr">${esc(r.email || '')}</div></div></div>`, csv: r => r.name },
+    { label: 'الممرضة', html: r => `<div style="display:flex;align-items:center;gap:10px"><span class="avatar sm">${esc(initials(r.name))}</span><div><b style="font-weight:600">${esc(r.name)}</b><div class="muted" style="font-size:11.5px" dir="ltr">${esc(r.email || '')}</div>${r.notices ? `<span class="tag" style="margin-top:3px" title="آخر إشعار ${esc(fmtDay(r.lastNotice))}">${r.notices} إشعار عدم التزام</span>` : ''}</div>${r.noticeStreak >= 2 ? `<button class="btn sm" style="margin-inline-start:auto" data-notice="${esc(r.username)}" title="لم تسلّم ${r.noticeStreak} أسابيع متتالية">${icon('print')}إشعار</button>` : ''}</div>`, csv: r => r.name },
     { label: 'الفرع', get: r => br(r.branch) },
     { label: 'هذا الأسبوع', html: r => r.state === 'inactive' ? '<span class="muted">—</span>' : timingPill(r.thisWeek), csv: r => r.state === 'inactive' ? '' : t('st_' + r.thisWeek) },
     { label: 'آخر 12 أسبوع', html: r => { const off = Math.max(0, r.cells.length - 12); return `<div class="heat">${r.cells.slice(off).map((c, i) => `<i class="${c}" title="${fmtShort(d.weeks[off + i])} — ${t('st_' + c)}"></i>`).join('')}</div>`; }, csv: r => r.cells.slice(-12).map(c => t('st_' + c)).join(' | ') },
@@ -1347,6 +1419,7 @@ async function renderHR(view) {
 
   const draw = () => {
     $('#roster').innerHTML = tableHTML(cols, filtered(), { empty: 'لا توجد نتائج' });
+    bindNotices($('#roster'));
     $$('#roster [data-status]').forEach(sel => sel.onchange = async () => {
       const r = d.roster.find(x => x.username === sel.dataset.status), v = sel.value;
       const revert = () => { sel.value = r.state; };
@@ -1429,6 +1502,217 @@ function periodRange(p, month) {
   return { from: ymd(first), to: ymd(last), label: new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn', { month: 'long', year: 'numeric' }).format(first) };
 }
 
+/* ══════════ PRINTED REPORTS (تقرير مطبوع + إشعار عدم الالتزام) ══════════ */
+const PR_TYPES = {
+  exec: { ar: 'تقرير الإدارة العليا', en: 'Executive Report' },
+  quality: { ar: 'تقرير اجتماع الجودة', en: 'Quality Meeting Report' },
+  branch: { ar: 'تقرير مشرف الفرع', en: 'Branch Supervisor Report' },
+};
+const BR_EN = { BURIDAH: 'Buraydah', ONIZAH: 'Unayzah', ALL: 'All branches' };
+const CHECK_EN = { expiry_checked: 'Expiry checked', sterilization_ok: 'Sterilization & pouches', fridge: 'Refrigerator', employee_card: 'Employee card', cleanliness: 'Cleanliness (4–5)', missing_tools: 'Tools complete' };
+const prDate = s => { const d = parseD(s); return d ? `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}` : '—'; };
+const prTone = (v, good = 90, warn = 70) => v == null ? '' : v >= good ? 'good' : v >= warn ? 'warn' : 'bad';
+const prH = (n, ar, en) => `<h2>${n ? `<span class="n">${n}</span>` : ''}${esc(ar)}<small>${esc(en)}</small></h2>`;
+const prBar = (v, tone) => `<div class="bar"><i><b class="${tone || prTone(v)}" style="width:${Math.max(0, Math.min(100, v || 0))}%"></b></i><span>${pct(v)}</span></div>`;
+const prTh = (ar, en, cls = '') => `<th class="${cls}">${esc(ar)}<small>${esc(en)}</small></th>`;
+const prTable = (heads, rows, empty) => rows.length
+  ? `<table class="t"><thead><tr>${heads.join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`
+  : `<div class="empty">${esc(empty || 'لا يوجد · None')}</div>`;
+
+function prFrame(title, metaRows, body) {
+  return `<div class="pr"><table class="frame"><thead><tr><td>
+    <div class="ph"><div class="t">${esc(title.ar)}<small>${esc(title.en)}</small></div>
+      <div class="meta">${metaRows.map(([ar, en, v]) => `${esc(ar)} · ${esc(en)}: <b>${v}</b>`).join('<br>')}</div></div>
+  </td></tr></thead><tbody><tr><td>${body}</td></tr></tbody></table></div>`;
+}
+
+function printHTML(html) {
+  let root = $('#print-root');
+  if (!root) { root = document.createElement('div'); root.id = 'print-root'; document.body.appendChild(root); }
+  root.innerHTML = html;
+  document.body.classList.add('printing');
+  const done = () => { document.body.classList.remove('printing'); root.innerHTML = ''; window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  const go = () => setTimeout(() => { window.print(); if (window.APEX_DEMO) setTimeout(done, 400); }, 60);
+  document.fonts && document.fonts.ready ? document.fonts.ready.then(go) : go();
+}
+
+/** توصيات مقترحة من الأرقام؛ يعدّلها المستخدم قبل الطباعة */
+function autoRecommendations(d) {
+  const k = d.kpi, out = [];
+  const low = d.nurses.filter(n => n.rate != null && n.rate < 50);
+  if (k.compliance != null && k.compliance < 90) out.push(`رفع نسبة الالتزام بالتسليم من ${k.compliance}% إلى 90% على الأقل بمتابعة أسبوعية للممرضات غير الملتزمات.`);
+  if (low.length) out.push(`مقابلة الممرضات اللواتي التزامهن أقل من 50% (${low.length}): ${low.slice(0, 6).map(n => n.name).join('، ')}${low.length > 6 ? '…' : ''}، وإصدار إشعار عدم التزام عند تكرار الغياب أسبوعين متتاليين.`);
+  if (k.onTime != null && k.onTime < 80) out.push(`التسليم في الوقت ${k.onTime}% فقط: التذكير بأن موعد التقرير السبت، والأحد يُحسب متأخراً.`);
+  if (k.coverage != null && k.coverage < 100) out.push(`${d.coverage.filter(c => !c.covered).length} عيادة بدون تقرير في آخر أسبوع: تحديد ممرضة مسؤولة عن كل عيادة.`);
+  if (k.expiringSoon) out.push(`سحب أو استبدال ${k.expiringSoon} مادة تنتهي صلاحيتها خلال 30 يوماً، ومراجعة المخزون مع التموين.`);
+  if (k.highOpen) out.push(`إغلاق ${k.highOpen} مشكلة عالية الخطورة ما زالت مفتوحة، مع تحديد مسؤول وموعد لكل منها.`);
+  (d.checks || []).filter(c => c.rate != null && c.rate < 90).forEach(c => out.push(`رفع الالتزام في بند «${c.label}» (حالياً ${c.rate}%).`));
+  if (d.recurring && d.recurring.length) out.push(`معالجة جذرية لـ ${d.recurring.length} مشكلة متكررة بدل الحل المؤقت.`);
+  if (d.fridge && d.fridge.outOfRange) out.push(`${d.fridge.outOfRange} قراءة حرارة ثلاجة خارج النطاق (${d.fridge.range[0]}–${d.fridge.range[1]}°): فحص الثلاجات وتسجيل الحرارة يومياً.`);
+  if (!out.length) out.push('المؤشرات ضمن المستهدف. الاستمرار على نفس مستوى المتابعة.');
+  return out;
+}
+
+function buildClinicsReport(type, d, range, recs, branch) {
+  const k = d.kpi, T = PR_TYPES[type], full = type !== 'exec';
+  const title = { ar: 'تقرير العيادات — ' + T.ar, en: 'Clinics Report — ' + T.en };
+  const meta = [
+    ['الفترة', 'Period', `${prDate(d.from)} – ${prDate(d.to)}`],
+    ['الفرع', 'Branch', `${esc(br(branch))} · ${esc(BR_EN[branch] || branch)}`],
+    ['تاريخ الإصدار', 'Issued', prDate(ymd(new Date()))],
+  ];
+  let n = 0;
+  const S = [];
+
+  // 1) الملخص
+  const kpi = (v, unit, ar, en, tone) => `<div class="kpi ${tone || ''}"><div class="v">${v == null ? '—' : v + (unit || '')}</div><div class="l">${esc(ar)}<i>${esc(en)}</i></div></div>`;
+  S.push(prH(++n, 'الملخص والالتزام', 'Summary & Compliance') + `<div class="kpis">
+    ${kpi(k.compliance, '%', 'الالتزام بالتسليم', 'Submission compliance', prTone(k.compliance))}
+    ${kpi(k.onTime, '%', 'التسليم في الوقت', 'On-time submission', prTone(k.onTime, 85, 65))}
+    ${kpi(k.coverage, '%', 'تغطية العيادات (آخر أسبوع)', 'Clinic coverage (last week)', prTone(k.coverage, 100, 85))}
+    ${kpi(k.reports, '', 'عدد التقارير', 'Reports received')}
+    ${kpi(k.openIssues, '', 'مشاكل مفتوحة', 'Open issues', k.openIssues ? 'warn' : 'good')}
+    ${kpi(k.highOpen, '', 'عالية الخطورة', 'High severity open', k.highOpen ? 'bad' : 'good')}
+    ${kpi(k.expiringSoon, '', 'مواد تنتهي خلال 30 يوماً', 'Expiring ≤ 30 days', k.expiringSoon ? 'warn' : 'good')}
+    ${kpi(k.avgResolveDays, '', 'متوسط أيام الحل', 'Avg. days to resolve')}
+  </div>
+  <div class="checks" style="margin-top:9px">${(d.checks || []).map(c => `<div class="row"><div>${esc(c.label)}<em>${esc(CHECK_EN[c.key] || '')}</em></div>${prBar(c.rate)}</div>`).join('')}</div>`);
+
+  // 2) الممرضات
+  const nurses = full ? d.nurses : d.nurses.filter(x => x.rate != null && x.rate < 70).slice(0, 10);
+  S.push(prH(++n, full ? 'الممرضات' : 'الممرضات الأقل التزاماً', full ? 'Nurses' : 'Lowest compliance') + prTable(
+    [prTh('#', '#', 'n'), prTh('الممرضة', 'Nurse'), prTh('الفرع', 'Branch'), prTh('أسابيع مطلوبة', 'Expected', 'n'), prTh('سلّمت', 'Submitted', 'n'), prTh('الالتزام', 'Compliance'), prTh('في الوقت', 'On time', 'n'), prTh('التقارير', 'Reports', 'n')],
+    nurses.map((x, i) => `<tr><td class="n">${i + 1}</td><td><b>${esc(x.name)}</b></td><td>${esc(br(x.branch))}</td><td class="n">${x.expected}</td><td class="n">${x.submitted}</td><td style="min-width:110px">${prBar(x.rate)}</td><td class="n">${pct(x.onTime)}</td><td class="n">${x.reports}</td></tr>`),
+    full ? 'لا توجد بيانات' : 'كل الممرضات التزامهن 70% أو أكثر · All nurses ≥ 70%'));
+
+  // 3) العيادات والسلامة
+  const exp = d.expiry.filter(x => x.days <= (full ? 60 : 30));
+  const clin = full ? d.clinicsScore : d.clinicsScore.filter(c => c.highOpen || c.steril || c.fridge || (c.coverage != null && c.coverage < 75)).slice(0, 8);
+  S.push(prH(++n, 'العيادات والسلامة', 'Clinics & Safety') + prTable(
+    [prTh('العيادة', 'Clinic'), prTh('التقارير', 'Reports', 'n'), prTh('التغطية', 'Coverage'), prTh('النظافة', 'Clean.', 'n'), prTh('التعقيم', 'Steril.', 'n'), prTh('الثلاجة', 'Fridge', 'n'), prTh('البطاقة', 'Card', 'n'), prTh('أدوات', 'Tools', 'n'), prTh('مفتوحة', 'Open', 'n')],
+    clin.map(c => `<tr><td><b>${esc(c.name)}</b> <span class="muted">· ${esc(br(c.branch))}</span></td><td class="n">${c.reports}</td><td style="min-width:90px">${prBar(c.coverage, prTone(c.coverage, 90, 70))}</td><td class="n">${c.avgClean == null ? '—' : c.avgClean}</td>
+      <td class="n">${c.steril || '—'}</td><td class="n">${c.fridge || '—'}</td><td class="n">${c.cards || '—'}</td><td class="n">${c.tools || '—'}</td><td class="n">${c.openIssues ? `<span class="tag ${c.highOpen ? 'bad' : 'warn'}">${c.openIssues}</span>` : '—'}</td></tr>`),
+    full ? 'لا توجد عيادات' : 'لا توجد عيادات تحتاج تدخلاً · No clinic needs attention')
+    + `<div class="note">الأرقام في أعمدة التعقيم والثلاجة والبطاقة والأدوات = عدد التقارير التي فيها ملاحظة. · Counts are reports with a finding.</div>`
+    + `<div class="${full ? 'two' : ''}"><div>${prH(0, 'مواد قريبة الانتهاء', 'Expiring items')}${prTable(
+      [prTh('العيادة', 'Clinic'), prTh('المادة', 'Item'), prTh('التاريخ', 'Date', 'n'), prTh('المتبقي', 'Days', 'n')],
+      exp.slice(0, full ? 30 : 8).map(x => `<tr><td>${esc(x.clinic_name)}</td><td>${esc(x.item || '—')}</td><td class="n">${prDate(x.date)}</td><td class="n"><span class="tag ${x.days < 0 ? 'bad' : x.days <= 30 ? 'warn' : 'good'}">${x.days < 0 ? 'منتهية' : x.days}</span></td></tr>`),
+      'لا توجد مواد قريبة الانتهاء · None')}</div>`
+    + (full ? `<div>${prH(0, 'الثلاجات', 'Refrigerators')}<div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+        ${kpi(d.fridge.readings, '', 'قراءات حرارة', 'Readings')}${kpi(d.fridge.outOfRange, '', 'خارج النطاق', 'Out of range', d.fridge.outOfRange ? 'bad' : 'good')}${kpi(d.fridge.problems, '', 'بلاغات ثلاجة', 'Fridge problems', d.fridge.problems ? 'warn' : 'good')}</div>
+        ${prTable([prTh('التاريخ', 'Date', 'n'), prTh('العيادة', 'Clinic'), prTh('الحرارة', 'Temp', 'n')],
+          d.fridge.outList.slice(0, 10).map(x => `<tr><td class="n">${prDate(x.date)}</td><td>${esc(x.clinic)}</td><td class="n"><span class="tag bad">${x.temp}°</span></td></tr>`), 'لا قراءات خارج النطاق · None')}</div>` : '')
+    + `</div>`);
+
+  // 4) المشاكل
+  const dept = d.issuesByDept || {};
+  const rec = (d.recurring || []).slice(0, full ? 20 : 6);
+  S.push(prH(++n, 'المشاكل والمتابعة', 'Issues & Follow-up') + `<div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+      ${kpi(dept.supply || 0, '', 'لدى التموين', 'Supply')}${kpi(dept.quality || 0, '', 'لدى الجودة', 'Quality')}${kpi(dept.hr || 0, '', 'لدى الموارد البشرية', 'HR')}</div>`
+    + prH(0, 'المشاكل المتكررة', 'Recurring issues') + prTable(
+      [prTh('العيادة', 'Clinic'), prTh('النوع', 'Type'), prTh('التفاصيل', 'Details'), prTh('التكرار', 'Times', 'n'), prTh('الخطورة', 'Severity', 'n')],
+      rec.map(i => `<tr><td>${esc(i.clinic_name)}</td><td>${esc(i.categoryLabel)}</td><td>${esc(i.item || i.description || '—')}</td><td class="n">${i.occurrences}×</td><td class="n"><span class="tag ${i.severity === 'high' ? 'bad' : i.severity === 'medium' ? 'warn' : 'good'}">${({ high: 'عالية', medium: 'متوسطة', low: 'منخفضة' })[i.severity] || '—'}</span></td></tr>`),
+      'لا توجد مشاكل متكررة · None')
+    + (full && d.incidents.length ? prH(0, 'سجل المخالفات (الأحدث)', 'Recent findings') + prTable(
+      [prTh('التاريخ', 'Date', 'n'), prTh('العيادة', 'Clinic'), prTh('الممرضة', 'Nurse'), prTh('الملاحظة', 'Finding')],
+      d.incidents.slice(0, 25).map(x => `<tr><td class="n">${prDate(x.date)}</td><td>${esc(x.clinic)}</td><td>${esc(x.nurse)}</td><td>${esc(x.what.join('، '))}</td></tr>`)) : ''));
+
+  // 5) التوصيات + التوقيع
+  S.push(prH(++n, 'التوصيات', 'Recommendations') + (recs.length ? `<ol class="recs">${recs.map(r => `<li>${esc(r)}</li>`).join('')}</ol>` : '<div class="empty">—</div>')
+    + `<div class="sig">
+      <div><div class="h">أعدّه<small>Prepared by</small></div><div class="line">الاسم · Name: <span>${esc(state.user ? state.user.name : '')}</span></div><div class="line">التوقيع · Signature: <span></span></div><div class="line">التاريخ · Date: <span>${prDate(ymd(new Date()))}</span></div></div>
+      <div><div class="h">اعتمده<small>Approved by</small></div><div class="line">الاسم · Name: <span></span></div><div class="line">التوقيع والختم · Signature & stamp: <span></span></div><div class="line">التاريخ · Date: <span></span></div></div>
+    </div>`);
+
+  return prFrame(title, meta, S.join(''));
+}
+
+function openReportDialog(d, range, branchNow) {
+  const recs0 = autoRecommendations(d);
+  modal({
+    title: 'طباعة التقرير', wide: true,
+    body: `<div class="field"><label>نوع التقرير</label>
+        <select class="input" id="pr-type">${Object.keys(PR_TYPES).map(k => `<option value="${k}">${PR_TYPES[k].ar} · ${PR_TYPES[k].en}</option>`).join('')}</select>
+        <div class="muted" id="pr-desc" style="font-size:12px;margin-top:4px"></div></div>
+      <div class="field hidden" id="pr-br-f"><label>الفرع</label><select class="input" id="pr-br"><option value="BURIDAH">بريدة</option><option value="ONIZAH">عنيزة</option></select></div>
+      <div class="muted" style="font-size:12.5px;margin:2px 0 10px">الفترة: <b>${esc(range.label)}</b> (${esc(prDate(d.from))} – ${esc(prDate(d.to))}) · الفرع: <b>${esc(br(branchNow))}</b>. غيّرهما من أعلى الصفحة قبل الطباعة.</div>
+      <div class="field"><label>التوصيات <span class="muted" style="font-weight:400">— مقترحة من الأرقام، عدّل أو أضف (سطر لكل توصية)</span></label>
+        <textarea class="input" id="pr-recs" rows="8" style="width:100%;resize:vertical">${esc(recs0.join('\n'))}</textarea></div>
+      <div id="pr-err"></div>`,
+    foot: `<button class="btn" data-close>إلغاء</button><button class="btn primary" id="pr-go">${icon('print')}طباعة</button>`,
+    onMount(el, close) {
+      const desc = { exec: 'صفحة إلى صفحتين: الأرقام الرئيسية، أقل الممرضات التزاماً، العيادات التي تحتاج تدخلاً، التوصيات والتوقيع.',
+        quality: 'تفصيلي: كل الممرضات وكل العيادات، الصلاحيات، الثلاجات، المشاكل المتكررة، سجل المخالفات، التوصيات والتوقيع.',
+        branch: 'تفصيلي لفرع واحد بأسماء ممرضاته وعياداته.' };
+      const sync = () => { const t = $('#pr-type', el).value; $('#pr-desc', el).textContent = desc[t]; $('#pr-br-f', el).classList.toggle('hidden', t !== 'branch'); };
+      $('#pr-type', el).onchange = sync;
+      if (branchNow && branchNow !== 'ALL') $('#pr-br', el).value = branchNow;
+      sync();
+      $('#pr-go', el).onclick = async () => {
+        const type = $('#pr-type', el).value;
+        const recs = $('#pr-recs', el).value.split('\n').map(s => s.trim()).filter(Boolean);
+        const b = $('#pr-go', el);
+        let data = d, brn = branchNow || 'ALL';
+        if (type === 'branch') {
+          brn = $('#pr-br', el).value;
+          if (brn !== branchNow) {
+            busy(b, true, 'تجهيز…');
+            try { data = await api('quality.stats', { from: range.from, to: range.to, branch: brn }); }
+            catch (e) { busy(b, false); $('#pr-err', el).innerHTML = `<div class="form-error">${esc(e.message)}</div>`; return; }
+          }
+        }
+        close();
+        printHTML(buildClinicsReport(type, data, range, recs, brn));
+      };
+    },
+  });
+}
+
+function buildNotices(list) {
+  return list.map(x => {
+    const weeks = String(x.weeks).split(',').filter(Boolean);
+    const ref = `<div class="ph" style="margin-bottom:6px"><div class="t" style="font-size:12pt">تقرير العيادات<small>Clinics Report</small></div>
+      <div class="meta">رقم الإشعار · Ref: <b class="en">${esc(x.notice_id)}</b><br>التاريخ · Date: <b>${prDate(x.issued_at)}</b></div></div>`;
+    return `<div class="page ntc">${ref}
+      <div class="ttl"><b>إشعار عدم التزام بتسليم التقرير الأسبوعي</b><span>Notice of Non-Compliance — Weekly Clinic Report</span></div>
+      <div class="facts">
+        <div><small>الممرضة · Nurse</small><b>${esc(x.nurse_name)}</b></div>
+        <div><small>الفرع · Branch</small><b>${esc(br(x.branch))} · ${esc(BR_EN[x.branch] || '')}</b></div>
+        <div><small>أسابيع متتالية لم تُسلَّم · Consecutive weeks missed</small><b class="en">${x.streak}</b></div>
+        <div><small>الالتزام العام · Overall compliance</small><b class="en">${x.compliance === '' ? '—' : x.compliance + '%'} <span class="muted" style="font-size:8pt">(${x.doneWeeks}/${x.expectedWeeks})</span></b></div>
+        <div><small>إشعارات سابقة · Previous notices</small><b class="en">${x.previous}${x.lastPrevious ? ` <span class="muted" style="font-size:8pt">(${prDate(x.lastPrevious)})</span>` : ''}</b></div>
+        <div><small>أصدره · Issued by</small><b>${esc(x.issued_by)}</b></div>
+      </div>
+      <div class="body2">
+        <div><p>تحية طيبة،</p><p>نفيدكم بأنه لم يتم تسليم تقرير العيادات الأسبوعي في الأسابيع التالية (تاريخ السبت لكل أسبوع):</p>
+          <div class="weeks">${weeks.map(w => `<span>${prDate(w)}</span>`).join('')}</div>
+          <p>تسليم التقرير أسبوعياً يوم السبت من مسؤوليات العمل، ويُقبل يوم الأحد كتقديم متأخر. يُرجى الالتزام بالتسليم في موعده، وفي حال وجود عذر يُرجى إبلاغ المشرف.</p></div>
+        <div class="en"><p>Dear colleague,</p><p>Our records show that the weekly clinic report was not submitted for the following weeks (Saturday of each week):</p>
+          <div class="weeks">${weeks.map(w => `<span>${prDate(w)}</span>`).join('')}</div>
+          <p>Submitting the report every Saturday is part of your duties; Sunday is accepted as late. Please submit on time, and inform your supervisor of any valid excuse.</p></div>
+      </div>
+      <div class="ack"><p><b>إقرار واطلاع:</b> اطلعت على هذا الإشعار وأتعهد بالالتزام بتسليم تقرير العيادات الأسبوعي في موعده.</p>
+        <p class="en"><b>Acknowledgement:</b> I have read this notice and commit to submitting the weekly clinic report on time.</p></div>
+      <div class="sig">
+        <div><div class="h">الممرضة<small>Nurse</small></div><div class="line">الاسم · Name: <span>${esc(x.nurse_name)}</span></div><div class="line">التوقيع · Signature: <span></span></div><div class="line">التاريخ · Date: <span></span></div></div>
+        <div><div class="h">المشرف<small>Supervisor</small></div><div class="line">الاسم · Name: <span></span></div><div class="line">التوقيع · Signature: <span></span></div><div class="line">التاريخ · Date: <span></span></div></div>
+      </div></div>`;
+  }).join('');
+}
+
+async function issueNotices(usernames, btn, after) {
+  busy(btn, true);
+  try {
+    const r = await api('hr.notice', { usernames: usernames || [] });
+    busy(btn, false);
+    if (r.skipped.length) toast('لا ينطبق عليها شرط الأسبوعين المتتاليين حتى آخر أسبوع مغلق: ' + r.skipped.join('، '), 'err');
+    if (!r.notices.length) { if (!r.skipped.length) toast('لا توجد ممرضة لم تسلّم أسبوعين متتاليين', 'err'); return; }
+    printHTML(`<div class="pr">${buildNotices(r.notices)}</div>`);
+    if (after) setTimeout(after, 800);
+  } catch (e) { busy(btn, false); toast(e.message, 'err'); }
+}
+
 async function renderQuality(view) {
   skeleton(view, [96, 120, 320, 320]);
   const range = periodRange(qState.period, qState.month);
@@ -1450,7 +1734,7 @@ async function renderQuality(view) {
         <option value="26w">آخر 6 أشهر</option><option value="all">كل المدة</option><option value="month">شهر محدد</option></select>
       <input class="input ${qState.period === 'month' ? '' : 'hidden'}" type="month" id="q-m" value="${qState.month || thisSaturday().slice(0, 7)}">
       <select class="input" id="q-b"><option value="ALL">كل الفروع</option><option value="BURIDAH">بريدة</option><option value="ONIZAH">عنيزة</option></select>
-      <button class="btn sm" onclick="window.print()">${icon('print')}طباعة التقرير</button>
+      <button class="btn sm" id="q-print">${icon('print')}طباعة التقرير</button>
     </div>
   </div>
 
@@ -1523,6 +1807,7 @@ async function renderQuality(view) {
   $('#q-p').onchange = e => { qState.period = e.target.value; renderQuality(view); };
   $('#q-m').onchange = e => { qState.month = e.target.value; renderQuality(view); };
   $('#q-b').onchange = e => { qState.branch = e.target.value; renderQuality(view); };
+  $('#q-print').onclick = () => openReportDialog(d, range, qState.branch);
   countUp(view);
 
   const expCols = [
