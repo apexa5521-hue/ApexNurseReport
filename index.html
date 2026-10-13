@@ -1275,8 +1275,8 @@ function showNurseDone(view, d, more) {
 /* ══════════════════════════════════════════════════════════
    HR — الموارد البشرية
    ══════════════════════════════════════════════════════════ */
-const hrState = { week: '', q: '', branch: 'ALL', filter: 'all', span: 'all' };
-const STATE_LABEL = { active: 'على رأس العمل', leave: 'إجازة', inactive: 'متوقفة عن العمل' };
+const hrState = { week: '', q: '', branch: 'ALL', filter: 'everyone', span: 'all' };
+const STATE_LABEL = { active: 'على رأس العمل', leave: 'إجازة', inactive: 'ليست على رأس العمل' };
 const fmtDay = s => fmtDate(s, { day: 'numeric', month: 'short' });
 
 async function renderHR(view) {
@@ -1310,7 +1310,7 @@ async function renderHR(view) {
     ${kpiCard('نسبة الالتزام', s.rate, '%', `${s.committed} من ${s.expected} ممرضة سلّمن`, true, 1)}
     ${kpiCard('ملتزمات', s.committed, '', `${s.onTime} في الوقت · ${s.late} متأخرة`, false, 2)}
     ${kpiCard('غير ملتزمات', s.missing, '', d.isCurrent ? 'لم يسلّمن حتى الآن' : 'لم يسلّمن هذا الأسبوع', false, 3)}
-    ${kpiCard('في إجازة', s.onLeave, '', `${s.stopped} متوقفة عن العمل`, false, 4)}
+    ${kpiCard('في إجازة', s.onLeave, '', `${s.stopped} ليست على رأس العمل`, false, 4)}
   </div>
 
   <div class="grid g-2e" style="margin-top:16px">
@@ -1332,7 +1332,7 @@ async function renderHR(view) {
         <input class="input" id="r-q" placeholder="بحث بالاسم" value="${esc(hrState.q)}" style="min-width:150px">
         <select class="input" id="r-br"><option value="ALL">كل الفروع</option><option value="BURIDAH">بريدة</option><option value="ONIZAH">عنيزة</option></select>
         <select class="input" id="r-span" aria-label="فترة الالتزام"><option value="all">الالتزام: كل المدة</option><option value="26">الالتزام: آخر 6 أشهر</option><option value="12">الالتزام: آخر 12 أسبوع</option></select>
-        <select class="input" id="r-f"><option value="all">العاملات والإجازات</option><option value="missing">غير الملتزمات</option><option value="leave">في إجازة</option><option value="inactive">المتوقفات عن العمل</option></select>
+        <select class="input" id="r-f"><option value="everyone">كل الممرضات</option><option value="active">على رأس العمل</option><option value="all">العاملات والإجازات</option><option value="missing">غير الملتزمات</option><option value="leave">في إجازة</option><option value="inactive">ليست على رأس العمل</option></select>
         <button class="btn sm" id="r-csv">${icon('dl')}CSV</button>
       </div></div>
     <div id="roster"></div>
@@ -1412,7 +1412,8 @@ async function renderHR(view) {
   ];
   const filtered = () => d.roster.filter(r =>
     (hrState.branch === 'ALL' || r.branch === hrState.branch) &&
-    (hrState.filter === 'all' ? r.state !== 'inactive'
+    (hrState.filter === 'everyone' ? true : hrState.filter === 'active' ? r.state === 'active'
+      : hrState.filter === 'all' ? r.state !== 'inactive'
       : hrState.filter === 'missing' ? (r.thisWeek === 'missing' && r.state === 'active')
       : hrState.filter === 'leave' ? r.state === 'leave' : r.state === 'inactive') &&
     (!hrState.q || (r.name + ' ' + (r.email || '')).toLowerCase().includes(hrState.q.toLowerCase())));
@@ -1424,7 +1425,7 @@ async function renderHR(view) {
       const r = d.roster.find(x => x.username === sel.dataset.status), v = sel.value;
       const revert = () => { sel.value = r.state; };
       if (v === 'leave') return leaveDialog(r, () => renderHR(view), revert);
-      if (v === 'inactive' && !(await confirmDialog(`تحويل ${r.name} إلى «متوقفة عن العمل»؟ لن يُطلب منها التقرير من الأسبوع الجاري، وتبقى تقاريرها السابقة محفوظة.`))) return revert();
+      if (v === 'inactive' && !(await confirmDialog(`تحويل ${r.name} إلى «ليست على رأس العمل»؟ لن يُطلب منها التقرير من الأسبوع الجاري، وتبقى تقاريرها السابقة محفوظة.`))) return revert();
       sel.disabled = true;
       try {
         await api('users.setStatus', { username: r.username, status: v });
@@ -2098,7 +2099,7 @@ async function renderUsers(view) {
     { label: 'العيادات', get: u => u.clinics.length ? u.clinics.length + ' عيادة' : (u.role === 'nurse' ? 'كل عيادات الفرع' : '—') },
     { label: 'الحالة', html: u => u.role !== 'nurse' ? (u.status === 'active' ? `<span class="pill good">${icon('check')}نشط</span>` : `<span class="pill">${icon('dash')}غير نشط</span>`)
         : u.state === 'leave' ? `<span class="pill accent">${icon('clock')}إجازة</span><div class="muted num" style="font-size:11px;margin-top:3px">${esc(fmtDay(u.leave.from))} → ${esc(fmtDay(u.leave.to))}</div>`
-        : u.state === 'inactive' ? `<span class="pill">${icon('dash')}متوقفة عن العمل</span>` : `<span class="pill good">${icon('check')}على رأس العمل</span>` },
+        : u.state === 'inactive' ? `<span class="pill">${icon('dash')}ليست على رأس العمل</span>` : `<span class="pill good">${icon('check')}على رأس العمل</span>` },
     { label: 'آخر دخول', html: u => u.must_change ? '<span class="tag">لم يسجّل بعد</span>' : esc(u.last_login ? fmtDT(u.last_login) : '—') },
     { label: '', html: u => `<div style="display:flex;gap:6px"><button class="btn sm" data-edit="${esc(u.username)}">تعديل</button><button class="btn sm ghost" data-reset="${esc(u.username)}">كلمة مرور مؤقتة</button></div>` },
   ];
