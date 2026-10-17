@@ -77,7 +77,8 @@ function createGasServices() {
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: t => ({ getContent: () => t, setMimeType() { return this; } }) },
     Utilities: {
-      getUuid: uuid, DigestAlgorithm: { SHA_256: 'sha256' }, Charset: { UTF_8: 'utf8' },
+      getUuid: uuid, DigestAlgorithm: { SHA_256: 'sha256', MD5: 'md5' }, Charset: { UTF_8: 'utf8' },
+      base64EncodeWebSafe: bytes => btoa(String.fromCharCode.apply(null, Array.from(bytes))).replace(/\+/g, '-').replace(/\//g, '_'),
       computeDigest: (alg, str) => sha256(new TextEncoder().encode(str)),
       base64Encode: bytes => btoa(String.fromCharCode.apply(null, Array.from(bytes))),
       // يستخدم توقيت المتصفح بدل الرياض حتى تبقى كل التواريخ متسقة مع بعضها في العرض التجريبي
