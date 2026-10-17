@@ -670,7 +670,33 @@ async function copyText(text) {
 }
 
 /* ══════════ API ══════════ */
+/* نتائج صفحات القراءة تُحفظ دقيقتين في الذاكرة: التنقل بين الصفحات فوري، وأي تعديل يمسحها */
+const READ_ACTIONS = ['nurse.context', 'hr.overview', 'quality.stats', 'reports.list', 'issues.list', 'users.list', 'clinics.list'];
+const MEMO = new Map(), INFLIGHT = new Map();
+const MEMO_MS = 120000;
 async function api(action, payload = {}) {
+  const read = READ_ACTIONS.includes(action);
+  const key = read ? action + '|' + JSON.stringify(payload) : '';
+  if (read) {
+    const m = MEMO.get(key);
+    if (m && Date.now() - m.at < MEMO_MS) return JSON.parse(m.json);
+    if (INFLIGHT.has(key)) return INFLIGHT.get(key).then(x => JSON.parse(x));
+    const p = apiRaw(action, payload).then(d => { const json = JSON.stringify(d); MEMO.set(key, { at: Date.now(), json }); return json; });
+    INFLIGHT.set(key, p);
+    try { return JSON.parse(await p); } finally { INFLIGHT.delete(key); }
+  }
+  const d = await apiRaw(action, payload);
+  if (!['login', 'me'].includes(action)) MEMO.clear();   // تعديل: لا نعرض بيانات قديمة
+  return d;
+}
+/** تحميل الصفحات الرئيسية للدور في الخلفية بعد الدخول، لتفتح فوراً */
+function prefetchFor(role) {
+  const qs = () => { const r = periodRange(qState.period, qState.month); return { from: r.from, to: r.to, branch: qState.branch }; };
+  const jobs = { quality: [['quality.stats', qs]], admin: [['quality.stats', qs], ['users.list', () => ({})]],
+    hr: [['hr.overview', () => ({ week: hrState.week, weeks: hrState.span })], ['users.list', () => ({})]] }[role] || [];
+  setTimeout(() => jobs.forEach(([a, p]) => api(a, p()).catch(() => {})), 300);
+}
+async function apiRaw(action, payload = {}) {
   let j;
   if (window.APEX_DEMO_API) {
     j = await window.APEX_DEMO_API(Object.assign({ action, token: state.token }, payload));
@@ -757,7 +783,7 @@ function renderLogin(error) {
     try {
       const d = await api('login', { username: u, password: p });
       state.token = d.token; store.set('apex.token', d.token);
-      state.user = d.user;
+      state.user = d.user; store.set('apex.user', JSON.stringify(d.user)); MEMO.clear(); boot.prefetched = false;
       if (d.user.role !== 'nurse' && state.lang !== 'ar') applyLang('ar');
       d.user.mustChange ? renderChangePassword() : boot();
     } catch (err) {
@@ -793,7 +819,7 @@ function renderChangePassword() {
     busy($('#cb'), true);
     try {
       const d = await api('changePassword', { oldPassword: a, newPassword: b });
-      state.user = d.user;
+      state.user = d.user; store.set('apex.user', JSON.stringify(d.user));
       boot();
     } catch (err) { busy($('#cb'), false); showErr(err.message); }
   };
@@ -805,6 +831,7 @@ const DEMO_ACCOUNTS = [
 ];
 /** عرض تجريبي: محاكاة يوم من أيام الأسبوع الحالي لرؤية نافذة التقديم (سبت/أحد/اثنين/جمعة) */
 function demoSetClock(v) {
+  MEMO.clear();
   window.APEX_DEMO_CLOCK = v;
   const sat = parseD(thisSaturday()), off = { sat: 0, sun: 1, mon: 2, fri: 6 }[v];
   window.APEX_DEMO_SET_NOW(v ? new Date(sat.getFullYear(), sat.getMonth(), sat.getDate() + off, 10, 0, 0).getTime() : null);
@@ -814,7 +841,7 @@ function demoSetClock(v) {
 async function demoLogin(u) {
   try {
     const d = await api('login', { username: u, password: 'demo' });
-    state.token = d.token; state.user = d.user;
+    state.token = d.token; state.user = d.user; store.set('apex.user', JSON.stringify(d.user)); MEMO.clear(); boot.prefetched = false;
     if (d.user.role !== 'nurse') applyLang('ar');
     if (location.hash && location.hash !== '#') location.hash = ''; // hashchange يعيد الرسم
     else boot();
@@ -824,7 +851,8 @@ async function demoLogin(u) {
 async function logout(expired) {
   const tok = state.token;
   state.token = null; state.user = null;
-  store.del('apex.token');
+  MEMO.clear(); INFLIGHT.clear();
+  store.del('apex.token'); store.del('apex.user'); boot.prefetched = false;
   if (tok && !expired && !window.APEX_DEMO) { try { await fetch(API(), { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'logout', token: tok }) }); } catch (e) {} }
   location.hash = '';
   renderLogin(expired ? (state.lang === 'en' ? 'Session expired, please sign in again.' : 'انتهت الجلسة، سجّل الدخول مرة أخرى') : '');
@@ -844,14 +872,22 @@ const allowedPages = u => Object.keys(PAGES).filter(k => PAGES[k].roles.includes
 
 async function boot() {
   if (!state.token) return renderLogin();
+  let saved = null;
+  try { saved = JSON.parse(store.get('apex.user') || 'null'); } catch (e) {}
+  if (!state.user && saved && saved.username) {
+    // نفتح مباشرة ببيانات الدخول المحفوظة بدل انتظار طلب إضافي، ونتحقق منها في الخلفية
+    state.user = saved;
+    api('me').then(d => { const changed = JSON.stringify(d.user) !== JSON.stringify(state.user); state.user = d.user; store.set('apex.user', JSON.stringify(d.user)); if (changed) rerender(); }).catch(() => {});
+  }
   if (!state.user) {
-    try { state.user = (await api('me')).user; }
+    try { state.user = (await api('me')).user; store.set('apex.user', JSON.stringify(state.user)); }
     catch (e) { if (e.code !== 'AUTH') renderLogin(e.message); return; }
   }
   if (state.user.mustChange) return renderChangePassword();
   if (state.user.role !== 'nurse') applyLang('ar');
   else applyLang(state.lang);
   route();
+  if (!boot.prefetched) { boot.prefetched = true; prefetchFor(state.user.role); }
 }
 
 function currentPage() {

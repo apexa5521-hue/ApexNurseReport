@@ -121,7 +121,13 @@ function doPost(e) {
     const handler = ACTIONS[req.action];
     if (!handler) throw err_('إجراء غير معروف: ' + req.action);
     const user = handler.roles ? requireSession_(req.token, handler.roles) : null;
+    // صفحات القراءة: نعيد النتيجة المحفوظة إن لم تتغير البيانات منذ آخر حساب
+    const key = handler.cache && user ? respKey_(req, user) : null;
+    const hit = key && cacheGet_(key);
+    if (hit) return ContentService.createTextOutput('{"ok":true,"data":' + hit + '}').setMimeType(ContentService.MimeType.JSON);
     const data = handler.fn(req, user);
+    if (key) cachePut_(key, JSON.stringify(data));
+    else if (handler.roles && WRITE_SAFE.indexOf(req.action) < 0) bumpDataVersion_();   // أي تعديل يُبطل النتائج المحفوظة
     return json_({ ok: true, data: data });
   } catch (ex) {
     const msg = ex && ex.userMessage ? ex.userMessage : 'حدث خطأ في الخادم';
@@ -131,6 +137,7 @@ function doPost(e) {
 }
 
 const STAFF = ['hr', 'quality', 'supply', 'admin'];
+const WRITE_SAFE = ['me'];   // طلبات لا تغيّر البيانات ولا تُحفظ
 
 const ACTIONS = {
   login:            { fn: apiLogin_ },
@@ -138,24 +145,24 @@ const ACTIONS = {
   me:               { roles: ['*'], fn: (r, u) => ({ user: publicUser_(u) }) },
   changePassword:   { roles: ['*'], fn: apiChangePassword_ },
 
-  'nurse.context':  { roles: ['nurse', 'admin'], fn: apiNurseContext_ },
+  'nurse.context':  { roles: ['nurse', 'admin'], fn: apiNurseContext_, cache: true },
   'nurse.submit':   { roles: ['nurse', 'admin'], fn: apiNurseSubmit_ },
 
-  'hr.overview':    { roles: ['hr', 'admin'], fn: apiHrOverview_ },
+  'hr.overview':    { roles: ['hr', 'admin'], fn: apiHrOverview_, cache: true },
   'hr.remind':      { roles: ['hr', 'admin'], fn: apiHrRemind_ },
   'hr.notice':      { roles: ['hr', 'admin'], fn: apiHrNotice_ },
   // الموارد البشرية لا ترى الإحصائيات الفنية (تعقيم، أدوية، ثلاجة…) ولا تفاصيل التقارير
-  'quality.stats':  { roles: ['quality', 'admin'], fn: apiQualityStats_ },
-  'reports.list':   { roles: ['quality', 'admin'], fn: apiReportsList_ },
+  'quality.stats':  { roles: ['quality', 'admin'], fn: apiQualityStats_, cache: true },
+  'reports.list':   { roles: ['quality', 'admin'], fn: apiReportsList_, cache: true },
 
-  'issues.list':    { roles: STAFF, fn: apiIssuesList_ },
+  'issues.list':    { roles: STAFF, fn: apiIssuesList_, cache: true },
   'issues.update':  { roles: ['supply', 'quality', 'hr', 'admin'], fn: apiIssueUpdate_ },
 
-  'users.list':     { roles: ['hr', 'admin'], fn: apiUsersList_ },
+  'users.list':     { roles: ['hr', 'admin'], fn: apiUsersList_, cache: true },
   'users.save':     { roles: ['hr', 'admin'], fn: apiUserSave_ },
   'users.reset':    { roles: ['hr', 'admin'], fn: apiUserReset_ },
   'users.setStatus': { roles: ['hr', 'admin'], fn: apiUserSetStatus_ },
-  'clinics.list':   { roles: STAFF, fn: () => ({ clinics: clinics_() }) },
+  'clinics.list':   { roles: STAFF, fn: () => ({ clinics: clinics_() }), cache: true },
   'clinics.save':   { roles: ['admin', 'quality'], fn: apiClinicSave_ },
 };
 
@@ -222,7 +229,8 @@ function apiLogout_(req) {
   return {};
 }
 
-function apiChangePassword_(req, user) {
+function apiChangePassword_(req, sessionUser) {
+  const user = rows_(S.USERS).find(x => x.username === sessionUser.username);   // الصف الكامل (قد تكون الجلسة محفوظة مختصرة)
   const oldPw = String(req.oldPassword || '');
   const newPw = String(req.newPassword || '');
   if (hash_(oldPw, user.salt) !== user.pass_hash) throw err_('كلمة المرور الحالية غير صحيحة');
@@ -237,7 +245,10 @@ function apiChangePassword_(req, user) {
 function requireSession_(token, roles) {
   const username = token && CacheService.getScriptCache().get('s_' + token);
   if (!username) throw err_('انتهت الجلسة، سجّل الدخول مرة أخرى', 'AUTH');
-  const u = rows_(S.USERS).find(x => x.username === username);
+  const uk = 'u_' + dataVersion_() + '_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, username));
+  const cached = CacheService.getScriptCache().get(uk);
+  let u = cached ? JSON.parse(cached) : rows_(S.USERS).find(x => x.username === username);
+  if (u && !cached) { const c = {}; ['username', 'name', 'email', 'role', 'branch', 'clinics', 'status', 'must_change', 'login', 'start_date'].forEach(k => c[k] = u[k]); CacheService.getScriptCache().put(uk, JSON.stringify(c), 600); u = Object.assign({}, u); }
   if (!u || u.status !== 'active') throw err_('الحساب غير نشط', 'AUTH');
   if (roles.indexOf('*') < 0 && roles.indexOf(u.role) < 0) throw err_('ليست لديك صلاحية لهذه الصفحة', 'FORBIDDEN');
   if (u.must_change === 'yes' && roles.indexOf('*') < 0) throw err_('يجب تغيير كلمة المرور أولاً', 'MUST_CHANGE');
@@ -544,9 +555,13 @@ function expectedOn_(n, w, leaves, cfg) {
 }
 
 /** آخر أسبوع سلّمت فيه كل ممرضة */
+let LW_ = { src: null, map: null };
 function lastWeekMap_() {
+  const src = rows_(S.REPORTS);
+  if (LW_.src === src) return LW_.map;   // يُحسب مرة واحدة لكل قراءة للتقارير
   const m = {};
-  rows_(S.REPORTS).forEach(r => { if (r.week_start > (m[r.username] || '')) m[r.username] = r.week_start; });
+  src.forEach(r => { if (r.week_start > (m[r.username] || '')) m[r.username] = r.week_start; });
+  LW_ = { src: src, map: m };
   return m;
 }
 
@@ -1696,6 +1711,7 @@ function importFormResponses() {
     ush.getRange(1, 1, rowsOut.length, rowsOut[0].length).setValues(rowsOut);
   } else if (ush) db.deleteSheet(ush);
   const unCount = um.reduce((x, g) => x + g.count, 0);
+  bumpDataVersion_();
   SpreadsheetApp.getActive().toast('تم نقل ' + reports.length + ' تقرير، وإنشاء ' + createdUsers.length + ' حساب ممرضة' +
     (relinked ? '، وربط ' + relinked + ' تقرير قديم بصاحبته' : '') +
     (dupRows.length ? '، وحذف ' + dupRows.length + ' نسخة مكررة' : '') +
@@ -1786,12 +1802,63 @@ function issueOut_(i) {
 
 /* ════════════════════════════ SHEET HELPERS ════════════════════════════ */
 
+/* ───────── السرعة: فتح الشيت مرة واحدة لكل طلب، وحفظ نتائج الصفحات ───────── */
+let SS_ = null;
+const SHEETS_ = {};
 function ss_() {
+  if (SS_) return SS_;
   const id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
-  return id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
+  return (SS_ = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet());
+}
+
+/** رقم نسخة البيانات: يتغير مع كل تعديل، فتُهمل النتائج المحفوظة القديمة تلقائياً */
+let DV_ = null;
+function dataVersion_() {
+  if (DV_) return DV_;
+  const c = CacheService.getScriptCache();
+  DV_ = c.get('dv');
+  if (!DV_) { DV_ = String(Date.now()); c.put('dv', DV_, 21600); }
+  return DV_;
+}
+function bumpDataVersion_() {
+  DV_ = String(Date.now()) + Math.floor(Math.random() * 1000);
+  try { CacheService.getScriptCache().put('dv', DV_, 21600); } catch (e) { /* لا شيء */ }
+}
+/** أي تعديل يدوي على الشيت يُبطل النتائج المحفوظة (يعمل حين يكون السكربت مرتبطاً بالشيت) */
+function onEdit() { bumpDataVersion_(); }
+
+function respKey_(req, user) {
+  const p = {}; Object.keys(req).sort().forEach(k => { if (k !== 'token') p[k] = req[k]; });
+  const raw = user.username + '|' + JSON.stringify(p) + '|' + Utilities.formatDate(new Date(), APP.TZ, 'yyyyMMddHH');
+  return 'r_' + dataVersion_() + '_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, raw));
+}
+/** تخزين مضغوط ومقسّم (حد CacheService ‏100KB لكل مفتاح) */
+function cachePut_(key, str) {
+  try {
+    const z = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(str, 'application/json')).getBytes());
+    const size = 90000, n = Math.ceil(z.length / size);
+    if (n > 20) return;
+    const parts = { };
+    for (let i = 0; i < n; i++) parts[key + '_' + i] = z.slice(i * size, (i + 1) * size);
+    parts[key] = String(n);
+    CacheService.getScriptCache().putAll(parts, 600);
+  } catch (e) { /* التخزين اختياري */ }
+}
+function cacheGet_(key) {
+  try {
+    const c = CacheService.getScriptCache();
+    const n = Number(c.get(key) || 0);
+    if (!n) return null;
+    const keys = []; for (let i = 0; i < n; i++) keys.push(key + '_' + i);
+    const got = c.getAll(keys);
+    let z = '';
+    for (let i = 0; i < n; i++) { if (got[keys[i]] == null) return null; z += got[keys[i]]; }
+    return Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(z), 'application/x-gzip')).getDataAsString();
+  } catch (e) { return null; }
 }
 
 function sh_(name) {
+  if (SHEETS_[name]) return SHEETS_[name];
   const ss = ss_();
   let s = ss.getSheetByName(name);
   if (!s) {
@@ -1802,7 +1869,7 @@ function sh_(name) {
     // نص عادي لمنع Sheets من تحويل التواريخ والأرقام تلقائياً
     s.getRange(1, 1, s.getMaxRows(), h.length).setNumberFormat('@');
   }
-  return s;
+  return (SHEETS_[name] = s);
 }
 
 const ROWS_CACHE_ = {};
@@ -1833,6 +1900,7 @@ function appendObjects_(name, objs, sheet) {
   range.setNumberFormat('@');
   range.setValues(values.map(r => r.map(c => typeof c === 'number' ? String(c) : c)));
   delete ROWS_CACHE_[name];
+  if (name !== S.LOG) bumpDataVersion_();
 }
 
 function setCell_(name, row, key, value) {
@@ -1847,6 +1915,7 @@ function setCells_(name, row, obj) {
     if (c >= 0) s.getRange(row, c + 1).setNumberFormat('@').setValue(obj[k] == null ? '' : String(obj[k]));
   });
   delete ROWS_CACHE_[name];
+  if (!(name === S.USERS && Object.keys(obj).join() === 'last_login')) bumpDataVersion_();   // تسجيل الدخول لا يُبطل الصفحات المحفوظة
 }
 
 function settings_() {
