@@ -997,7 +997,14 @@ function checkCredentials() {
     const cands = loginCandidates_(id);
     const u = pickLoginUser_(cands, pw);
     let msg;
-    if (!u) msg = '✗ لا يوجد حساب باسم الدخول «' + id + '». شغّل applyCredentials أو تأكد من عمود username';
+    if (!u) {
+      // نوضح السبب: هل الحساب نفسه موجود؟ وما اسم الدخول المسجّل له فعلاً؟
+      const nurses = rows_(S.USERS).filter(x => x.role === 'nurse');
+      const m = matchNurseByName_(get('account') || get('name'), nurses);
+      if (m.err) msg = '✗ لا يوجد حساب باسم الدخول «' + id + '»، ولا حساب يطابق «' + (get('account') || get('name')) + '»: ' + m.err;
+      else if (m.user.login) msg = '✗ اسم الدخول المسجّل لـ ' + m.user.name + ' هو «' + m.user.login + '» وليس «' + id + '». شغّل applyCredentials مرة أخرى أو استخدم «' + m.user.login + '»';
+      else msg = '✗ الحساب موجود (' + m.user.name + ' · ' + (m.user.email || m.user.username) + ') لكن لم يُطبَّق عليه الرقم بعد. شغّل applyCredentials وانظر عمود result لهذا الصف';
+    }
     else if (u.status !== 'active') msg = '✗ الحساب (' + u.name + ') غير نشط/ترك العمل';
     else if (!u.pass_hash || hash_(pw, u.salt) !== u.pass_hash) msg = '✗ الرقم السري لا يطابق حساب ' + u.name + '. شغّل applyCredentials مرة أخرى';
     else if (Number(cache.get('fail_' + String(u.username).toLowerCase()) || 0) >= APP.MAX_LOGIN_FAILS) msg = '✗ مقفل مؤقتاً بعد محاولات خاطئة: شغّل clearLoginLocks';
@@ -1668,7 +1675,34 @@ function importFormResponses() {
     if (nk) k.push('n:' + nk);
     return k;
   };
-  values.forEach(v => { const k = keysOf(v); k.forEach(x => union(k[0], x)); });
+  // الاسم يربط بإيميل واحد فقط: الأكثر استخداماً معه. فلو كتبت ممرضتان نفس الاسم القصير (Maryam)
+  // بإيميلين مختلفين، لا يندمج حساباهما بسبب الاسم
+  // (إيميل ثانوي يُربط بالاسم إلا إذا كان من فرع آخر: ممرضة أخرى بنفس الاسم القصير)
+  const nameEmails = {}, emailBranch = {};
+  const brOf = v => { const b = String(v[C.branch] || '').toUpperCase(); return b.indexOf('ONIZAH') >= 0 ? 'ONIZAH' : b.indexOf('BURIDAH') >= 0 ? 'BURIDAH' : ''; };
+  values.forEach(v => {
+    const k = keysOf(v);
+    if (!k.length || k[0].indexOf('e:') !== 0) return;
+    const b = brOf(v); if (b) { const eb = emailBranch[k[0]] = emailBranch[k[0]] || {}; eb[b] = (eb[b] || 0) + 1; }
+    if (k.length !== 2) return;
+    const c = nameEmails[k[1]] = nameEmails[k[1]] || {}; c[k[0]] = (c[k[0]] || 0) + 1;
+  });
+  const mainBranch = e => { const c = emailBranch[e] || {}; return Object.keys(c).sort((a, b) => c[b] - c[a])[0] || ''; };
+  const topEmail = {};
+  Object.keys(nameEmails).forEach(n => { const c = nameEmails[n]; topEmail[n] = Object.keys(c).sort((a, b) => c[b] - c[a])[0]; });
+  const ownAccount = e => !!byEmail[e.slice(2)];
+  const linkable = (e, n) => {
+    const top = topEmail[n];
+    if (!top || top === e) return true;
+    if (ownAccount(e) && ownAccount(top)) return false;                     // لكل إيميل حسابه: شخصان
+    const b1 = mainBranch(e), b2 = mainBranch(top);
+    return !(b1 && b2 && b1 !== b2);                                        // فرعان مختلفان: شخصان
+  };
+  values.forEach(v => {
+    const k = keysOf(v);
+    if (k.length === 2 && !linkable(k[0], k[1])) { union(k[0], k[0]); return; }
+    k.forEach(x => union(k[0], x));
+  });
   Object.keys(byEmail).forEach(e => { if (parent['e:' + e]) union('e:' + e, 'e:' + e); });
   const known = {};
   const claim = (key, u) => { if (!parent[key]) return; const r = find(key); if (!known[r]) known[r] = u; };
