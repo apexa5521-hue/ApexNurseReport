@@ -168,15 +168,26 @@ const ACTIONS = {
 
 /* ════════════════════════════ AUTH ════════════════════════════ */
 
+/** كل الحسابات التي يطابقها ما كُتب في خانة الدخول (بدون اعتبار للمسافات أو حالة الأحرف) */
+function loginCandidates_(raw) {
+  const id = String(raw || '').trim().toLowerCase(), idc = id.replace(/\s+/g, '');
+  if (!id) return [];
+  const eq = v => { const x = String(v || '').trim().toLowerCase(); return !!x && (x === id || x.replace(/\s+/g, '') === idc); };
+  return rows_(S.USERS).filter(x => x.role !== 'merged' && (eq(x.username) || eq(x.email) || eq(x.login)));
+}
+
+/** إن طابق أكثر من حساب (مثل حساب قديم مكرر) نختار الذي تصح معه كلمة المرور */
+function pickLoginUser_(cands, pw) {
+  return cands.find(x => x.status === 'active' && x.pass_hash && hash_(pw, x.salt) === x.pass_hash)
+    || cands.find(x => x.status === 'active' && x.pass_hash) || cands[0] || null;
+}
+
 function apiLogin_(req) {
   const id = String(req.username || '').trim().toLowerCase();
-  const pw = String(req.password || '');
+  const pw = String(req.password || '').trim();
   if (!id || !pw) throw err_('أدخل اسم المستخدم وكلمة المرور');
 
-  const u = rows_(S.USERS).find(x =>
-    String(x.username).toLowerCase() === id ||
-    (x.email && String(x.email).toLowerCase() === id) ||
-    (x.login && String(x.login).toLowerCase() === id));
+  const u = pickLoginUser_(loginCandidates_(id), pw);
 
   // العدّاد على الحساب نفسه: لا يمكن مضاعفة المحاولات بالتبديل بين الاسم والإيميل
   const cache = CacheService.getScriptCache();
@@ -232,7 +243,7 @@ function apiLogout_(req) {
 function apiChangePassword_(req, sessionUser) {
   const user = rows_(S.USERS).find(x => x.username === sessionUser.username);   // الصف الكامل (قد تكون الجلسة محفوظة مختصرة)
   const oldPw = String(req.oldPassword || '');
-  const newPw = String(req.newPassword || '');
+  const newPw = String(req.newPassword || '').trim();
   if (hash_(oldPw, user.salt) !== user.pass_hash) throw err_('كلمة المرور الحالية غير صحيحة');
   if (newPw.length < 6) throw err_('كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل');
   if (newPw === oldPw) throw err_('اختر كلمة مرور مختلفة عن الحالية');
@@ -875,6 +886,38 @@ function passwordFields_(pw, mustChange, login) {
  * الحساب غير النشط يُفعَّل عند إعطائه كلمة مرور.
  */
 function previewCredentials() { return processCredentials_(true); }
+
+/**
+ * يجرّب الدخول لكل صف في ورقة Credentials (اسم الدخول من عمود username أو الاسم + الرقم السري)
+ * ويكتب في عمود check: ✓ أو سبب الفشل بالضبط. لا يغيّر شيئاً ولا يحسب محاولات خاطئة.
+ */
+function checkCredentials() {
+  const sh = ss_().getSheetByName('Credentials');
+  if (!sh) throw new Error('لا توجد ورقة Credentials');
+  const data = sh.getDataRange().getValues();
+  const head = data.shift().map(h => String(h).trim().toLowerCase());
+  const col = k => head.indexOf(k);
+  let cc = col('check'); if (cc < 0) { cc = head.length; sh.getRange(1, cc + 1).setValue('check'); }
+  const cache = CacheService.getScriptCache();
+  let good = 0, bad = 0;
+  data.forEach((row, i) => {
+    const get = k => col(k) < 0 ? '' : String(row[col(k)] == null ? '' : row[col(k)]).trim();
+    if (!get('name') && !get('password')) return;
+    const id = get('username') || get('name'), pw = get('password');
+    const cands = loginCandidates_(id);
+    const u = pickLoginUser_(cands, pw);
+    let msg;
+    if (!u) msg = '✗ لا يوجد حساب باسم الدخول «' + id + '». شغّل applyCredentials أو تأكد من عمود username';
+    else if (u.status !== 'active') msg = '✗ الحساب (' + u.name + ') غير نشط/ترك العمل';
+    else if (!u.pass_hash || hash_(pw, u.salt) !== u.pass_hash) msg = '✗ الرقم السري لا يطابق حساب ' + u.name + '. شغّل applyCredentials مرة أخرى';
+    else if (Number(cache.get('fail_' + String(u.username).toLowerCase()) || 0) >= APP.MAX_LOGIN_FAILS) msg = '✗ مقفل مؤقتاً بعد محاولات خاطئة: شغّل clearLoginLocks';
+    else msg = '✓ يدخل بـ «' + (u.login || id) + '» → ' + u.name + (cands.length > 1 ? ' (تنبيه: ' + cands.length + ' حسابات بنفس الاسم)' : '');
+    if (msg[0] === '✓') good++; else bad++;
+    sh.getRange(i + 2, cc + 1).setValue(msg);
+  });
+  SpreadsheetApp.getActive().toast('فحص الدخول: ' + good + ' يعمل · ' + bad + ' لا يعمل. انظر عمود check', APP.NAME, 12);
+  return { ok: good, failed: bad };
+}
 function applyCredentials() { return processCredentials_(false); }
 
 function processCredentials_(dryRun) {
@@ -898,9 +941,14 @@ function processCredentials_(dryRun) {
     if (pw.length < 3 || pw.length > 60) return fail('كلمة المرور يجب أن تكون 3 خانات على الأقل');
 
     let m = matchNurseByName_(get('account') || get('name'), nurses);
-    const email = get('email').toLowerCase(), branch = get('branch').toUpperCase();
+    // إيميل ممرضة جديدة كُتب في عمود account بدل email: نعامله كإيميل الحساب الجديد
+    const acctIsNewEmail = m.err && /@/.test(get('account')) && !get('email');
+    const email = (acctIsNewEmail ? get('account') : get('email')).toLowerCase();
+    const branch = (get('branch').toUpperCase().indexOf('ONI') >= 0 || /عنيزة/.test(get('branch'))) ? 'ONIZAH'
+      : (get('branch').toUpperCase().indexOf('BUR') >= 0 || /بريدة/.test(get('branch'))) ? 'BURIDAH' : get('branch').toUpperCase();
+    if (acctIsNewEmail && !BRANCHES[branch]) return fail('ممرضة جديدة (لا يوجد حساب بهذا الإيميل): اكتب الفرع في عمود branch (BURIDAH أو ONIZAH)');
     let create = false;
-    if (m.err && !get('account') && email && BRANCHES[branch]) {
+    if (m.err && (!get('account') || acctIsNewEmail) && email && BRANCHES[branch]) {
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail('البريد غير صحيح');
       if (loginsTaken_()[email]) return fail('هذا البريد مستخدم لحساب آخر');
       create = true; m = { user: { name: get('name'), username: email, email: email, branch: branch, role: 'nurse', status: 'active' } };
