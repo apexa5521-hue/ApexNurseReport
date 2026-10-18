@@ -672,6 +672,7 @@ async function copyText(text) {
 
 /* ══════════ API ══════════ */
 /* نتائج صفحات القراءة تُحفظ دقيقتين في الذاكرة: التنقل بين الصفحات فوري، وأي تعديل يمسحها */
+const CLIENT_VERSION = '2026-10-18';   // يجب أن يطابق APP.VERSION في Code.gs
 const READ_ACTIONS = ['nurse.context', 'hr.overview', 'quality.stats', 'reports.list', 'issues.list', 'users.list', 'clinics.list'];
 const MEMO = new Map(), INFLIGHT = new Map();
 const MEMO_MS = 120000;
@@ -720,6 +721,7 @@ async function apiRaw(action, payload = {}) {
     err.code = j.code;
     throw err;
   }
+  if (j.ok) state.serverVersion = j.version || 'قديمة';   // الخادم القديم لا يرسل رقم النسخة
   return j.data;
 }
 
@@ -897,12 +899,19 @@ function currentPage() {
   return ok.includes(h) ? h : HOME[state.user.role] || ok[0];
 }
 
+function versionBanner() {
+  const sv = state.serverVersion;
+  if (window.APEX_DEMO || !sv || sv === CLIENT_VERSION || !state.user || state.user.role === 'nurse') return '';
+  return `<div class="notice" style="margin:0 0 14px">${icon('alert')} نسخة الخادم (Code.gs) <b class="num">${esc(sv)}</b> لا تطابق نسخة الصفحة (index.html) <b class="num">${CLIENT_VERSION}</b>. انشر الملفين من GitHub ثم Deploy ← New version، وإلا قد لا تظهر الميزات الجديدة.</div>`;
+}
 function route() {
   if (!state.user) return;
   const page = currentPage();
   renderShell(page);
   destroyCharts();
   PAGES[page].render($('#view'));
+  const vb = versionBanner();
+  if (vb) $('#view').insertAdjacentHTML('beforebegin', `<div class="wrap-banner" style="max-width:1240px;margin:16px auto 0;padding:0 20px">${vb}</div>`);
 }
 if (window.APEX_DEMO) document.documentElement.classList.add('is-demo');
 window.addEventListener('hashchange', () => state.user && route());
@@ -1365,6 +1374,16 @@ async function renderHR(view) {
         : '<div class="empty"><b>لا أحد بعد</b>لم يصل أي تقرير لهذا الأسبوع</div>'}</div></section>
   </div>
 
+  ${state.user.role === 'admin' ? `<section class="card rise ex-card" style="--i:7;margin-top:16px">
+    <div class="card-h" style="flex-wrap:wrap"><h3>${icon('clock')}استثناءات أسبوع ${esc(fmtDate(d.week, { day: 'numeric', month: 'long' }))}</h3>
+      <span class="sub">تمديد مهلة أو إعفاء لهذا الأسبوع فقط (للمدير)</span><div class="spacer"></div>
+      <button class="btn primary sm" id="ex-add">${icon('plus')}إضافة استثناء</button></div>
+    <div class="card-b" style="padding-top:4px">${d.roster.filter(r => r.exception).length ? `<div class="plist">${d.roster.filter(r => r.exception).map(r => `<div class="prow"><span class="avatar sm">${esc(initials(r.name))}</span>
+      <div class="pinfo"><b>${esc(r.name)}</b><div class="muted">${br(r.branch)}${r.exception.reason ? ' · ' + esc(r.exception.reason) : ''}${r.exception.by ? ' · ' + esc(r.exception.by) : ''}</div></div>
+      <span class="tag">${r.exception.type === 'exempt' ? 'معفاة هذا الأسبوع' : 'مهلة حتى ' + esc(fmtDay(r.exception.until))}</span>
+      <button class="btn sm" data-ex="${esc(r.username)}">تعديل</button><button class="btn sm" data-ex-cancel="${esc(r.exception.id)}">إلغاء</button></div>`).join('')}</div>`
+      : '<div class="empty"><b>لا توجد استثناءات</b>لهذا الأسبوع. لأسبوع آخر غيّر التاريخ من أعلى الصفحة.</div>'}</div></section>` : ''}
+
   <section class="card rise" style="--i:7;margin-top:16px">
     <div class="card-h" style="flex-wrap:wrap"><h3>حالة الممرضات</h3><span class="sub">حدّث حالة أي ممرضة من القائمة بجانب اسمها</span><div class="spacer"></div>
       <div class="toolbar">
@@ -1405,6 +1424,24 @@ async function renderHR(view) {
     issueNotices([r.username], b, () => renderHR(view));
   });
   bindNotices(view);
+  const bindEx = scope => {
+    $$('[data-ex]', scope).forEach(b => b.onclick = () => exceptionDialog(d.roster.find(x => x.username === b.dataset.ex), d.week, () => renderHR(view)));
+    $$('[data-ex-cancel]', scope).forEach(b => b.onclick = async () => {
+      if (!await confirmDialog('إلغاء الاستثناء؟ تعود قواعد التقديم العادية لهذا الأسبوع (التقارير المصحّحة سابقاً تبقى كما هي).')) return;
+      try { await api('exceptions.cancel', { id: b.dataset.exCancel }); toast('أُلغي الاستثناء'); renderHR(view); } catch (e) { toast(e.message, 'err'); }
+    });
+  };
+  if ($('.ex-card', view)) bindEx($('.ex-card', view));
+  const exAdd = $('#ex-add');
+  if (exAdd) exAdd.onclick = () => {
+    const list = d.roster.filter(r => r.state !== 'inactive').sort((a, b) => a.name.localeCompare(b.name));
+    modal({
+      title: 'إضافة استثناء',
+      body: `<div class="field"><label for="ex-n">الممرضة</label><select class="input" id="ex-n"><option value="">اختر الممرضة</option>${list.map(r => `<option value="${esc(r.username)}">${esc(r.name)} · ${br(r.branch)}</option>`).join('')}</select></div>`,
+      foot: `<button class="btn" data-close>إلغاء</button><button class="btn primary" id="ex-next">التالي</button>`,
+      onMount(el, close) { $('#ex-next', el).onclick = () => { const u = $('#ex-n', el).value; if (!u) return; close(); exceptionDialog(d.roster.find(x => x.username === u), d.week, () => renderHR(view)); }; },
+    });
+  };
 
   /* ───── إرسال تذكير السبت ───── */
   const remind = $('#remind-btn');
@@ -1446,7 +1483,7 @@ async function renderHR(view) {
     { label: 'الفرع', get: r => br(r.branch) },
     { label: 'هذا الأسبوع', html: r => (r.state === 'inactive' ? '<span class="muted">—</span>' : timingPill(r.thisWeek))
         + (r.exception ? `<div class="leave-note"><span class="tag" title="${esc(r.exception.reason || '')}${r.exception.by ? ' · ' + esc(r.exception.by) : ''}">${r.exception.type === 'exempt' ? 'معفاة هذا الأسبوع' : 'مهلة حتى ' + esc(fmtDay(r.exception.until))}</span>${isAdmin ? `<button class="linkbtn" data-ex-cancel="${esc(r.exception.id)}">إلغاء</button>` : ''}</div>` : '')
-        + (isAdmin && r.state !== 'inactive' ? `<div><button class="linkbtn" data-ex="${esc(r.username)}">${r.exception ? 'تعديل الاستثناء' : 'استثناء'}</button></div>` : ''),
+        + (isAdmin && r.state !== 'inactive' ? `<div style="margin-top:4px"><button class="btn sm" data-ex="${esc(r.username)}">${icon('clock')}${r.exception ? 'تعديل الاستثناء' : 'استثناء'}</button></div>` : ''),
       csv: r => (r.state === 'inactive' ? '' : t('st_' + r.thisWeek)) + (r.exception ? (r.exception.type === 'exempt' ? ' (معفاة)' : ' (مهلة حتى ' + r.exception.until + ')') : '') },
     { label: 'آخر 12 أسبوع', html: r => { const off = Math.max(0, r.cells.length - 12); return `<div class="heat">${r.cells.slice(off).map((c, i) => `<i class="${c}" title="${fmtShort(d.weeks[off + i])} — ${t('st_' + c)}"></i>`).join('')}</div>`; }, csv: r => r.cells.slice(-12).map(c => t('st_' + c)).join(' | ') },
     { label: spanLabel, html: r => `<span class="num strong">${pct(r.compliance)}</span><div class="muted num" style="font-size:11.5px">${r.doneWeeks} من ${r.expectedWeeks} أسبوع</div>`, csv: r => pct(r.compliance) },
@@ -1464,11 +1501,7 @@ async function renderHR(view) {
   const draw = () => {
     $('#roster').innerHTML = tableHTML(cols, filtered(), { empty: 'لا توجد نتائج' });
     bindNotices($('#roster'));
-    $$('#roster [data-ex]').forEach(b => b.onclick = () => exceptionDialog(d.roster.find(x => x.username === b.dataset.ex), d.week, () => renderHR(view)));
-    $$('#roster [data-ex-cancel]').forEach(b => b.onclick = async () => {
-      if (!await confirmDialog('إلغاء الاستثناء؟ تعود قواعد التقديم العادية لهذا الأسبوع (التقارير المصحّحة سابقاً تبقى كما هي).')) return;
-      try { await api('exceptions.cancel', { id: b.dataset.exCancel }); toast('أُلغي الاستثناء'); renderHR(view); } catch (e) { toast(e.message, 'err'); }
-    });
+    bindEx($('#roster'));
     $$('#roster [data-status]').forEach(sel => sel.onchange = async () => {
       const r = d.roster.find(x => x.username === sel.dataset.status), v = sel.value;
       const revert = () => { sel.value = r.state; };

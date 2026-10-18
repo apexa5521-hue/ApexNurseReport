@@ -16,6 +16,7 @@
 
 const APP = {
   NAME: 'Nursing',
+  VERSION: '2026-10-18',   // يجب أن يطابق CLIENT_VERSION في index.html
   TZ: 'Asia/Riyadh',
   SESSION_SECONDS: 6 * 60 * 60, // أقصى مدة يسمح بها CacheService
   HASH_ROUNDS: 250,
@@ -126,11 +127,11 @@ function doPost(e) {
     // صفحات القراءة: نعيد النتيجة المحفوظة إن لم تتغير البيانات منذ آخر حساب
     const key = handler.cache && user ? respKey_(req, user) : null;
     const hit = key && cacheGet_(key);
-    if (hit) return ContentService.createTextOutput('{"ok":true,"data":' + hit + '}').setMimeType(ContentService.MimeType.JSON);
+    if (hit) return ContentService.createTextOutput('{"ok":true,"version":"' + APP.VERSION + '","data":' + hit + '}').setMimeType(ContentService.MimeType.JSON);
     const data = handler.fn(req, user);
     if (key) cachePut_(key, JSON.stringify(data));
     else if (handler.roles && WRITE_SAFE.indexOf(req.action) < 0) bumpDataVersion_();   // أي تعديل يُبطل النتائج المحفوظة
-    return json_({ ok: true, data: data });
+    return json_({ ok: true, data: data, version: APP.VERSION });
   } catch (ex) {
     const msg = ex && ex.userMessage ? ex.userMessage : 'حدث خطأ في الخادم';
     if (!(ex && ex.userMessage)) console.error(req.action, ex && ex.stack || ex);
@@ -1623,8 +1624,7 @@ function setup() {
  * يوحّد الأسماء والعيادات، ينشئ حسابات الممرضات من الإيميلات، ويحوّل الإجابات إلى تقارير ومشاكل.
  * آمن للتكرار: الصفوف المنقولة سابقاً لا تُكرر، فيمكن تشغيله أكثر من مرة خلال الفترة الانتقالية.
  */
-function importFormResponses() {
-  const cfg = settings_();
+function readFormSheet_(cfg) {
   const srcId = (String(cfg.FORM_SOURCE || '').match(/\/d\/([a-zA-Z0-9-_]+)/) || [])[1] || String(cfg.FORM_SOURCE || '').trim();
   const ss = srcId ? SpreadsheetApp.openById(srcId) : ss_();
   const want = String(cfg.FORM_TAB || '').trim().toLowerCase();
@@ -1643,6 +1643,12 @@ function importFormResponses() {
   const h = values.shift().map(x => String(x).toLowerCase());
   // بعض الطوابع الزمنية مكتوبة يدوياً كنص — نحولها لتاريخ
   values.forEach(v => { v[0] = parseTimestamp_(v[0]); });
+  return { values: values, h: h, sheetName: src.getName() };
+}
+
+function importFormResponses() {
+  const cfg = settings_();
+  const form = readFormSheet_(cfg), values = form.values, h = form.h;
   const col = (re, from) => h.findIndex((x, i) => i >= (from || 0) && re.test(x));
   const C = {
     ts: 0, name: col(/name/), clinic: col(/clinic number/), expChecked: col(/expiration date of the drugs/),
@@ -1890,6 +1896,87 @@ function importFormResponses() {
     (unCount ? '. يوجد ' + unCount + ' رد بلا ممرضة: راجع ورقة Unmatched' : ''), APP.NAME, 12);
 }
 
+
+/**
+ * تدقيق: يقارن كل رد في الشيت الأساسي بما في النظام، ويكتب ورقتين للمراجعة اليدوية:
+ *   Audit       لكل ممرضة: عدد ردودها في النموذج، عدد تقاريرها في النظام، الإيميلات والأسماء والفروع التي ظهرت، وتنبيهات
+ *   Audit_Rows  كل رد في النموذج: الوقت، الاسم والإيميل كما كُتبا، ولمن نُسب في النظام
+ * لا يغيّر أي بيانات. شغّله بعد importFormResponses وقبل إصدار أي إشعار.
+ */
+function auditReports() {
+  const cfg = settings_();
+  const form = readFormSheet_(cfg), values = form.values, h = form.h;
+  const col = re => h.findIndex(x => re.test(x));
+  const C = { name: col(/name/), email: col(/البريد|email/), branch: col(/barnch|branch/), clinic: col(/clinic number/) };
+  const users = rows_(S.USERS);
+  const byUser = {}; users.forEach(u => byUser[u.username] = u);
+  const reports = rows_(S.REPORTS);
+  const legacyByTs = {};
+  reports.forEach(r => { const m = String(r.source || '').match(/^(legacy:\d{14})/); if (m) (legacyByTs[m[1]] = legacyByTs[m[1]] || []).push(r); });
+  const used = new Set();
+  const rowsOut = [['وقت الرد', 'الاسم في النموذج', 'الإيميل في النموذج', 'الفرع في النموذج', 'العيادة في النموذج', '← نُسب في النظام إلى', 'إيميل الحساب', 'أسبوع السبت', 'التوقيت', 'ملاحظة']];
+  const per = {};   // username → ملخص
+  const P = u => per[u] = per[u] || { form: 0, emails: {}, names: {}, branches: {} };
+  let missing = 0, orphan = 0;
+  values.forEach(v => {
+    if (!(v[0] instanceof Date)) return;
+    const ts = 'legacy:' + Utilities.formatDate(v[0], APP.TZ, 'yyyyMMddHHmmss');
+    const cand = (legacyByTs[ts] || []).filter(r => !used.has(r));
+    const em = String(v[C.email] || '').trim().toLowerCase(), nm = String(v[C.name] || '').trim(), brn = String(v[C.branch] || '').trim();
+    // عند ردّين في نفس الثانية نختار المطابق للإيميل/الاسم
+    const key = normText_(em || nm).slice(0, 24);
+    const r = cand.find(x => String(x.source).split(':')[2] === key) || cand[0];
+    let note = '';
+    if (!r) { missing++; note = '✗ غير موجود في النظام: شغّل importFormResponses'; }
+    else {
+      used.add(r);
+      if (!r.username) { orphan++; note = '✗ بلا ممرضة: أضف الاسم/الإيميل في aliases أو ورقة Merges'; }
+      else {
+        const p = P(r.username); p.form++;
+        if (em) p.emails[em] = (p.emails[em] || 0) + 1;
+        if (nm) p.names[nm] = (p.names[nm] || 0) + 1;
+        if (brn) p.branches[brn.toUpperCase()] = (p.branches[brn.toUpperCase()] || 0) + 1;
+      }
+    }
+    const u = r && byUser[r.username];
+    rowsOut.push([Utilities.formatDate(v[0], APP.TZ, 'yyyy-MM-dd HH:mm:ss'), nm, em, brn, String(v[C.clinic] || ''),
+      u ? u.name : (r ? '(بلا ممرضة)' : '—'), u ? (u.email || u.username) : '', r ? r.week_start : '', r ? r.timing : '', note]);
+  });
+  const extraLegacy = Object.keys(legacyByTs).reduce((n, k) => n + legacyByTs[k].filter(r => !used.has(r)).length, 0);
+
+  const out = [['الممرضة', 'الحساب', 'الحالة', 'الفرع', 'ردود النموذج', 'تقارير من المنصة', 'الإجمالي في النظام', 'الإيميلات في النموذج', 'الأسماء في النموذج', 'الفروع في النموذج', 'تنبيه']];
+  users.filter(u => u.role === 'nurse').forEach(u => {
+    const p = per[u.username] || { form: 0, emails: {}, names: {}, branches: {} };
+    const mine = reports.filter(r => r.username === u.username);
+    const platform = mine.filter(r => String(r.source || '').indexOf('legacy:') !== 0).length;
+    const fmt = o => Object.keys(o).map(k => k + ' (' + o[k] + ')').join('، ');
+    const flags = [];
+    if (Object.keys(p.emails).length > 1) flags.push('أكثر من إيميل: تأكد أنها نفس الممرضة');
+    if (Object.keys(p.branches).length > 1) flags.push('ردود من أكثر من فرع');
+    const first = normText_(String(u.name).split(/\s+/)[0]);
+    const odd = Object.keys(p.names).filter(n => normText_(n).indexOf(first) < 0 && first.indexOf(normText_(n).slice(0, 4)) < 0);
+    if (odd.length) flags.push('أسماء لا تشبه اسم الحساب: ' + odd.join('، '));
+    if (mine.length !== p.form + platform) flags.push('عدد غير متطابق');
+    out.push([u.name, u.email || u.username, u.status === 'active' ? 'على رأس العمل' : 'ترك العمل', br_(u.branch), p.form, platform, mine.length,
+      fmt(p.emails), fmt(p.names), fmt(p.branches), flags.join(' · ') || '✓']);
+  });
+  const db = ss_();
+  const write = (name, data) => {
+    let sh = db.getSheetByName(name);
+    if (!sh) sh = db.insertSheet(name);
+    sh.clearContents();
+    sh.getRange(1, 1, data.length, data[0].length).setNumberFormat('@').setValues(data.map(r => r.map(c => c == null ? '' : String(c))));
+    sh.setFrozenRows(1);
+  };
+  write('Audit', out);
+  write('Audit_Rows', rowsOut);
+  const formRows = rowsOut.length - 1;
+  const msg = 'التدقيق: ' + formRows + ' رد في النموذج · ' + (formRows - missing - orphan) + ' منسوب لممرضة · ' + orphan + ' بلا ممرضة · ' + missing + ' غير منقول'
+    + (extraLegacy ? ' · ' + extraLegacy + ' تقرير منقول لم يعد موجوداً في النموذج' : '') + '. راجع ورقتي Audit وAudit_Rows';
+  SpreadsheetApp.getActive().toast(msg, APP.NAME, 15);
+  return { formRows: formRows, missing: missing, orphan: orphan, extraLegacy: extraLegacy };
+}
+function br_(b) { return BRANCHES[b] || b || ''; }
 
 /**
  * يعيد بناء التقارير المنقولة من النموذج من الصفر.
