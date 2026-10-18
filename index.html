@@ -135,6 +135,7 @@ select.input.demo-switch{height:36px;width:170px;flex:none;padding:0 10px;font-s
 
 /* ══════════ FORMS ══════════ */
 .field{margin-bottom:16px}
+.radio{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:7px 0;cursor:pointer;line-height:1.5}.radio input{margin-top:4px;accent-color:var(--accent)}
 .field>label,.label{display:block;font-size:12.5px;font-weight:500;color:var(--ink-2);margin-bottom:7px}
 .input,select.input,textarea.input{width:100%;height:44px;padding:0 14px;border:1px solid var(--line-strong);border-radius:var(--r);background:var(--surface);transition:border-color .2s,box-shadow .2s;outline:none}
 textarea.input{height:auto;min-height:84px;padding:12px 14px;resize:vertical}
@@ -491,7 +492,7 @@ const T = {
     changeTitle: 'تعيين كلمة مرور جديدة', changeSub: 'هذا أول دخول لك، اختر كلمة مرور خاصة بك.', oldPass: 'كلمة المرور المؤقتة',
     newPass: 'كلمة المرور الجديدة (6 أحرف على الأقل)', confirmPass: 'تأكيد كلمة المرور', save: 'حفظ', mismatch: 'كلمتا المرور غير متطابقتين',
     hello: 'مرحباً', weekOf: 'تقرير العيادات', dueToday: 'موعد التسليم اليوم', onTimeNow: 'التسليم الآن يُحسب في الوقت',
-    lateNow: 'التسليم الآن يُحسب متأخراً', closedNow: 'نافذة التقديم مغلقة', closedDone: n => `رفعتِ هذا الأسبوع ${n} تقرير.`, myStats: 'إحصائياتك', statCommit: 'التزامك', stat12: 'آخر 12 أسبوع', statOnTime: 'في الوقت', statLast: 'آخر تقديم', statOpen: 'بلاغات مفتوحة', statStreak: 'أسابيع بلا تقديم', recent: 'آخر تقاريرك', colDate: 'التاريخ', colUnit: 'القسم', colTiming: 'التوقيت', colItems: 'بنود للمتابعة', colNote: 'ملاحظتك', noRecent: 'لم ترفعي أي تقرير بعد.', onLeaveNote: (a, b) => `مسجّل لك إجازة من ${a} إلى ${b}، فلا يُطلب منك تقرير خلالها.`, veryLateNow: 'خارج نافذة التقديم — سيُسجَّل التقرير خارج النافذة', earlyNow: 'التسليم الآن يُحسب مبكراً لأسبوع',
+    lateNow: 'التسليم الآن يُحسب متأخراً', closedNow: 'نافذة التقديم مغلقة', closedDone: n => `رفعتِ هذا الأسبوع ${n} تقرير.`, myStats: 'إحصائياتك', statCommit: 'التزامك', stat12: 'آخر 12 أسبوع', statOnTime: 'في الوقت', statLast: 'آخر تقديم', statOpen: 'بلاغات مفتوحة', statStreak: 'أسابيع بلا تقديم', recent: 'آخر تقاريرك', colDate: 'التاريخ', colUnit: 'القسم', colTiming: 'التوقيت', colItems: 'بنود للمتابعة', colNote: 'ملاحظتك', noRecent: 'لم ترفعي أي تقرير بعد.', onLeaveNote: (a, b) => `مسجّل لك إجازة من ${a} إلى ${b}، فلا يُطلب منك تقرير خلالها.`, veryLateNow: 'خارج نافذة التقديم — سيُسجَّل التقرير خارج النافذة', earlyNow: 'التسليم الآن يُحسب مبكراً لأسبوع', excusedNote: d => `مُنحتِ مهلة لتقرير هذا الأسبوع حتى ${d}، وما ترفعينه خلالها يُحسب في الوقت.`, exemptNote: 'أُعفيتِ من تقرير هذا الأسبوع.',
     submittedOf: 'عيادات تم رفعها', mySubmitted: 'تقاريرك هذا الأسبوع', q1: 'العيادة', q1h: 'اختر العيادة أو القسم الذي تكتب تقريره', submitted: 'تم الرفع',
     pick: 'اختر من القائمة…', gDental: 'عيادات الأسنان', gDerma: 'Derma', gSteril: 'التعقيم', gOther: 'أخرى',
     q2: 'هل تم فحص تواريخ انتهاء الأدوية والمواد داخل العيادة؟', q2h: 'سجّل أقرب تاريخ انتهاء بين المواد والأدوية',
@@ -521,7 +522,7 @@ const T = {
     changeTitle: 'Set a new password', changeSub: 'This is your first sign-in. Choose your own password.', oldPass: 'Temporary password',
     newPass: 'New password (min. 6 characters)', confirmPass: 'Confirm password', save: 'Save', mismatch: 'Passwords do not match',
     hello: 'Hello', weekOf: 'Clinics report', dueToday: 'Due today', onTimeNow: 'Submitting now counts as on time',
-    lateNow: 'Submitting now counts as late', closedNow: 'Submission window is closed', closedDone: n => `You submitted ${n} report${n > 1 ? 's' : ''} this week.`, myStats: 'Your statistics', statCommit: 'Your commitment', stat12: 'last 12 weeks', statOnTime: 'On time', statLast: 'Last submission', statOpen: 'Open reports', statStreak: 'Weeks missed in a row', recent: 'Your latest reports', colDate: 'Date', colUnit: 'Unit', colTiming: 'Timing', colItems: 'Follow-up items', colNote: 'Your note', noRecent: 'You have not submitted a report yet.', onLeaveNote: (a, b) => `You are on leave from ${a} to ${b}; no report is required during this period.`, veryLateNow: 'Outside the submission window — this report will be recorded as outside the window', earlyNow: 'Submitting now counts as early for the week of',
+    lateNow: 'Submitting now counts as late', closedNow: 'Submission window is closed', closedDone: n => `You submitted ${n} report${n > 1 ? 's' : ''} this week.`, myStats: 'Your statistics', statCommit: 'Your commitment', stat12: 'last 12 weeks', statOnTime: 'On time', statLast: 'Last submission', statOpen: 'Open reports', statStreak: 'Weeks missed in a row', recent: 'Your latest reports', colDate: 'Date', colUnit: 'Unit', colTiming: 'Timing', colItems: 'Follow-up items', colNote: 'Your note', noRecent: 'You have not submitted a report yet.', onLeaveNote: (a, b) => `You are on leave from ${a} to ${b}; no report is required during this period.`, veryLateNow: 'Outside the submission window — this report will be recorded as outside the window', earlyNow: 'Submitting now counts as early for the week of', excusedNote: d => `You have been given an extension for this week's report until ${d}. Reports submitted until then count as on time.`, exemptNote: 'You are excused from this week\'s report.',
     submittedOf: 'clinics submitted', mySubmitted: 'Your reports this week', q1: 'Clinic', q1h: 'Choose the clinic or unit you are reporting on', submitted: 'Submitted',
     pick: 'Select from the list…', gDental: 'Dental clinics', gDerma: 'Derma', gSteril: 'Sterilization', gOther: 'Other',
     q2: 'Have expiry dates of drugs and materials in the clinic been checked?', q2h: 'Record the earliest expiry date you found',
@@ -1091,6 +1092,8 @@ async function renderNurse(view) {
     </div></section>
 
     ${ctx.stats.leave ? `<div class="notice rise" style="margin-top:12px">${t('onLeaveNote')(fmtDay(ctx.stats.leave.from), fmtDay(ctx.stats.leave.to))}</div>` : ''}
+    ${ctx.window.excusedUntil ? `<div class="notice rise" style="margin-top:12px">${icon('check')} ${esc(t('excusedNote')(fmtDate(ctx.window.excusedUntil, { weekday: 'long', day: 'numeric', month: 'long' })))}</div>` : ''}
+    ${ctx.window.exception && ctx.window.exception.type === 'exempt' ? `<div class="notice rise" style="margin-top:12px">${esc(t('exemptNote'))}</div>` : ''}
 
     ${pending.length && !closed ? `
     <form id="nform" novalidate style="display:grid;gap:12px;margin-top:16px">
@@ -1432,6 +1435,7 @@ async function renderHR(view) {
   };
 
   /* ───── جدول الحالة ───── */
+  const isAdmin = state.user.role === 'admin';
   const fy = w => fmtDate(w, { day: 'numeric', month: 'short', year: 'numeric' });
   const spanLabel = 'الالتزام' + (d.weeks.length ? ' (' + fy(d.weeks[0]) + ' – ' + fy(d.weeks[d.weeks.length - 1]) + ')' : '');
   const statusCell = r => `<select class="input status-select st-${r.state}" data-status="${esc(r.username)}" aria-label="حالة ${esc(r.name)}">
@@ -1440,7 +1444,10 @@ async function renderHR(view) {
   const cols = [
     { label: 'الممرضة', html: r => `<div style="display:flex;align-items:center;gap:10px"><span class="avatar sm">${esc(initials(r.name))}</span><div><b style="font-weight:600">${esc(r.name)}</b><div class="muted" style="font-size:11.5px" dir="ltr">${esc(r.email || '')}</div>${r.notices ? `<span class="tag" style="margin-top:3px" title="آخر إشعار ${esc(fmtDay(r.lastNotice))}">${r.notices} إشعار عدم التزام</span>` : ''}</div>${r.noticeStreak >= 2 ? `<button class="btn sm" style="margin-inline-start:auto" data-notice="${esc(r.username)}" title="لم تسلّم ${r.noticeStreak} أسابيع متتالية">${icon('print')}إشعار</button>` : ''}</div>`, csv: r => r.name },
     { label: 'الفرع', get: r => br(r.branch) },
-    { label: 'هذا الأسبوع', html: r => r.state === 'inactive' ? '<span class="muted">—</span>' : timingPill(r.thisWeek), csv: r => r.state === 'inactive' ? '' : t('st_' + r.thisWeek) },
+    { label: 'هذا الأسبوع', html: r => (r.state === 'inactive' ? '<span class="muted">—</span>' : timingPill(r.thisWeek))
+        + (r.exception ? `<div class="leave-note"><span class="tag" title="${esc(r.exception.reason || '')}${r.exception.by ? ' · ' + esc(r.exception.by) : ''}">${r.exception.type === 'exempt' ? 'معفاة هذا الأسبوع' : 'مهلة حتى ' + esc(fmtDay(r.exception.until))}</span>${isAdmin ? `<button class="linkbtn" data-ex-cancel="${esc(r.exception.id)}">إلغاء</button>` : ''}</div>` : '')
+        + (isAdmin && r.state !== 'inactive' ? `<div><button class="linkbtn" data-ex="${esc(r.username)}">${r.exception ? 'تعديل الاستثناء' : 'استثناء'}</button></div>` : ''),
+      csv: r => (r.state === 'inactive' ? '' : t('st_' + r.thisWeek)) + (r.exception ? (r.exception.type === 'exempt' ? ' (معفاة)' : ' (مهلة حتى ' + r.exception.until + ')') : '') },
     { label: 'آخر 12 أسبوع', html: r => { const off = Math.max(0, r.cells.length - 12); return `<div class="heat">${r.cells.slice(off).map((c, i) => `<i class="${c}" title="${fmtShort(d.weeks[off + i])} — ${t('st_' + c)}"></i>`).join('')}</div>`; }, csv: r => r.cells.slice(-12).map(c => t('st_' + c)).join(' | ') },
     { label: spanLabel, html: r => `<span class="num strong">${pct(r.compliance)}</span><div class="muted num" style="font-size:11.5px">${r.doneWeeks} من ${r.expectedWeeks} أسبوع</div>`, csv: r => pct(r.compliance) },
     { label: 'التقارير', html: r => `<span class="num">${r.reports}</span>`, csv: r => r.reports },
@@ -1457,6 +1464,11 @@ async function renderHR(view) {
   const draw = () => {
     $('#roster').innerHTML = tableHTML(cols, filtered(), { empty: 'لا توجد نتائج' });
     bindNotices($('#roster'));
+    $$('#roster [data-ex]').forEach(b => b.onclick = () => exceptionDialog(d.roster.find(x => x.username === b.dataset.ex), d.week, () => renderHR(view)));
+    $$('#roster [data-ex-cancel]').forEach(b => b.onclick = async () => {
+      if (!await confirmDialog('إلغاء الاستثناء؟ تعود قواعد التقديم العادية لهذا الأسبوع (التقارير المصحّحة سابقاً تبقى كما هي).')) return;
+      try { await api('exceptions.cancel', { id: b.dataset.exCancel }); toast('أُلغي الاستثناء'); renderHR(view); } catch (e) { toast(e.message, 'err'); }
+    });
     $$('#roster [data-status]').forEach(sel => sel.onchange = async () => {
       const r = d.roster.find(x => x.username === sel.dataset.status), v = sel.value;
       const revert = () => { sel.value = r.state; };
@@ -1486,6 +1498,41 @@ async function renderHR(view) {
     { label: '', html: r => `<button class="btn sm" data-issue="${esc(r.issue_id)}">تحديث</button>` },
   ], d.cardIssues, { empty: 'كل البطاقات موجودة' });
   $$('#cards [data-issue]').forEach(b => b.onclick = () => issueDialog(d.cardIssues.find(i => i.issue_id === b.dataset.issue), () => renderHR(view)));
+}
+
+/** استثناء من المدير لأسبوع واحد: تمديد المهلة حتى تاريخ، أو إعفاء من الأسبوع */
+function exceptionDialog(r, week, done) {
+  const sun = addDays(week, 1), thu = addDays(week, 5);
+  const today = ymd(new Date());
+  const def = r.exception && r.exception.until ? r.exception.until : (today > sun && today <= thu ? addDays(today, 1) : addDays(week, 2));
+  modal({
+    title: 'استثناء: ' + r.name,
+    body: `<p class="muted" style="font-size:12.5px;margin-top:0">أسبوع السبت <b>${esc(fmtDate(week, { day: 'numeric', month: 'long' }))}</b> فقط. لاختيار أسبوع آخر غيّر الأسبوع من أعلى الصفحة.</p>
+      <div class="field"><label>النوع</label>
+        <label class="radio"><input type="radio" name="ex-t" value="extend" checked> تمديد المهلة: ما ترفعه حتى التاريخ المحدد يُحسب «في الوقت»، وتستطيع الرفع حتى لو أُغلقت النافذة</label>
+        <label class="radio"><input type="radio" name="ex-t" value="exempt" ${r.exception && r.exception.type === 'exempt' ? 'checked' : ''}> إعفاء من هذا الأسبوع: لا يُطلب منها تقرير ولا يُحسب عليها</label></div>
+      <div class="field" id="ex-u-f"><label for="ex-u">آخر يوم للمهلة (حتى نهاية اليوم)</label>
+        <input class="input" type="date" id="ex-u" min="${week}" max="${thu}" value="${def > thu ? thu : def}">
+        <div class="muted" style="font-size:12px;margin-top:4px">حتى الخميس ${esc(fmtDay(thu))} كحد أقصى، لأن الجمعة تفتح نافذة الأسبوع التالي.</div></div>
+      <div class="field"><label for="ex-r">السبب</label><input class="input" id="ex-r" maxlength="200" placeholder="مثلاً: مشكلة تقنية، يوم أوف" value="${esc(r.exception ? r.exception.reason || '' : '')}"></div>
+      <div id="ex-err"></div>`,
+    foot: `<button class="btn" data-close>إلغاء</button><button class="btn primary" id="ex-save">${icon('check')}حفظ الاستثناء</button>`,
+    onMount(el, close) {
+      const sync = () => $('#ex-u-f', el).classList.toggle('hidden', $('input[name=ex-t]:checked', el).value !== 'extend');
+      $$('input[name=ex-t]', el).forEach(x => x.onchange = sync); sync();
+      $('#ex-save', el).onclick = async () => {
+        const b = $('#ex-save', el), type = $('input[name=ex-t]:checked', el).value, until = $('#ex-u', el).value;
+        if (type === 'extend' && !until) { $('#ex-err', el).innerHTML = '<div class="form-error">حدد آخر يوم للمهلة</div>'; return; }
+        busy(b, true);
+        try {
+          const res = await api('exceptions.save', { username: r.username, week, type, until, reason: $('#ex-r', el).value });
+          close();
+          toast(type === 'exempt' ? `${r.name}: معفاة من هذا الأسبوع` : `${r.name}: مهلة حتى ${fmtDay(until)}` + (res.fixed ? ` · صُحّح ${res.fixed} تقرير إلى «في الوقت»` : ''));
+          done();
+        } catch (e) { busy(b, false); $('#ex-err', el).innerHTML = `<div class="form-error">${esc(e.message)}</div>`; }
+      };
+    },
+  });
 }
 
 /** تحديد فترة الإجازة أو تعديلها / تمديدها */

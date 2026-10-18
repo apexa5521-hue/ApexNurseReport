@@ -43,6 +43,7 @@ const S = {
   TEMP: 'Temp_Passwords',
   LEAVES: 'Leaves',
   NOTICES: 'Notices',
+  EXCEPTIONS: 'Exceptions',
 };
 
 const HEADERS = {
@@ -60,6 +61,7 @@ const HEADERS = {
   Settings: ['key', 'value', 'description'],
   Audit_Log: ['at', 'user', 'action', 'details'],
   Temp_Passwords: ['name', 'username', 'role', 'temp_password', 'created_at'],
+  Exceptions: ['ex_id', 'username', 'week_start', 'type', 'until', 'reason', 'created_at', 'created_by', 'cancelled'],
   Notices: ['notice_id', 'username', 'nurse_name', 'branch', 'weeks', 'streak', 'compliance', 'issued_at', 'issued_by'],
   Leaves: ['leave_id', 'username', 'from_date', 'to_date', 'cancelled', 'created_at', 'created_by'],
 };
@@ -162,6 +164,8 @@ const ACTIONS = {
   'users.save':     { roles: ['hr', 'admin'], fn: apiUserSave_ },
   'users.reset':    { roles: ['hr', 'admin'], fn: apiUserReset_ },
   'users.setStatus': { roles: ['hr', 'admin'], fn: apiUserSetStatus_ },
+  'exceptions.save':   { roles: ['admin'], fn: apiExceptionSave_ },
+  'exceptions.cancel': { roles: ['admin'], fn: apiExceptionCancel_ },
   'clinics.list':   { roles: STAFF, fn: () => ({ clinics: clinics_() }), cache: true },
   'clinics.save':   { roles: ['admin', 'quality'], fn: apiClinicSave_ },
 };
@@ -356,15 +360,17 @@ function apiNurseContext_(req, user) {
   const openIssues = rows_(S.ISSUES)
     .filter(i => (i.status === 'open' || i.status === 'in_progress') && reportedBy_(i, user.username))
     .map(issueOut_);
-  const closed = now.timing === 'very_late' && !allowVeryLate_(cfg);
+  const eff = effectiveWindow_(user.username, new Date(), cfg);
+  const closed = eff.closed;
   const nextSat = addDays_(parseDate_(now.week), 7);
 
   return {
     user: publicUser_(user),
     week: now.week,
-    timingIfNow: closed ? 'closed' : now.timing,
+    timingIfNow: closed ? 'closed' : eff.timing,
     window: {
-      state: closed ? 'closed' : now.timing,          // early | on_time | late | closed
+      state: closed ? 'closed' : eff.excused ? 'excused' : now.timing,          // early | on_time | late | closed | excused
+      excusedUntil: eff.excused ? eff.until : '', exception: eff.exception || null,
       saturday: now.week, sunday: dateStr_(addDays_(parseDate_(now.week), 1)), monday: dateStr_(addDays_(parseDate_(now.week), 2)),
       opensOn: dateStr_(addDays_(nextSat, -cfg.EARLY_ALLOWED_DAYS)), nextDeadline: dateStr_(nextSat),
     },
@@ -398,8 +404,8 @@ function nurseClinics_(user) {
 
 function apiNurseSubmit_(req, user) {
   const cfg = settings_();
-  const win = classifySubmission_(new Date(), cfg);
-  if (win.timing === 'very_late' && !allowVeryLate_(cfg)) {
+  const win = effectiveWindow_(user.username, new Date(), cfg);
+  if (win.closed) {
     throw err_('نافذة التقديم لهذا الأسبوع مغلقة. التقديم السبت، ويُقبل الأحد كمتأخر. تفتح النافذة القادمة من الجمعة.', 'CLOSED');
   }
   const p = req.report || {};
@@ -439,7 +445,7 @@ function apiNurseSubmit_(req, user) {
   lock.waitLock(20000);
   try {
     const when = new Date();
-    const cls = classifySubmission_(when, cfg);
+    const cls = effectiveWindow_(user.username, when, cfg);
     const dup = rows_(S.REPORTS).find(x => x.week_start === cls.week && x.clinic_id === clinic.clinic_id);
     if (dup) throw err_('تم رفع تقرير ' + clinic.name + ' لهذا الأسبوع مسبقاً');
 
@@ -556,6 +562,7 @@ function onLeave_(leaves, week) {
 
 /** هل يُطلب من الممرضة تقرير في أسبوع التسليم w (تاريخ السبت)؟ */
 function expectedOn_(n, w, leaves, cfg) {
+  if (exemptMap_()[n.username + '|' + w]) return false;   // إعفاء من هذا الأسبوع (استثناء من المدير)
   if (n.start_date) { const st = dateStr_(parseDate_(n.start_date)); if (st && w < weekOf_(st, cfg)) return false; }
   if (n.status !== 'active') {
     // متوقفة عن العمل: مطلوبة حتى تاريخ التوقف، وإن لم يُكتب فحتى آخر أسبوع سلّمت فيه (حتى لا يضيع سجلها القديم)
@@ -563,6 +570,88 @@ function expectedOn_(n, w, leaves, cfg) {
     if (!end || w > end) return false;
   }
   return !onLeave_(leaves, w);
+}
+
+/* ───────── استثناءات المدير: تمديد المهلة أو إعفاء من أسبوع واحد ───────── */
+
+let EX_ = { src: null, list: null, exempt: null };
+function exceptions_() {
+  const src = rows_(S.EXCEPTIONS);
+  if (EX_.src !== src) {
+    const list = src.filter(x => x.cancelled !== 'yes');
+    const exempt = {};
+    list.forEach(x => { if (x.type === 'exempt') exempt[x.username + '|' + x.week_start] = x; });
+    EX_ = { src: src, list: list, exempt: exempt };
+  }
+  return EX_;
+}
+function exemptMap_() { return exceptions_().exempt; }
+/** آخر استثناء فعّال لممرضة في أسبوع */
+function exceptionFor_(username, week) {
+  const l = exceptions_().list.filter(x => x.username === username && x.week_start === week);
+  return l.length ? l[l.length - 1] : null;
+}
+
+/**
+ * نافذة التقديم الفعلية لممرضة الآن: القواعد العامة، إلا إذا منحها المدير مهلة لهذا الأسبوع.
+ * مع المهلة: ما يُرفع حتى نهاية تاريخ until يُحسب «في الوقت» حتى لو كانت النافذة مغلقة.
+ */
+function effectiveWindow_(username, when, cfg) {
+  const c = classifySubmission_(when, cfg);
+  const base = { week: c.week, timing: c.timing, closed: c.timing === 'very_late' && !allowVeryLate_(cfg), excused: false };
+  const ex = exceptionFor_(username, c.week);
+  if (!ex) return base;
+  const today = dateStr_(when);
+  if (ex.type === 'extend' && ex.until && today <= ex.until && (c.timing === 'late' || c.timing === 'very_late')) {
+    return { week: c.week, timing: 'on_time', closed: false, excused: true, until: ex.until, exception: { type: ex.type, until: ex.until, reason: ex.reason } };
+  }
+  return Object.assign(base, { exception: { type: ex.type, until: ex.until, reason: ex.reason } });
+}
+
+function apiExceptionSave_(req, user) {
+  const cfg = settings_();
+  const u = rows_(S.USERS).find(x => x.username === req.username && x.role === 'nurse');
+  if (!u) throw err_('الممرضة غير موجودة');
+  const week = normalizeWeek_(req.week, cfg);
+  const type = req.type === 'exempt' ? 'exempt' : 'extend';
+  let until = '';
+  if (type === 'extend') {
+    const d = parseDate_(req.until);
+    if (!d) throw err_('حدد آخر يوم للمهلة');
+    until = dateStr_(d);
+    const last = dateStr_(addDays_(parseDate_(week), 5));   // حتى الخميس، قبل أن تفتح نافذة الأسبوع التالي
+    if (until < week) throw err_('تاريخ المهلة قبل سبت هذا الأسبوع');
+    if (until > last) throw err_('أقصى مهلة لهذا الأسبوع حتى الخميس ' + last + '. بعدها يبدأ الأسبوع التالي');
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    // استثناء واحد فعّال لكل ممرضة في الأسبوع: الجديد يحل محل القديم
+    rows_(S.EXCEPTIONS).filter(x => x.username === u.username && x.week_start === week && x.cancelled !== 'yes')
+      .forEach(x => setCell_(S.EXCEPTIONS, x._row, 'cancelled', 'yes'));
+    const ex = { ex_id: 'X' + Utilities.formatDate(new Date(), APP.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 90 + 10),
+      username: u.username, week_start: week, type: type, until: until, reason: clean_(req.reason, 200),
+      created_at: nowStr_(), created_by: user.name, cancelled: '' };
+    appendObjects_(S.EXCEPTIONS, [ex]);
+    // ما رفعته متأخراً قبل الاستثناء يُصحَّح إلى «في الوقت» إن كان ضمن المهلة
+    let fixed = 0;
+    rows_(S.REPORTS).filter(r => r.username === u.username && r.week_start === week && (r.timing === 'late' || r.timing === 'very_late'))
+      .forEach(r => {
+        if (type === 'exempt' || String(r.submitted_at).slice(0, 10) <= until) { setCell_(S.REPORTS, r._row, 'timing', 'on_time'); fixed++; }
+      });
+    log_(user.username, 'exception_' + type, u.username + ' ' + week + (until ? ' → ' + until : '') + (fixed ? ' (صُحّح ' + fixed + ')' : '') + (ex.reason ? ' · ' + ex.reason : ''));
+    return { exception: ex, fixed: fixed };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function apiExceptionCancel_(req, user) {
+  const ex = rows_(S.EXCEPTIONS).find(x => x.ex_id === req.id && x.cancelled !== 'yes');
+  if (!ex) throw err_('الاستثناء غير موجود');
+  setCell_(S.EXCEPTIONS, ex._row, 'cancelled', 'yes');
+  log_(user.username, 'exception_cancel', ex.username + ' ' + ex.week_start);
+  return { ok: true };
 }
 
 /** آخر أسبوع سلّمت فيه كل ممرضة */
@@ -644,6 +733,7 @@ function apiHrOverview_(req, user) {
   const weeks = req.weeks === 'all' ? weeksBetween_(firstWeek_(user, week), week)
     : weeksBack_(week, Math.min(52, Math.max(4, Number(req.weeks) || 12)));
   const roster = buildRoster_(user, week, weeks, cfg);
+  roster.forEach(r => { const ex = exceptionFor_(r.username, week); r.exception = ex ? { id: ex.ex_id, type: ex.type, until: ex.until, reason: ex.reason, by: ex.created_by } : null; });
   // أسابيع متتالية بلا تسليم حتى آخر أسبوع انتهت نافذته (شرط إشعار عدم الالتزام)
   const closedIdx = weeks.indexOf(lastClosedWeek_(cfg));
   roster.forEach(r => {
