@@ -1519,7 +1519,8 @@ function apiUserSave_(req, user) {
   const name = clean_(p.name, 80);
   const email = clean_(p.email, 120).toLowerCase();
   if (!name) throw err_('أدخل الاسم');
-  if (role === 'nurse' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw err_('أدخل بريداً إلكترونياً صحيحاً للممرضة، تصلها عليه تذكيرات التقرير');
+  if (role === 'nurse' && !p.username && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw err_('أدخل بريداً إلكترونياً صحيحاً للممرضة، تصلها عليه تذكيرات التقرير');
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw err_('البريد الإلكتروني غير صحيح');
   if (p.newUsername && !/^[a-z0-9._@+-]{3,80}$/i.test(String(p.newUsername).trim())) throw err_('اسم المستخدم: أحرف إنجليزية وأرقام و . _ - فقط (3 خانات على الأقل)');
 
   const lock = LockService.getScriptLock();
@@ -1530,8 +1531,13 @@ function apiUserSave_(req, user) {
     const clinicsStr = (Array.isArray(p.clinics) ? p.clinics : []).join(',');
     if (existing) {
       if (user.role !== 'admin' && existing.role !== 'nurse') throw err_('لا يمكن تعديل هذا الحساب', 'FORBIDDEN');
+      if (name !== existing.name) {
+        const clash = existing.role === 'nurse' && nameClash_(existing, name, users.filter(x => x.role === 'nurse'));
+        if (clash) throw err_('الاسم «' + name + '» مستخدم لحساب آخر (' + (clash.email || clash.username) + '). إن كانتا نفس الممرضة ادمجهما أولاً');
+        renameNurse_(existing, name);
+      }
       setCells_(S.USERS, existing._row, {
-        name: name, email: email, role: role, branch: branch, clinics: clinicsStr,
+        email: email, role: role, branch: branch, clinics: clinicsStr,
         start_date: p.start_date ? dateStr_(parseDate_(p.start_date)) : existing.start_date,
       });
       log_(user.username, 'user_update', existing.username);
@@ -1977,6 +1983,72 @@ function auditReports() {
   return { formRows: formRows, missing: missing, orphan: orphan, extraLegacy: extraLegacy };
 }
 function br_(b) { return BRANCHES[b] || b || ''; }
+
+/**
+ * تغيير اسم ممرضة في كل مكان: الحساب، وتقاريرها وبلاغاتها السابقة. الاسم القديم يُحفظ في aliases
+ * حتى تبقى ردود النموذج المكتوبة به منسوبة لها.
+ */
+/** حساب آخر يحمل نفس الاسم أو اسماً بديلاً مطابقاً (تغيير الاسم إليه سيخلط ردود النموذج بين الحسابين) */
+function nameClash_(u, newName, nurses) {
+  const q = normText_(newName);
+  return nurses.find(x => x.username !== u.username && [x.name].concat(splitList_(x.aliases)).some(k => normText_(k) === q)) || null;
+}
+
+function renameNurse_(u, newName) {
+  const name = clean_(newName, 80);
+  if (!name || name === u.name) return false;
+  const al = splitList_(u.aliases);
+  if (u.name && !al.some(a => normText_(a) === normText_(u.name))) al.push(u.name);
+  setCells_(S.USERS, u._row, { name: name, aliases: al.join(', ') });
+  [S.REPORTS, S.ISSUES].forEach(sn => {
+    const sheet = sh_(sn), last = sheet.getLastRow();
+    if (last < 2) return;
+    const hd = HEADERS[sn], ui = hd.indexOf('username'), ni = hd.indexOf('nurse_name');
+    const vals = sheet.getRange(2, 1, last - 1, hd.length).getValues();
+    let changed = false;
+    vals.forEach(v => { if (String(v[ui]).trim() === u.username && v[ni] !== name) { v[ni] = name; changed = true; } });
+    if (changed) sheet.getRange(2, ni + 1, vals.length, 1).setValues(vals.map(v => [v[ni]]));
+    delete ROWS_CACHE_[sn];
+  });
+  bumpDataVersion_();
+  return true;
+}
+
+/**
+ * تعديل أسماء الممرضات دفعة واحدة. أنشئ ورقة Names بعمودين: account | name
+ *   account  إيميل الحساب أو اسم الدخول أو الاسم الحالي
+ *   name     الاسم الصحيح كما تريده أن يظهر
+ * previewNames يكتب في عمود result ما سيتغير، وapplyNames يطبّق (ويحدّث الاسم في التقارير السابقة).
+ */
+function previewNames() { return processNames_(true); }
+function applyNames() { return processNames_(false); }
+function processNames_(dryRun) {
+  const sh = ss_().getSheetByName('Names');
+  if (!sh) throw new Error('أنشئ ورقة باسم Names وفيها العمودان: account | name');
+  const data = sh.getDataRange().getValues();
+  const head = data.shift().map(x => String(x).trim().toLowerCase());
+  const ca = head.indexOf('account'), cn = head.indexOf('name');
+  if (ca < 0 || cn < 0) throw new Error('العمودان account وname مطلوبان في الصف الأول');
+  let rc = head.indexOf('result'); if (rc < 0) { rc = head.length; sh.getRange(1, rc + 1).setValue('result'); }
+  const nurses = rows_(S.USERS).filter(u => u.role === 'nurse');
+  let ok = 0, bad = 0;
+  data.forEach((row, i) => {
+    const acc = String(row[ca] || '').trim(), nm = clean_(row[cn], 80);
+    if (!acc && !nm) return;
+    const say = m => sh.getRange(i + 2, rc + 1).setValue(m);
+    const hits = findNurseExact_(acc, nurses);
+    if (hits.length !== 1) { bad++; return say(hits.length ? '✗ يطابق أكثر من حساب: اكتب الإيميل' : '✗ لا يوجد حساب بهذا الإيميل/الاسم'); }
+    const u = hits[0];
+    if (!nm) { bad++; return say('✗ اكتب الاسم الجديد'); }
+    if (nm === u.name) { ok++; return say('بدون تغيير'); }
+    const clash = nameClash_(u, nm, nurses);
+    if (clash) { bad++; return say('✗ الاسم «' + nm + '» مستخدم لحساب آخر (' + clash.name + ' · ' + (clash.email || clash.username) + '). إن كانتا نفس الممرضة ادمجهما أولاً من ورقة Merges'); }
+    if (!dryRun) renameNurse_(rows_(S.USERS).find(x => x.username === u.username), nm);
+    ok++; say((dryRun ? 'سيتغير: ' : 'تم: ') + u.name + ' ← ' + nm);
+  });
+  SpreadsheetApp.getActive().toast((dryRun ? 'معاينة: ' : 'تم: ') + ok + ' · يحتاج مراجعة: ' + bad, APP.NAME, 10);
+  return { ok: ok, failed: bad };
+}
 
 /**
  * يعيد بناء التقارير المنقولة من النموذج من الصفر.
