@@ -1804,16 +1804,16 @@ function buildNotices(list) {
       <div class="body2">
         <div><p>تحية طيبة،</p><p>نفيدكم بأنه لم يتم تسليم تقرير العيادات الأسبوعي في الأسابيع التالية (تاريخ السبت لكل أسبوع):</p>
           <div class="weeks">${weeks.map(w => `<span>${prDate(w)}</span>`).join('')}</div>
-          <p>تسليم التقرير أسبوعياً يوم السبت من مسؤوليات العمل، ويُقبل يوم الأحد كتقديم متأخر. يُرجى الالتزام بالتسليم في موعده، وفي حال وجود عذر يُرجى إبلاغ المشرف.</p></div>
+          <p>تسليم التقرير أسبوعياً يوم السبت من مسؤوليات العمل، ويُقبل يوم الأحد كتقديم متأخر. يُرجى الالتزام بالتسليم في موعده، وفي حال وجود عذر يُرجى إبلاغ مدير الفرع.</p></div>
         <div class="en"><p>Dear colleague,</p><p>Our records show that the weekly clinic report was not submitted for the following weeks (Saturday of each week):</p>
           <div class="weeks">${weeks.map(w => `<span>${prDate(w)}</span>`).join('')}</div>
-          <p>Submitting the report every Saturday is part of your duties; Sunday is accepted as late. Please submit on time, and inform your supervisor of any valid excuse.</p></div>
+          <p>Submitting the report every Saturday is part of your duties; Sunday is accepted as late. Please submit on time, and inform your branch manager of any valid excuse.</p></div>
       </div>
       <div class="ack"><p><b>إقرار واطلاع:</b> اطلعت على هذا الإشعار وأتعهد بالالتزام بتسليم تقرير العيادات الأسبوعي في موعده.</p>
         <p class="en"><b>Acknowledgement:</b> I have read this notice and commit to submitting the weekly clinic report on time.</p></div>
       <div class="sig">
         <div><div class="h">الممرضة<small>Nurse</small></div><div class="line">الاسم · Name: <span>${esc(x.nurse_name)}</span></div><div class="line">التوقيع · Signature: <span></span></div><div class="line">التاريخ · Date: <span></span></div></div>
-        <div><div class="h">المشرف<small>Supervisor</small></div><div class="line">الاسم · Name: <span></span></div><div class="line">التوقيع · Signature: <span></span></div><div class="line">التاريخ · Date: <span></span></div></div>
+        <div><div class="h">مدير الفرع<small>Branch Manager</small></div><div class="line">الاسم · Name: <span></span></div><div class="line">التوقيع · Signature: <span></span></div><div class="line">التاريخ · Date: <span></span></div></div>
       </div></div>`;
   }).join('');
 }
