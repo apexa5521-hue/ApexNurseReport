@@ -46,6 +46,7 @@ const S = {
   NOTICES: 'Notices',
   EXCEPTIONS: 'Exceptions',
   ISSUE_HISTORY: 'Issue_History',
+  ERRORS: 'Errors',
 };
 
 const HEADERS = {
@@ -61,6 +62,7 @@ const HEADERS = {
            'department', 'status', 'occurrences', 'last_seen', 'assigned_to', 'updated_at',
            'updated_by', 'resolved_at', 'resolution', 'reporters', 'review_date'],
   Issue_History: ['at', 'issue_id', 'by', 'action', 'from_status', 'to_status', 'note'],
+  Errors: ['at', 'where', 'message', 'stack'],
   Settings: ['key', 'value', 'description'],
   Audit_Log: ['at', 'user', 'action', 'details'],
   Temp_Passwords: ['name', 'username', 'role', 'temp_password', 'created_at'],
@@ -81,6 +83,10 @@ const DEFAULT_SETTINGS = [
   ['FORM_SOURCE', '', 'رابط الشيت الأساسي (ردود النموذج) لسحب البيانات منه. اتركه فارغاً إذا كان السكربت داخل نفس الشيت'],
   ['FORM_TAB', 'ردود النموذج 1', 'اسم ورقة ردود Google Form'],
   ['LEGACY_OPEN_WEEKS', 2, 'المشاكل المستوردة من آخر N أسابيع تبقى مفتوحة، والأقدم تُؤرشف'],
+  ['OVERDUE_HIGH_DAYS', 3, 'المشكلة عالية الخطورة تُعد متأخرة إذا لم تُحدَّث خلال هذا العدد من الأيام'],
+  ['SUBMISSIONS_PAUSED', 'no', 'yes = إيقاف رفع التقارير مؤقتاً (طوارئ). يغيّره المدير من صفحة المستخدمين'],
+  ['PAUSE_MESSAGE', '', 'الرسالة التي تظهر للممرضات أثناء الإيقاف'],
+  ['ADMIN_EMAIL', '', 'بريد يصله تنبيه عند فشل مهمة تلقائية والفحص الأسبوعي. فارغ = بريد صاحب السكربت'],
 ];
 
 /** العيادات الافتراضية — مستخرجة من بيانات النموذج القديم */
@@ -136,7 +142,7 @@ function doPost(e) {
     return json_({ ok: true, data: data, version: APP.VERSION });
   } catch (ex) {
     const msg = ex && ex.userMessage ? ex.userMessage : 'حدث خطأ في الخادم';
-    if (!(ex && ex.userMessage)) console.error(req.action, ex && ex.stack || ex);
+    if (!(ex && ex.userMessage)) { console.error(req.action, ex && ex.stack || ex); logError_('api:' + (req.action || ''), ex); }
     return json_({ ok: false, error: msg, code: ex && ex.code || 'ERR' });
   }
 }
@@ -146,6 +152,7 @@ const WRITE_SAFE = ['me'];   // طلبات لا تغيّر البيانات ول
 
 const ACTIONS = {
   login:            { fn: apiLogin_ },
+  forgot:           { fn: apiForgot_ },
   logout:           { fn: apiLogout_ },
   me:               { roles: ['*'], fn: (r, u) => ({ user: publicUser_(u) }) },
   changePassword:   { roles: ['*'], fn: apiChangePassword_ },
@@ -169,6 +176,9 @@ const ACTIONS = {
   'users.reset':    { roles: ['hr', 'admin'], fn: apiUserReset_ },
   'users.setStatus': { roles: ['hr', 'admin'], fn: apiUserSetStatus_ },
   'exceptions.save':   { roles: ['admin'], fn: apiExceptionSave_ },
+  'settings.pause':    { roles: ['admin'], fn: apiSettingsPause_ },
+  'audit.list':        { roles: ['admin'], fn: apiAuditList_ },
+  'search':            { roles: STAFF, fn: apiSearch_ },
   'exceptions.cancel': { roles: ['admin'], fn: apiExceptionCancel_ },
   'clinics.list':   { roles: STAFF, fn: () => ({ clinics: clinics_() }), cache: true },
   'clinics.save':   { roles: ['admin', 'quality'], fn: apiClinicSave_ },
@@ -393,6 +403,7 @@ function apiNurseContext_(req, user) {
     history: history,
     openIssues: openIssues,
     fridgeRange: [cfg.FRIDGE_MIN, cfg.FRIDGE_MAX],
+    paused: String(cfg.SUBMISSIONS_PAUSED).toLowerCase() === 'yes' ? (cfg.PAUSE_MESSAGE || 'رفع التقارير متوقف مؤقتاً') : '',
   };
 }
 
@@ -408,6 +419,7 @@ function nurseClinics_(user) {
 
 function apiNurseSubmit_(req, user) {
   const cfg = settings_();
+  if (String(cfg.SUBMISSIONS_PAUSED).toLowerCase() === 'yes') throw err_(cfg.PAUSE_MESSAGE || 'رفع التقارير متوقف مؤقتاً. حاولي لاحقاً.', 'PAUSED');
   const win = effectiveWindow_(user.username, new Date(), cfg);
   if (win.closed) {
     throw err_('نافذة التقديم لهذا الأسبوع مغلقة. التقديم السبت، ويُقبل الأحد كمتأخر. تفتح النافذة القادمة من الجمعة.', 'CLOSED');
@@ -644,7 +656,22 @@ function apiExceptionSave_(req, user) {
         if (type === 'exempt' || String(r.submitted_at).slice(0, 10) <= until) { setCell_(S.REPORTS, r._row, 'timing', 'on_time'); fixed++; }
       });
     log_(user.username, 'exception_' + type, u.username + ' ' + week + (until ? ' → ' + until : '') + (fixed ? ' (صُحّح ' + fixed + ')' : '') + (ex.reason ? ' · ' + ex.reason : ''));
-    return { exception: ex, fixed: fixed };
+    // إبلاغ الممرضة بالبريد (إن كان لها بريد)، حتى تعرف أن لديها مهلة وحتى متى
+    let emailed = false;
+    const to = emailOf_(u);
+    if (to) {
+      try {
+        const url = String(cfg.APP_URL || '');
+        const body = type === 'exempt'
+          ? ['أُعفيتِ من تقرير العيادات لأسبوع السبت ' + week + '.', '', 'You are excused from the clinic report for the week of Saturday ' + week + '.']
+          : ['مُنحتِ مهلة لتقرير العيادات لأسبوع السبت ' + week + ' حتى نهاية يوم ' + until + '، وما ترفعينه خلالها يُحسب في الوقت.',
+             '', 'You have an extension for the clinic report (week of Saturday ' + week + ') until the end of ' + until + '. Reports submitted until then count as on time.'];
+        if (url && type !== 'exempt') body.push('', url);
+        MailApp.sendEmail({ to: to, subject: type === 'exempt' ? 'إعفاء من تقرير هذا الأسبوع | Excused this week' : 'مهلة لتقرير العيادات | Clinic report extension', body: body.join('\n'), name: APP.NAME });
+        emailed = true;
+      } catch (e) { logError_('exception_email', e); }
+    }
+    return { exception: ex, fixed: fixed, emailed: emailed };
   } finally {
     lock.releaseLock();
   }
@@ -811,7 +838,9 @@ function apiHrNotice_(req, user) {
     if (r.missedStreak < 2) { skipped.push(r.name); return; }
     const missed = weeks.slice(weeks.length - r.missedStreak);
     const prev = prior[r.username] || [];
-    const id = 'N' + Utilities.formatDate(new Date(), APP.TZ, 'yyMMdd') + '-' + String(rows_(S.NOTICES).length + out.length + 1).padStart(4, '0');
+    const yr = Utilities.formatDate(new Date(), APP.TZ, 'yyyy');
+    const seq = rows_(S.NOTICES).filter(n => String(n.notice_id).indexOf('N-' + yr + '-') === 0).length + out.length + 1;
+    const id = 'N-' + yr + '-' + String(seq).padStart(4, '0');   // ترقيم سنوي متسلسل
     out.push({ notice_id: id, username: r.username, nurse_name: r.name, branch: r.branch, weeks: missed.join(','),
                streak: r.missedStreak, compliance: r.compliance == null ? '' : r.compliance, issued_at: stamp, issued_by: user.name,
                previous: prev.length, lastPrevious: prev.length ? prev[prev.length - 1].issued_at : '',
@@ -899,18 +928,21 @@ function sendReminders_(scopeUser, week, cfg, kind) {
 }
 
 /** المشغّلات التلقائية: السبت (موعد) · الأحد (متأخر) · الاثنين (أُغلقت النافذة) */
-function autoReminderSaturday() { const cfg = settings_(); sendReminders_({ role: 'admin', branch: 'ALL' }, currentWeek_(cfg), cfg, 'deadline'); }
-function autoReminderSunday() { const cfg = settings_(); sendReminders_({ role: 'admin', branch: 'ALL' }, currentWeek_(cfg), cfg, 'late'); }
-function autoReminderMonday() { const cfg = settings_(); sendReminders_({ role: 'admin', branch: 'ALL' }, currentWeek_(cfg), cfg, 'closed'); }
+function autoReminderSaturday() { guarded_('autoReminderSaturday', () => { const cfg = settings_(); sendReminders_({ role: 'admin', branch: 'ALL' }, currentWeek_(cfg), cfg, 'deadline'); }); }
+/** تذكير أخير مساء السبت (قبل نهاية الموعد بساعتين) لمن لم ترفع بعد */
+function autoReminderSaturdayEvening() { guarded_('autoReminderSaturdayEvening', () => { const cfg = settings_(); sendReminders_({ role: 'admin', branch: 'ALL' }, currentWeek_(cfg), cfg, 'deadline'); }); }
+function autoReminderSunday() { guarded_('autoReminderSunday', () => { const cfg = settings_(); sendReminders_({ role: 'admin', branch: 'ALL' }, currentWeek_(cfg), cfg, 'late'); }); }
+function autoReminderMonday() { guarded_('autoReminderMonday', () => { const cfg = settings_(); sendReminders_({ role: 'admin', branch: 'ALL' }, currentWeek_(cfg), cfg, 'closed'); }); }
 
 function installReminderTriggers() {
   if (!settings_().APP_URL) throw new Error('ضع رابط المنصة في ورقة Settings ← APP_URL أولاً، ليصل الرابط للممرضات في التذكير');
-  const names = ['autoReminderSaturday', 'autoReminderSunday', 'autoReminderMonday'];
+  const names = ['autoReminderSaturday', 'autoReminderSaturdayEvening', 'autoReminderSunday', 'autoReminderMonday'];
   ScriptApp.getProjectTriggers().filter(t => names.indexOf(t.getHandlerFunction()) >= 0).forEach(t => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('autoReminderSaturday').timeBased().onWeekDay(ScriptApp.WeekDay.SATURDAY).atHour(10).create();
+  ScriptApp.newTrigger('autoReminderSaturdayEvening').timeBased().onWeekDay(ScriptApp.WeekDay.SATURDAY).atHour(21).create();
   ScriptApp.newTrigger('autoReminderSunday').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(10).create();
   ScriptApp.newTrigger('autoReminderMonday').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(9).create();
-  SpreadsheetApp.getActive().toast('تم تفعيل التذكير: السبت 10ص (موعد)، الأحد 10ص (متأخر)، الاثنين 9ص (أُغلقت النافذة)', APP.NAME, 8);
+  SpreadsheetApp.getActive().toast('تم تفعيل التذكير: السبت 10ص و9م (موعد)، الأحد 10ص (متأخر)، الاثنين 9ص (أُغلقت النافذة)', APP.NAME, 8);
 }
 
 /* ───────── أسماء دخول قصيرة وأرقام سرية (اختياري) ───────── */
@@ -1412,6 +1444,17 @@ function apiQualityStats_(req, user) {
     clinicsScore: clinicsScore, fridge: fridge, incidents: incidents.slice(0, 150), incidentsTotal: incidents.length,
     issuesByDept: issuesByDept, qualityQueue: qualityQueue,
     from: from, to: to, weeks: weeks, branches: branchKeys,
+    byBranch: branchKeys.map(b => {
+      const ns = nurseStats.filter(n => n.branch === b), rs = reports.filter(r => r.branch === b);
+      const exp = ns.reduce((x, n) => x + n.expected, 0), sub = ns.reduce((x, n) => x + Math.min(n.submitted, n.expected), 0);
+      const oi = openIssues.filter(i => i.branch === b);
+      return { branch: b, nurses: ns.length, reports: rs.length,
+        compliance: exp ? Math.round(sub / exp * 100) : null,
+        onTime: rs.length ? Math.round(rs.filter(r => r.timing === 'on_time' || r.timing === 'early').length / rs.length * 100) : null,
+        openIssues: oi.length, highOpen: oi.filter(i => i.severity === 'high').length, overdueHigh: oi.filter(isOverdue_).length,
+        lowNurses: ns.filter(n => n.rate != null && n.rate < 50).length };
+    }),
+    digest: weekDigest_(nurses, rows_(S.REPORTS).filter(r => inScope(r.branch)), issues, to, lm, cfg),
     kpi: {
       reports: reports.length,
       compliance: expectedTotal ? Math.round(submittedTotal / expectedTotal * 100) : null,
@@ -1419,6 +1462,7 @@ function apiQualityStats_(req, user) {
       openIssues: openIssues.length,
       highOpen: openIssues.filter(i => i.severity === 'high').length,
       reviewsDue: openIssues.filter(i => i.review_date && i.review_date <= dateStr_(new Date())).length,
+      overdueHigh: openIssues.filter(isOverdue_).length,
       expiringSoon: expiry.filter(x => x.days <= 30).length,
       avgResolveDays: avgResolveDays,
       coverage: coverage.length ? Math.round(coverage.filter(c => c.covered).length / coverage.length * 100) : null,
@@ -2076,6 +2120,144 @@ function processNames_(dryRun) {
   return { ok: ok, failed: bad };
 }
 
+/* ───────── إيقاف طارئ، استعادة كلمة المرور، البحث، سجل القرارات ───────── */
+
+function setSetting_(key, value) {
+  const r = rows_(S.SETTINGS).find(x => x.key === key);
+  if (r) setCells_(S.SETTINGS, r._row, { value: value });
+  else {
+    const d = DEFAULT_SETTINGS.find(x => x[0] === key);
+    appendObjects_(S.SETTINGS, [{ key: key, value: value, description: d ? d[2] : '' }]);
+  }
+}
+
+function apiSettingsPause_(req, user) {
+  const paused = !!req.paused;
+  setSetting_('SUBMISSIONS_PAUSED', paused ? 'yes' : 'no');
+  if (req.message != null) setSetting_('PAUSE_MESSAGE', clean_(req.message, 200));
+  log_(user.username, paused ? 'submissions_paused' : 'submissions_resumed', clean_(req.message || '', 200));
+  return { paused: paused };
+}
+
+/**
+ * نسيت كلمة المرور: إن كان للحساب بريد، تصله كلمة مؤقتة ويُطلب منه تغييرها عند الدخول.
+ * الرد واحد دائماً (لا يكشف هل الحساب موجود)، ومرة واحدة كل 15 دقيقة لكل حساب.
+ */
+function apiForgot_(req) {
+  const generic = { message: 'إن كان للحساب بريد مسجّل فستصله كلمة مرور مؤقتة خلال دقائق. If the account has an email, a temporary password is on its way.' };
+  const id = String(req.username || '').trim();
+  if (!id) throw err_('اكتب اسم المستخدم أو البريد');
+  const u = pickLoginUser_(loginCandidates_(id), '');
+  if (!u || u.status !== 'active') return generic;
+  const to = emailOf_(u);
+  if (!to) return generic;
+  const cache = CacheService.getScriptCache(), key = 'forgot_' + String(u.username).toLowerCase();
+  if (cache.get(key)) return generic;
+  cache.put(key, '1', 900);
+  const temp = tempPassword_();
+  setCells_(S.USERS, u._row, passwordFields_(temp, true, u.login || ''));
+  cache.remove('fail_' + String(u.username).toLowerCase());
+  try {
+    MailApp.sendEmail({ to: to, name: APP.NAME, subject: 'كلمة مرور مؤقتة | Temporary password',
+      body: ['كلمة المرور المؤقتة: ' + temp, 'اسم الدخول: ' + (u.login || u.username), 'سيُطلب منك اختيار كلمة جديدة عند الدخول.', '',
+             'Temporary password: ' + temp, 'Login: ' + (u.login || u.username), 'You will be asked to choose a new password after signing in.',
+             settings_().APP_URL ? '\n' + settings_().APP_URL : ''].join('\n') });
+  } catch (e) { logError_('forgot_email', e); }
+  log_(u.username, 'password_forgot', '');
+  return generic;
+}
+
+/** بحث عام: المشاكل لكل الأقسام (حسب صلاحية القسم)، والممرضات للموارد البشرية والمدير، والتقارير للجودة والمدير */
+function apiSearch_(req, user) {
+  const q = normText_(req.q);
+  if (q.length < 2) return { issues: [], nurses: [], reports: [] };
+  const has = (...xs) => xs.some(x => normText_(x).indexOf(q) >= 0);
+  const deptOk = i => user.role === 'admin' || user.role === 'quality' || i.department === user.role;
+  const issues = rows_(S.ISSUES).filter(i => i.status !== 'archived' && branchAllowed_(user, i.branch) && deptOk(i) &&
+    has(i.clinic_name, i.item, i.nurse_name, i.description, (CATEGORIES[i.category] || {}).label)).slice(0, 30).map(issueOut_);
+  const nurses = ['hr', 'admin'].indexOf(user.role) >= 0
+    ? rows_(S.USERS).filter(u => u.role === 'nurse' && branchAllowed_(user, u.branch) && has(u.name, u.email, u.login, u.aliases)).slice(0, 20)
+        .map(u => ({ username: u.username, name: u.name, email: u.email, branch: u.branch, status: u.status })) : [];
+  const reports = ['quality', 'admin'].indexOf(user.role) >= 0
+    ? rows_(S.REPORTS).filter(r => branchAllowed_(user, r.branch) && has(r.nurse_name, r.clinic_name, r.notes, r.other_issue, r.expiry_item))
+        .sort((a, b) => a.submitted_at < b.submitted_at ? 1 : -1).slice(0, 20).map(reportOut_) : [];
+  return { issues: issues, nurses: nurses, reports: reports };
+}
+
+/** سجل القرارات: كل ما فعله المستخدمون (عدا الدخول) — الأحدث أولاً */
+function apiAuditList_(req, user) {
+  const q = normText_(req.q || '');
+  const rowsAll = rows_(S.LOG).filter(r => r.action !== 'login' && (!q || normText_([r.user, r.action, r.details].join(' ')).indexOf(q) >= 0));
+  return { entries: rowsAll.slice(-400).reverse().map(r => ({ at: r.at, user: r.user, action: r.action, details: r.details })) };
+}
+
+/* ───────── أخطاء ومهام تلقائية ───────── */
+
+function logError_(where, ex) {
+  try { appendObjects_(S.ERRORS, [{ at: nowStr_(), where: where, message: String(ex && ex.message || ex).slice(0, 500), stack: String(ex && ex.stack || '').slice(0, 1500) }]); } catch (e) { /* لا شيء */ }
+}
+
+function adminEmail_() {
+  const e = String(settings_().ADMIN_EMAIL || '').trim();
+  if (e) return e;
+  try { return Session.getEffectiveUser().getEmail(); } catch (x) { return ''; }
+}
+
+function notifyAdmin_(subject, lines) {
+  const to = adminEmail_();
+  if (!to) return;
+  try { MailApp.sendEmail({ to: to, name: APP.NAME, subject: subject, body: lines.join('\n') }); } catch (e) { logError_('notify_admin', e); }
+}
+
+/** يشغّل مهمة تلقائية، وعند فشلها يسجّل الخطأ ويرسل تنبيهاً للمدير */
+function guarded_(name, fn) {
+  try { return fn(); }
+  catch (e) {
+    logError_(name, e);
+    notifyAdmin_('فشل مهمة تلقائية: ' + name, ['المهمة: ' + name, 'الوقت: ' + nowStr_(), 'الخطأ: ' + (e && e.message || e), '', 'التفاصيل في ورقة Errors.']);
+    throw e;
+  }
+}
+
+/** نسخة احتياطية كاملة من الشيت في Drive (مجلد Nursing Backups)، ويُبقي آخر 8 نسخ */
+function backupSpreadsheet() {
+  const ss = ss_();
+  const it = DriveApp.getFoldersByName('Nursing Backups');
+  const folder = it.hasNext() ? it.next() : DriveApp.createFolder('Nursing Backups');
+  DriveApp.getFileById(ss.getId()).makeCopy(ss.getName() + ' — backup ' + Utilities.formatDate(new Date(), APP.TZ, 'yyyy-MM-dd HH:mm'), folder);
+  const files = [], f = folder.getFiles();
+  while (f.hasNext()) files.push(f.next());
+  files.sort((a, b) => b.getDateCreated() - a.getDateCreated()).slice(8).forEach(x => x.setTrashed(true));
+  return files.length;
+}
+
+/** صيانة أسبوعية: نسخة احتياطية + تدقيق البيانات، وتنبيه المدير بالنتيجة إن وُجد ما يحتاج مراجعة */
+function weeklyMaintenance() {
+  return guarded_('weeklyMaintenance', () => {
+    const lines = [];
+    try { backupSpreadsheet(); lines.push('✓ نسخة احتياطية في Drive ← Nursing Backups'); }
+    catch (e) { logError_('backup', e); lines.push('✗ النسخة الاحتياطية فشلت: ' + e.message); }
+    let audit = null;
+    try { audit = auditReports(); } catch (e) { logError_('audit', e); lines.push('✗ التدقيق فشل: ' + e.message); }
+    if (audit) {
+      lines.push('التدقيق: ' + audit.formRows + ' رد · بلا ممرضة ' + audit.orphan + ' · غير منقول ' + audit.missing);
+      const sheet = ss_().getSheetByName('Audit');
+      const flagged = sheet ? sheet.getDataRange().getValues().slice(1).filter(r => String(r[10]) !== '✓').map(r => '• ' + r[0] + ': ' + r[10]) : [];
+      if (flagged.length) lines.push('', 'تنبيهات تحتاج مراجعة:', ...flagged.slice(0, 30));
+    }
+    const needs = lines.some(l => l.indexOf('✗') === 0) || (audit && (audit.orphan || audit.missing));
+    if (needs) notifyAdmin_('الصيانة الأسبوعية: يوجد ما يحتاج مراجعة', lines);
+    return lines;
+  });
+}
+
+/** يفعّل الصيانة الأسبوعية (الأحد 7 صباحاً). يطلب صلاحية Drive عند أول تشغيل */
+function installMaintenanceTriggers() {
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'weeklyMaintenance').forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('weeklyMaintenance').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(7).create();
+  SpreadsheetApp.getActive().toast('تم تفعيل الصيانة الأسبوعية: الأحد 7 صباحاً (نسخة احتياطية + تدقيق)', APP.NAME, 8);
+}
+
 /**
  * يعيد بناء التقارير المنقولة من النموذج من الصفر.
  * استخدمها بعد دمج حسابات مكررة: اكتب الاسم أو الإيميل المكرر في عمود aliases للحساب الصحيح،
@@ -2144,6 +2326,30 @@ function reportedBy_(i, username) {
   return i.username === username || splitList_(i.reporters).indexOf(username) >= 0;
 }
 
+/** «الأسبوع في دقيقة»: آخر أسبوع مقابل الذي قبله */
+function weekDigest_(nurses, reports, issues, week, lm, cfg) {
+  const prev = dateStr_(addDays_(parseDate_(week), -7));
+  const comp = w => {
+    const exp = nurses.filter(n => expectedOn_(n, w, lm[n.username], cfg));
+    if (!exp.length) return null;
+    const done = {}; reports.filter(r => r.week_start === w).forEach(r => done[r.username] = 1);
+    return Math.round(exp.filter(n => done[n.username]).length / exp.length * 100);
+  };
+  const end = dateStr_(addDays_(parseDate_(week), 6));
+  const inWeek = d => { const x = String(d || '').slice(0, 10); return x >= week && x <= end; };
+  const open = issues.filter(i => i.status === 'open' || i.status === 'in_progress');
+  return { week: week, compliance: comp(week), prevCompliance: comp(prev),
+    opened: issues.filter(i => inWeek(i.created_at)).length, resolved: issues.filter(i => i.status === 'resolved' && inWeek(i.resolved_at)).length,
+    overdueHigh: open.filter(isOverdue_).length, reviewsDue: open.filter(i => i.review_date && i.review_date <= dateStr_(new Date())).length };
+}
+
+/** مشكلة عالية الخطورة مفتوحة لم يُحدّثها أحد منذ OVERDUE_HIGH_DAYS يوماً */
+function isOverdue_(i) {
+  if (i.severity !== 'high' || (i.status !== 'open' && i.status !== 'in_progress')) return false;
+  const last = parseDateTime_(i.updated_at || i.created_at);
+  return !!last && daysBetween_(last, new Date()) >= Number(settings_().OVERDUE_HIGH_DAYS || 3);
+}
+
 function issueOut_(i) {
   return {
     issue_id: i.issue_id, report_id: i.report_id, created_at: i.created_at, week_start: i.week_start,
@@ -2154,6 +2360,7 @@ function issueOut_(i) {
     assigned_to: i.assigned_to, updated_at: i.updated_at, updated_by: i.updated_by,
     resolved_at: i.resolved_at, resolution: i.resolution, review_date: i.review_date || '',
     reviewDue: !!i.review_date && (i.status === 'open' || i.status === 'in_progress') && i.review_date <= dateStr_(new Date()),
+    overdue: isOverdue_(i),
     ageDays: Math.max(0, daysBetween_(parseDateTime_(i.created_at), new Date())),
   };
 }
