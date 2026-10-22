@@ -45,6 +45,7 @@ const S = {
   LEAVES: 'Leaves',
   NOTICES: 'Notices',
   EXCEPTIONS: 'Exceptions',
+  ISSUE_HISTORY: 'Issue_History',
 };
 
 const HEADERS = {
@@ -58,7 +59,8 @@ const HEADERS = {
   Issues: ['issue_id', 'report_id', 'created_at', 'week_start', 'branch', 'clinic_id', 'clinic_name',
            'username', 'nurse_name', 'category', 'item', 'qty', 'severity', 'description',
            'department', 'status', 'occurrences', 'last_seen', 'assigned_to', 'updated_at',
-           'updated_by', 'resolved_at', 'resolution', 'reporters'],
+           'updated_by', 'resolved_at', 'resolution', 'reporters', 'review_date'],
+  Issue_History: ['at', 'issue_id', 'by', 'action', 'from_status', 'to_status', 'note'],
   Settings: ['key', 'value', 'description'],
   Audit_Log: ['at', 'user', 'action', 'details'],
   Temp_Passwords: ['name', 'username', 'role', 'temp_password', 'created_at'],
@@ -160,6 +162,7 @@ const ACTIONS = {
 
   'issues.list':    { roles: STAFF, fn: apiIssuesList_, cache: true },
   'issues.update':  { roles: ['supply', 'quality', 'hr', 'admin'], fn: apiIssueUpdate_ },
+  'issues.history': { roles: STAFF, fn: apiIssueHistory_ },
 
   'users.list':     { roles: ['hr', 'admin'], fn: apiUsersList_, cache: true },
   'users.save':     { roles: ['hr', 'admin'], fn: apiUserSave_ },
@@ -1415,6 +1418,7 @@ function apiQualityStats_(req, user) {
       onTime: reports.length ? Math.round(reports.filter(r => r.timing === 'on_time' || r.timing === 'early').length / reports.length * 100) : null,
       openIssues: openIssues.length,
       highOpen: openIssues.filter(i => i.severity === 'high').length,
+      reviewsDue: openIssues.filter(i => i.review_date && i.review_date <= dateStr_(new Date())).length,
       expiringSoon: expiry.filter(x => x.days <= 30).length,
       avgResolveDays: avgResolveDays,
       coverage: coverage.length ? Math.round(coverage.filter(c => c.covered).length / coverage.length * 100) : null,
@@ -1467,6 +1471,15 @@ function apiIssuesList_(req, user) {
   };
 }
 
+/** سجل تغييرات مشكلة واحدة (من يحق له رؤية المشكلة يرى سجلها) */
+function apiIssueHistory_(req, user) {
+  const i = rows_(S.ISSUES).find(x => x.issue_id === req.issue_id);
+  if (!i) throw err_('المشكلة غير موجودة');
+  if (!branchAllowed_(user, i.branch)) throw err_('ليست لديك صلاحية على هذا الفرع', 'FORBIDDEN');
+  return { history: rows_(S.ISSUE_HISTORY).filter(h => h.issue_id === req.issue_id)
+    .sort((a, b) => a.at < b.at ? 1 : -1).map(h => ({ at: h.at, by: h.by, action: h.action, from: h.from_status, to: h.to_status, note: h.note })) };
+}
+
 function apiIssueUpdate_(req, user) {
   const status = req.status;
   if (ISSUE_STATUS.indexOf(status) < 0) throw err_('حالة غير صحيحة');
@@ -1483,8 +1496,21 @@ function apiIssueUpdate_(req, user) {
     const patch = { status: status, updated_at: nowStr_(), updated_by: user.name };
     if (req.assigned_to != null) patch.assigned_to = clean_(req.assigned_to, 80);
     if (req.resolution != null) patch.resolution = clean_(req.resolution, 500);
+    if (req.review_date !== undefined) {
+      const rd = req.review_date ? parseDate_(req.review_date) : null;
+      if (req.review_date && !rd) throw err_('تاريخ المراجعة غير صحيح');
+      patch.review_date = rd ? dateStr_(rd) : '';
+    }
     patch.resolved_at = status === 'resolved' ? nowStr_() : '';
     setCells_(S.ISSUES, i._row, patch);
+    // سجل الانتقال: من أي حالة إلى أي حالة، ومن غيّرها، ومتى، ولماذا
+    const changed = i.status !== status;
+    const dateChanged = patch.review_date !== undefined && String(i.review_date || '') !== patch.review_date;
+    if (changed || dateChanged) {
+      appendObjects_(S.ISSUE_HISTORY, [{ at: nowStr_(), issue_id: i.issue_id, by: user.name,
+        action: changed ? 'status' : 'review_date', from_status: changed ? i.status : '', to_status: changed ? status : '',
+        note: changed ? clean_(req.resolution || '', 300) : (patch.review_date ? 'مراجعة: ' + patch.review_date : 'أُلغي تاريخ المراجعة') }]);
+    }
     log_(user.username, 'issue_' + status, i.issue_id);
     return { issue: issueOut_(Object.assign(i, patch)) };
   } finally {
@@ -2126,7 +2152,8 @@ function issueOut_(i) {
     item: i.item, qty: i.qty, severity: i.severity, description: i.description, department: i.department,
     status: i.status, occurrences: Number(i.occurrences) || 1, last_seen: i.last_seen,
     assigned_to: i.assigned_to, updated_at: i.updated_at, updated_by: i.updated_by,
-    resolved_at: i.resolved_at, resolution: i.resolution,
+    resolved_at: i.resolved_at, resolution: i.resolution, review_date: i.review_date || '',
+    reviewDue: !!i.review_date && (i.status === 'open' || i.status === 'in_progress') && i.review_date <= dateStr_(new Date()),
     ageDays: Math.max(0, daysBetween_(parseDateTime_(i.created_at), new Date())),
   };
 }
@@ -2199,8 +2226,22 @@ function sh_(name) {
     s.setFrozenRows(1);
     // نص عادي لمنع Sheets من تحويل التواريخ والأرقام تلقائياً
     s.getRange(1, 1, s.getMaxRows(), h.length).setNumberFormat('@');
+  } else {
+    ensureHeaders_(s, name);
   }
   return (SHEETS_[name] = s);
+}
+
+/** يضيف في آخر الصف الأول أي عمود جديد أضفناه في الكود ولم يكن موجوداً في الشيت القديم (لا يحذف شيئاً) */
+function ensureHeaders_(s, name) {
+  const want = HEADERS[name] || [];
+  const lastCol = Math.max(1, s.getLastColumn());
+  const have = s.getRange(1, 1, 1, lastCol).getValues()[0].map(x => String(x).trim());
+  const missing = want.filter(h => have.indexOf(h) < 0);
+  if (!missing.length) return;
+  s.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]).setFontWeight('bold').setBackground('#0f3d3e').setFontColor('#ffffff');
+  s.getRange(2, lastCol + 1, Math.max(1, s.getMaxRows() - 1), missing.length).setNumberFormat('@');
+  delete ROWS_CACHE_[name];
 }
 
 const ROWS_CACHE_ = {};
@@ -2210,24 +2251,32 @@ function rows_(name) {
   const last = s.getLastRow();
   const h = HEADERS[name];
   if (last < 2) return (ROWS_CACHE_[name] = []);
-  const values = s.getRange(2, 1, last - 1, h.length).getValues();
+  const cols = s.getRange(1, 1, 1, s.getLastColumn()).getValues()[0].map(x => String(x).trim());
+  const values = s.getRange(2, 1, last - 1, cols.length).getValues();
+  const idx = h.map(k => cols.indexOf(k));
   const out = [];
   values.forEach((r, i) => {
     if (!r.some(c => c !== '' && c !== null)) return;
     const o = { _row: i + 2 };
-    h.forEach((k, j) => { o[k] = r[j] instanceof Date ? cellDate_(r[j]) : (typeof r[j] === 'string' ? r[j].trim() : r[j]); });
+    h.forEach((k, j) => { const v = idx[j] < 0 ? '' : r[idx[j]]; o[k] = v instanceof Date ? cellDate_(v) : (typeof v === 'string' ? v.trim() : v); });
     out.push(o);
   });
   return (ROWS_CACHE_[name] = out);
 }
 
+/** ترتيب أعمدة الشيت الفعلي حسب صفه الأول (قد تختلف عن HEADERS إذا أُضيفت أعمدة لاحقاً) */
+function sheetCols_(s, name) {
+  const lastCol = Math.max(1, s.getLastColumn());
+  return s.getRange(1, 1, 1, lastCol).getValues()[0].map(x => String(x).trim());
+}
+
 function appendObjects_(name, objs, sheet) {
   const s = sheet || sh_(name);
-  const h = HEADERS[name];
-  const values = objs.map(o => h.map(k => o[k] == null ? '' : o[k]));
+  const cols = sheetCols_(s, name);
+  const values = objs.map(o => cols.map(k => k === '' || o[k] == null ? '' : o[k]));
   const start = s.getLastRow() + 1;
   if (start + values.length > s.getMaxRows()) s.insertRowsAfter(s.getMaxRows(), values.length + 100);
-  const range = s.getRange(start, 1, values.length, h.length);
+  const range = s.getRange(start, 1, values.length, cols.length);
   range.setNumberFormat('@');
   range.setValues(values.map(r => r.map(c => typeof c === 'number' ? String(c) : c)));
   delete ROWS_CACHE_[name];
@@ -2240,7 +2289,7 @@ function setCell_(name, row, key, value) {
 
 function setCells_(name, row, obj) {
   const s = sh_(name);
-  const h = HEADERS[name];
+  const h = sheetCols_(s, name);
   Object.keys(obj).forEach(k => {
     const c = h.indexOf(k);
     if (c >= 0) s.getRange(row, c + 1).setNumberFormat('@').setValue(obj[k] == null ? '' : String(obj[k]));

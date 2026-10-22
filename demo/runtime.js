@@ -39,6 +39,7 @@ function createGasServices() {
   function mkSheet(name) {
     const s = {
       name, data: [], maxRows: 1000,
+      getLastColumn() { return s.data.reduce((m, r) => Math.max(m, r.length), 0); },
       getLastRow() { let n = s.data.length; while (n > 0 && !s.data[n - 1].some(v => v !== '' && v != null)) n--; return n; },
       getMaxRows() { return Math.max(s.maxRows, s.data.length); },
       insertRowsAfter(a, n) { s.maxRows += n; },
