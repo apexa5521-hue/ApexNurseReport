@@ -272,6 +272,16 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
 .issue .act{display:flex;gap:8px;margin-top:auto;padding-top:4px}
 .issue.sev-high{box-shadow:inset 3px 0 0 var(--crit),var(--sh-1)}
 .issue.faded{opacity:.62}
+.wim-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:4px 18px 18px}
+.wim-t{display:flex;flex-direction:column;gap:4px;padding:14px;border-radius:12px;background:var(--surface-2,var(--bg));border:1px solid var(--line);text-decoration:none;color:inherit}
+.wim-t b{font:600 26px Inter,var(--font)}.wim-t span{font-size:12.5px;color:var(--ink-3)}
+.wim-t.up b{color:var(--good,#1f8a5b)}.wim-t.down b{color:var(--crit)}
+@media(max-width:720px){.wim-row{grid-template-columns:1fr}.iss-cards{grid-template-columns:1fr 1fr}.issues{grid-template-columns:1fr}.page-head .toolbar{flex-wrap:wrap}.page-head .toolbar .input{flex:1 1 140px;min-width:0}}
+.gsearch-res{display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto}
+.gsearch-res h4{margin:10px 0 4px;font-size:12.5px;color:var(--ink-3)}
+.gsearch-res button{all:unset;cursor:pointer;padding:8px 10px;border-radius:8px;border:1px solid var(--line);display:block}
+.gsearch-res button:hover,.gsearch-res button:focus-visible{border-color:var(--accent)}
+.pr .draft{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none;font:700 90pt Inter,sans-serif;color:rgba(168,56,44,.09);transform:rotate(-28deg);z-index:0}
 .iss-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
 .iss-card{all:unset;cursor:pointer;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface);display:flex;flex-direction:column;gap:2px}
 .iss-card:focus-visible{outline:2px solid var(--accent)}
@@ -460,6 +470,7 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
   <symbol id="i-trash" viewBox="0 0 20 20"><path d="M5 6h10M8 6V4.5h4V6M6.5 6l.6 9.5h5.8l.6-9.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-chev" viewBox="0 0 20 20"><path d="M8 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-dl" viewBox="0 0 20 20"><path d="M10 3.5v9M6 9l4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M13.2 13.2L17 17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="i-print" viewBox="0 0 20 20"><path d="M6 8V3.5h8V8M6 14H4.5A1 1 0 013.5 13V9a1 1 0 011-1h11a1 1 0 011 1v4a1 1 0 01-1 1H14M6 11.5h8V16.5H6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
   <symbol id="i-copy" viewBox="0 0 20 20"><rect x="7" y="7" width="9" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13 7V5a1 1 0 00-1-1H5a1 1 0 00-1 1v7a1 1 0 001 1h2" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
   <symbol id="i-bell" viewBox="0 0 20 20"><path d="M5.5 14.5h9l-1.2-1.8V9a3.3 3.3 0 00-6.6 0v3.7zM8.3 16.5a1.8 1.8 0 003.4 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -686,7 +697,7 @@ async function copyText(text) {
 
 /* ══════════ API ══════════ */
 /* نتائج صفحات القراءة تُحفظ دقيقتين في الذاكرة: التنقل بين الصفحات فوري، وأي تعديل يمسحها */
-const CLIENT_VERSION = '2026-10-18';   // يجب أن يطابق APP.VERSION في Code.gs
+const CLIENT_VERSION = '2026-10-22';   // يجب أن يطابق APP.VERSION في Code.gs
 const READ_ACTIONS = ['nurse.context', 'hr.overview', 'quality.stats', 'reports.list', 'issues.list', 'users.list', 'clinics.list'];
 const MEMO = new Map(), INFLIGHT = new Map();
 const MEMO_MS = 120000;
@@ -781,6 +792,7 @@ function renderLogin(error) {
         <div class="field"><label for="lu">${t('user')}</label><input class="input" id="lu" dir="ltr" autocomplete="username" autocapitalize="off" spellcheck="false" required></div>
         <div class="field"><label for="lp">${t('pass')}</label><input class="input" id="lp" type="password" dir="ltr" autocomplete="current-password" required></div>
         <button class="btn primary lg block" type="submit" id="lb">${t('enter')}</button>
+        ${window.APEX_DEMO ? '' : `<button type="button" class="linkbtn" id="forgot" style="margin-top:10px">${state.lang === 'en' ? 'Forgot password?' : 'نسيت كلمة المرور؟'}</button>`}
         ${window.APEX_DEMO ? `<div class="demo-box"><b>${state.lang === 'en' ? 'Demo — fictional data. Try as:' : 'نسخة تجريبية ببيانات وهمية. جرّب بصفة:'}</b>
           <div class="chips">${DEMO_ACCOUNTS.map(a => `<button type="button" class="btn sm" data-demo="${a.u}">${a.label}</button>`).join('')}</div></div>` : ''}
         ${!API() && !window.APEX_DEMO ? `<div class="form-error">${esc(t('noApi'))}</div>` : ''}
@@ -791,6 +803,23 @@ function renderLogin(error) {
   </div>`;
   $$('[data-lang]').forEach(b => b.onclick = () => { applyLang(b.dataset.lang); renderLogin(); });
   $$('[data-demo]').forEach(b => b.onclick = () => demoLogin(b.dataset.demo));
+  $('#forgot') && ($('#forgot').onclick = () => {
+    const en = state.lang === 'en';
+    modal({
+      title: en ? 'Forgot password' : 'نسيت كلمة المرور',
+      body: `<p class="muted" style="margin-top:0">${en ? 'Enter your login name or email. If the account has an email, a temporary password will be sent to it.' : 'اكتب اسم الدخول أو البريد. إن كان للحساب بريد مسجّل تصله كلمة مرور مؤقتة.'}</p>
+        <div class="field"><input class="input" id="fg-u" dir="ltr" value="${esc($('#lu').value)}" autocomplete="username"></div><div id="fg-m"></div>`,
+      foot: `<button class="btn" data-close>${en ? 'Cancel' : 'إلغاء'}</button><button class="btn primary" id="fg-s">${en ? 'Send' : 'إرسال'}</button>`,
+      onMount(el) {
+        $('#fg-s', el).onclick = async () => {
+          const b = $('#fg-s', el), v = $('#fg-u', el).value.trim(); if (!v) return;
+          busy(b, true);
+          try { const r = await api('forgot', { username: v }); $('#fg-m', el).innerHTML = `<div class="notice">${esc(r.message)}</div>`; b.remove(); }
+          catch (e) { busy(b, false); $('#fg-m', el).innerHTML = `<div class="form-error">${esc(e.message)}</div>`; }
+        };
+      },
+    });
+  });
   $('#login-form').onsubmit = async e => {
     e.preventDefault();
     const btn = $('#lb');
@@ -944,18 +973,51 @@ function renderShell(page) {
     ${nurse ? `<div class="lang-switch" style="margin:0" role="group" aria-label="Language"><button type="button" data-lang="ar" aria-pressed="${state.lang === 'ar'}">ع</button><button type="button" data-lang="en" aria-pressed="${state.lang === 'en'}">EN</button></div>` : ''}
  ${window.APEX_DEMO ? `<select class="input demo-clock" id="demo-clock" aria-label="محاكاة اليوم">${[['', 'اليوم: الوقت الحقيقي'], ['sat', 'محاكاة: السبت (موعد)'], ['sun', 'محاكاة: الأحد (متأخر)'], ['mon', 'محاكاة: الاثنين (مغلق)'], ['fri', 'محاكاة: الجمعة (يفتح)']].map(([v, l]) => `<option value="${v}" ${(window.APEX_DEMO_CLOCK || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : ''}
     ${window.APEX_DEMO ? `<select class="input demo-switch" id="demo-switch" aria-label="تبديل الدور"><option value="">عرض تجريبي · تبديل الدور</option>${DEMO_ACCOUNTS.map(a => `<option value="${a.u}">${a.label}</option>`).join('')}</select>` : ''}
+    ${nurse ? '' : `<button class="icon-btn" id="gsearch-btn" title="بحث عام (Ctrl+K)" aria-label="بحث عام">${icon('search')}</button>`}
     <button class="icon-btn" id="theme-btn" title="${t('theme')}" aria-label="${t('theme')}">${icon(isDark() ? 'sun' : 'moon')}</button>
     <div class="who"><span class="avatar">${esc(initials(u.name))}</span><span class="meta"><b>${esc(u.name)}</b><span>${esc(nurse ? br(u.branch) : u.roleLabel + (u.branch && u.branch !== 'ALL' ? ' · ' + br(u.branch) : ''))}</span></span></div>
     <button class="icon-btn" id="logout-btn" title="${t('logout')}" aria-label="${t('logout')}">${icon('out')}</button>
   </div></header>
   <main id="view"></main>`;
   $('#theme-btn').onclick = toggleTheme;
+  $('#gsearch-btn') && ($('#gsearch-btn').onclick = openGlobalSearch);
   $('#demo-switch') && ($('#demo-switch').onchange = e => e.target.value && demoLogin(e.target.value));
   $('#demo-clock') && ($('#demo-clock').onchange = e => demoSetClock(e.target.value));
   $('#logout-btn').onclick = () => logout();
   $$('.topbar [data-lang]').forEach(b => b.onclick = () => { applyLang(b.dataset.lang); route(); });
   moveNavIndicator();
 }
+
+/** بحث عام: المشاكل والممرضات والتقارير في مكان واحد (كلٌ حسب صلاحيته) */
+function openGlobalSearch() {
+  if (document.querySelector('#gs-q')) return;
+  let timer = null, seq = 0;
+  modal({
+    title: 'بحث عام', wide: true,
+    body: `<input class="input" id="gs-q" placeholder="اسم ممرضة، عيادة، مادة، أداة…" style="width:100%"><div class="gsearch-res" id="gs-r" style="margin-top:10px"><div class="muted">اكتب حرفين على الأقل</div></div>`,
+    onMount(el, close) {
+      const run = async () => {
+        const q = $('#gs-q', el).value.trim(), my = ++seq;
+        if (q.length < 2) { $('#gs-r', el).innerHTML = '<div class="muted">اكتب حرفين على الأقل</div>'; return; }
+        $('#gs-r', el).innerHTML = '<div class="muted">جارٍ البحث…</div>';
+        let r; try { r = await api('search', { q }); } catch (e) { $('#gs-r', el).innerHTML = `<div class="form-error">${esc(e.message)}</div>`; return; }
+        if (my !== seq) return;
+        const sec = (title, items, fn) => items.length ? `<h4>${title} (${items.length})</h4>${items.map(fn).join('')}` : '';
+        $('#gs-r', el).innerHTML = (sec('المشاكل', r.issues, (i, n) => `<button data-gi="${n}">${sevPill(i.severity)} <b>${esc(i.item || i.categoryLabel)}</b> · ${esc(i.clinic_name)} — ${br(i.branch)} <span class="muted">· ${esc(i.nurse_name)} · ${esc(t('is_' + i.status))}</span></button>`)
+          + sec('الممرضات', r.nurses, (u, n) => `<button data-gn="${n}"><b>${esc(u.name)}</b> <span class="muted">· ${br(u.branch)} · ${esc(u.email || u.username)}</span></button>`)
+          + sec('التقارير', r.reports, (x, n) => `<button data-gr="${n}"><b>${esc(x.nurse_name)}</b> · ${esc(x.clinic_name)} <span class="muted">· ${esc(fmtDT(x.submitted_at))}</span></button>`))
+          || '<div class="muted">لا نتائج</div>';
+        $$('[data-gi]', el).forEach(b => b.onclick = () => { close(); issueDialog(r.issues[+b.dataset.gi], () => route()); });
+        $$('[data-gn]', el).forEach(b => b.onclick = () => { close(); hrState.q = r.nurses[+b.dataset.gn].name; location.hash = '#hr'; route(); });
+        $$('[data-gr]', el).forEach(b => b.onclick = () => { close(); rState.q = r.reports[+b.dataset.gr].nurse_name; rState.period = 'all'; location.hash = '#reports'; route(); });
+      };
+      $('#gs-q', el).oninput = () => { clearTimeout(timer); timer = setTimeout(run, 300); };
+    },
+  });
+}
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && state.user && state.user.role !== 'nurse') { e.preventDefault(); openGlobalSearch(); }
+});
 
 function moveNavIndicator() {
   const nav = $('.nav'); if (!nav) return;
@@ -1085,7 +1147,11 @@ async function renderNurse(view) {
     on_time: t('onTimeNow'), late: t('lateNow'), very_late: t('veryLateNow'),
     early: t('earlyNow') + ' ' + fmtDate(ctx.week), closed: t('closedNow'),
   }[ctx.timingIfNow];
-  const closed = ctx.window.state === 'closed';
+  const closed = ctx.window.state === 'closed' || !!ctx.paused;
+  // شكر عند الالتزام بالوقت 3 أسابيع متتالية (لا يُحسب الأسبوع الحالي إن لم ترفع بعد)
+  const okHist = (ctx.history || []).slice();
+  if (okHist.length && okHist[okHist.length - 1].timing === 'missing') okHist.pop();
+  const streakOk = okHist.slice(-3).length === 3 && okHist.slice(-3).every(h => h.timing === 'on_time' || h.timing === 'early');
   const ratio = ctx.clinics.length ? done / ctx.clinics.length : 0;
   const R = 36, C = 2 * Math.PI * R;
 
@@ -1115,6 +1181,8 @@ async function renderNurse(view) {
     </div></section>
 
     ${ctx.stats.leave ? `<div class="notice rise" style="margin-top:12px">${t('onLeaveNote')(fmtDay(ctx.stats.leave.from), fmtDay(ctx.stats.leave.to))}</div>` : ''}
+    ${ctx.paused ? `<div class="notice rise" style="margin-top:12px;border-color:var(--crit)">${icon('alert')} ${esc(ctx.paused)}</div>` : ''}
+    ${streakOk && !ctx.paused ? `<div class="notice rise" style="margin-top:12px">${icon('check')} ${state.lang === 'en' ? 'Thank you! You submitted on time three weeks in a row.' : 'شكراً لك! رفعتِ التقرير في الوقت ثلاثة أسابيع متتالية.'}</div>` : ''}
     ${ctx.window.excusedUntil ? `<div class="notice rise" style="margin-top:12px">${icon('check')} ${esc(t('excusedNote')(fmtDate(ctx.window.excusedUntil, { weekday: 'long', day: 'numeric', month: 'long' })))}</div>` : ''}
     ${ctx.window.exception && ctx.window.exception.type === 'exempt' ? `<div class="notice rise" style="margin-top:12px">${esc(t('exemptNote'))}</div>` : ''}
 
@@ -1770,6 +1838,7 @@ function openReportDialog(d, range, branchNow) {
       <div class="muted" style="font-size:12.5px;margin:2px 0 10px">الفترة: <b>${esc(range.label)}</b> (${esc(prDate(d.from))} – ${esc(prDate(d.to))}) · الفرع: <b>${esc(br(branchNow))}</b>. غيّرهما من أعلى الصفحة قبل الطباعة.</div>
       <div class="field"><label>التوصيات <span class="muted" style="font-weight:400">— مقترحة من الأرقام، عدّل أو أضف (سطر لكل توصية)</span></label>
         <textarea class="input" id="pr-recs" rows="8" style="width:100%;resize:vertical">${esc(recs0.join('\n'))}</textarea></div>
+      <label class="radio"><input type="checkbox" id="pr-draft"> علامة «مسودة · DRAFT» (قبل اعتماد المدير)</label>
       <div id="pr-err"></div>`,
     foot: `<button class="btn" data-close>إلغاء</button><button class="btn primary" id="pr-go">${icon('print')}طباعة</button>`,
     onMount(el, close) {
@@ -1794,7 +1863,8 @@ function openReportDialog(d, range, branchNow) {
           }
         }
         close();
-        printHTML(buildClinicsReport(type, data, range, recs, brn));
+        const draft = $('#pr-draft', el).checked;
+        printHTML(buildClinicsReport(type, data, range, recs, brn).replace('<div class="pr">', '<div class="pr">' + (draft ? '<div class="draft">مسودة · DRAFT</div>' : '')));
       };
     },
   });
@@ -1869,6 +1939,22 @@ async function renderQuality(view) {
     </div>
   </div>
 
+  ${(() => {
+    // «الأسبوع في دقيقة»: آخر أسبوع مقابل الذي قبله، وما يحتاج قرارك الآن
+    const g = d.digest || {};
+    const diff = g.compliance != null && g.prevCompliance != null ? g.compliance - g.prevCompliance : null;
+    const decide = (g.overdueHigh || 0) + (g.reviewsDue || 0);
+    return `<section class="card rise wim" style="margin-bottom:16px"><div class="card-h"><h3>الأسبوع في دقيقة</h3><span class="sub">أسبوع السبت ${esc(fmtDate(g.week, { day: 'numeric', month: 'long' }))}</span></div>
+      <div class="wim-row">
+        <div class="wim-t ${diff == null ? '' : diff >= 0 ? 'up' : 'down'}"><b class="num">${g.compliance == null ? '—' : g.compliance + '%'}</b><span>الالتزام ${diff == null ? '' : (diff >= 0 ? '▲ ' : '▼ ') + Math.abs(diff) + ' نقطة عن الأسبوع السابق'}</span></div>
+        <div class="wim-t"><b class="num">${g.opened || 0} / ${g.resolved || 0}</b><span>مشاكل جديدة / محلولة هذا الأسبوع</span></div>
+        <a class="wim-t ${decide ? 'down' : 'up'}" href="#supply"><b class="num">${decide}</b><span>تحتاج قرارك: ${g.overdueHigh || 0} عالية متأخرة · ${g.reviewsDue || 0} حان موعد مراجعتها</span></a>
+      </div></section>`;
+  })()}
+
+  ${d.byBranch && d.byBranch.length > 1 ? `<section class="card rise" style="margin-bottom:16px"><div class="card-h"><h3>مقارنة الفروع</h3><span class="sub">نفس المؤشرات جنباً إلى جنب للفترة المختارة</span></div>
+    <div id="br-t"></div></section>` : ''}
+
   <div class="grid g-kpi">
     ${kpiCard('الالتزام بالتسليم', k.compliance, '%', 'تقارير مستلمة ÷ المطلوبة', true, 1)}
     ${kpiCard('التسليم في الوقت', k.onTime, '%', `من ${k.reports} تقرير`, false, 2)}
@@ -1939,6 +2025,16 @@ async function renderQuality(view) {
   $('#q-m').onchange = e => { qState.month = e.target.value; renderQuality(view); };
   $('#q-b').onchange = e => { qState.branch = e.target.value; renderQuality(view); };
   $('#q-print').onclick = () => openReportDialog(d, range, qState.branch);
+  if ($('#br-t')) $('#br-t').innerHTML = tableHTML([
+    { label: 'الفرع', html: b => `<b>${esc(br(b.branch))}</b>`, csv: b => br(b.branch) },
+    { label: 'الالتزام', html: b => `<span class="num strong">${pct(b.compliance)}</span>`, csv: b => pct(b.compliance) },
+    { label: 'في الوقت', get: b => pct(b.onTime) },
+    { label: 'التقارير', key: 'reports' },
+    { label: 'مشاكل مفتوحة', key: 'openIssues' },
+    { label: 'عالية الخطورة', html: b => b.highOpen ? `<span class="pill crit">${b.highOpen}</span>` : '0', csv: b => b.highOpen },
+    { label: 'عالية متأخرة', html: b => b.overdueHigh ? `<span class="pill crit">${b.overdueHigh}</span>` : '0', csv: b => b.overdueHigh },
+    { label: 'ممرضات دون 50%', key: 'lowNurses' },
+  ], d.byBranch);
   countUp(view);
 
   const expCols = [
@@ -2052,6 +2148,7 @@ async function renderIssues(view) {
       <select class="input" id="i-b"><option value="ALL">كل الفروع</option><option value="BURIDAH">بريدة</option><option value="ONIZAH">عنيزة</option></select>
       <select class="input" id="i-c"><option value="all">كل الأنواع</option>${Object.keys(d.categories).filter(c => iState.dept === 'all' || d.categories[c].dept === iState.dept).map(c => `<option value="${c}">${d.categories[c].label}</option>`).join('')}</select>
       <select class="input" id="i-sev"><option value="all">كل الخطورات</option><option value="high">عالية</option><option value="medium">متوسطة</option><option value="low">منخفضة</option></select>
+      <button class="btn sm" id="i-csv">${icon('dl')}CSV</button>
       <select class="input" id="i-g"><option value="clinic">تجميع: العيادة</option><option value="category">تجميع: نوع المشكلة</option><option value="nurse">تجميع: الممرضة</option><option value="none">بدون تجميع</option></select>
     </div>
   </div>
@@ -2083,9 +2180,19 @@ async function renderIssues(view) {
     $('#s-csv').onclick = () => exportTable('قائمة-النواقص-' + ymd(new Date()), sCols, d.shortage);
   }
 
+  let lastList = [];
+  const issueCols = [
+    { label: 'العيادة', get: i => i.clinic_name }, { label: 'الفرع', get: i => br(i.branch) },
+    { label: 'النوع', get: i => i.categoryLabel }, { label: 'المادة/المشكلة', get: i => i.item || '' },
+    { label: 'الكمية', get: i => i.qty || '' }, { label: 'الخطورة', get: i => (SEV[i.severity] || SEV.low)[2] },
+    { label: 'الحالة', get: i => t('is_' + i.status) }, { label: 'الممرضة', get: i => i.nurse_name },
+    { label: 'التكرار', get: i => i.occurrences }, { label: 'منذ (يوم)', get: i => i.ageDays },
+    { label: 'القسم', get: i => DEPT[i.department] || '' }, { label: 'المسؤول', get: i => i.assigned_to || '' },
+    { label: 'موعد المراجعة', get: i => i.review_date || '' }, { label: 'الإجراء', get: i => i.resolution || '' },
+  ];
   const issueCard = (i, n) => `
       <article class="card issue rise sev-${i.severity}${i.status === 'resolved' ? ' faded' : ''}" style="--i:${Math.min(n, 12)}">
-        <div class="top">${sevPill(i.severity)}${statusPill(i.status)}<span class="tag">${esc(i.categoryLabel)}</span>${i.occurrences > 1 ? `<span class="repeat">${icon('alert')}تكرر ${i.occurrences} أسابيع</span>` : ''}</div>
+        <div class="top">${sevPill(i.severity)}${statusPill(i.status)}<span class="tag">${esc(i.categoryLabel)}</span>${i.occurrences > 1 ? `<span class="repeat">${icon('alert')}تكرر ${i.occurrences} أسابيع</span>` : ''}${i.overdue ? `<span class="pill crit">${icon('clock')}متأخرة</span>` : ''}</div>
         <h4>${esc(i.item || i.categoryLabel)}${i.qty ? ` <span class="muted num" style="font-weight:500">× ${esc(i.qty)}</span>` : ''}</h4>
         <p class="desc">${esc(i.description)}</p>
         <div class="meta"><span><b>${esc(i.clinic_name)}</b> · ${br(i.branch)}</span><span>${esc(i.nurse_name)}</span><span>منذ <b class="num">${i.ageDays}</b> يوم</span>${!supply ? `<span>${DEPT[i.department] || ''}</span>` : ''}</div>
@@ -2106,7 +2213,7 @@ async function renderIssues(view) {
     const list = d.issues.filter(i =>
       (iState.branch === 'ALL' || i.branch === iState.branch) && (iState.cat === 'all' || i.category === iState.cat) &&
       (iState.sev === 'all' || i.severity === iState.sev) &&
-      (iState.flag !== 'due' || i.reviewDue) && (iState.flag !== 'repeat' || i.occurrences >= 3) &&
+      (iState.flag !== 'due' || i.reviewDue) && (iState.flag !== 'repeat' || i.occurrences >= 3) && (iState.flag !== 'overdue' || i.overdue) &&
       (!q || [i.clinic_name, i.item, i.nurse_name, i.description, i.categoryLabel].join(' ').toLowerCase().includes(q)));
     // بطاقات الملخص تُحسب من القائمة الحالية (بعد الفلاتر)، وتتحول إلى فلاتر عند الضغط
     const cards = [
@@ -2114,7 +2221,9 @@ async function renderIssues(view) {
       { key: 'high', label: 'عالية الخطورة', n: list.filter(i => i.severity === 'high').length, bad: true },
       { key: 'repeat', label: 'متكررة 3 أسابيع+', n: list.filter(i => i.occurrences >= 3).length },
       { key: 'due', label: 'حان موعد مراجعتها', n: list.filter(i => i.reviewDue).length, bad: true },
+      { key: 'overdue', label: 'عالية متأخرة بلا تحديث', n: list.filter(i => i.overdue).length, bad: true },
     ];
+    lastList = list;
     const active = iState.flag === '' ? '' : iState.flag;
     $('#iss-cards').innerHTML = cards.map(c => `<button class="iss-card${c.bad && c.n ? ' bad' : ''}${c.key === active ? ' on' : ''}" data-flag="${c.key}"><b class="num">${c.n}</b><span>${esc(c.label)}</span></button>`).join('');
     $$('#iss-cards [data-flag]').forEach(b => b.onclick = () => {
@@ -2155,6 +2264,7 @@ async function renderIssues(view) {
   $('#i-sev').value = iState.sev; $('#i-g').value = iState.group;
   $('#i-sev').onchange = e => { iState.sev = e.target.value; draw(); };
   $('#i-g').onchange = e => { iState.group = e.target.value; draw(); };
+  $('#i-csv').onclick = () => exportTable('المشاكل-' + ymd(new Date()), issueCols, lastList);
   $$('#issue-list [data-hist]').forEach(b => b.onclick = () => issueHistoryDialog(d.issues.find(i => i.issue_id === b.dataset.hist)));
 }
 
@@ -2285,9 +2395,41 @@ async function renderUsers(view) {
       ${admin ? `<select class="input" id="u-r"><option value="all">كل الأدوار</option>${Object.keys(d.roles).map(r => `<option value="${r}">${d.roles[r]}</option>`).join('')}</select>` : ''}
       <select class="input" id="u-s"><option value="all">كل الحالات</option><option value="active">نشط</option><option value="inactive">غير نشط</option></select>
       <button class="btn primary sm" id="u-new">${icon('plus')}${admin ? 'مستخدم جديد' : 'ممرضة جديدة'}</button>
+      ${admin ? `<button class="btn sm" id="u-log">${icon('clock')}سجل القرارات</button>` : ''}
     </div></div>
+  ${admin ? `<section class="card rise" style="margin-bottom:14px;${d.paused ? 'border-color:var(--crit)' : ''}"><div class="card-h" style="flex-wrap:wrap">
+    <h3>${d.paused ? icon('alert') + 'رفع التقارير متوقف الآن' : 'إيقاف طارئ لرفع التقارير'}</h3>
+    <span class="sub">${d.paused ? esc(d.pauseMessage || 'تظهر للممرضات رسالة الإيقاف') : 'عند عطل أو مشكلة في البيانات: يوقف الرفع لكل الممرضات حتى تعيد تشغيله'}</span>
+    <div class="spacer"></div><button class="btn sm ${d.paused ? 'primary' : ''}" id="u-pause">${d.paused ? 'إعادة تشغيل الرفع' : 'إيقاف الرفع مؤقتاً'}</button></div></section>` : ''}
   <section class="card rise" id="u-t"></section>`;
   if ($('#u-r')) $('#u-r').value = uState.role;
+  $('#u-pause') && ($('#u-pause').onclick = () => {
+    if (d.paused) {
+      return confirmDialog('إعادة تشغيل رفع التقارير لكل الممرضات؟').then(async yes => {
+        if (!yes) return; try { await api('settings.pause', { paused: false }); toast('عاد الرفع للعمل'); renderUsers(view); } catch (e) { toast(e.message, 'err'); }
+      });
+    }
+    modal({
+      title: 'إيقاف رفع التقارير مؤقتاً',
+      body: `<div class="field"><label for="pz-m">الرسالة التي تراها الممرضات</label><input class="input" id="pz-m" maxlength="200" value="رفع التقارير متوقف مؤقتاً للصيانة. حاولي لاحقاً. Submissions are paused for maintenance."></div>`,
+      foot: `<button class="btn" data-close>إلغاء</button><button class="btn primary" id="pz-go">إيقاف الرفع</button>`,
+      onMount(el, close) { $('#pz-go', el).onclick = async () => { try { await api('settings.pause', { paused: true, message: $('#pz-m', el).value }); close(); toast('توقف الرفع'); renderUsers(view); } catch (e) { toast(e.message, 'err'); } }; },
+    });
+  });
+  $('#u-log') && ($('#u-log').onclick = async () => {
+    let r; try { r = await api('audit.list'); } catch (e) { return toast(e.message, 'err'); }
+    const AL = { exception_extend: 'استثناء: تمديد', exception_exempt: 'استثناء: إعفاء', exception_cancel: 'إلغاء استثناء', notice: 'إشعار عدم التزام', merge_nurses: 'دمج حسابات',
+      submissions_paused: 'إيقاف الرفع', submissions_resumed: 'إعادة الرفع', credentials_set: 'رقم سري', user_update: 'تعديل مستخدم', user_create: 'مستخدم جديد',
+      status_active: 'على رأس العمل', status_leave: 'إجازة', status_inactive: 'ترك العمل', issue_resolved: 'إغلاق مشكلة', issue_in_progress: 'مشكلة قيد المعالجة', issue_open: 'إعادة فتح مشكلة',
+      change_password: 'تغيير كلمة المرور', password_forgot: 'نسيت كلمة المرور' };
+    const cols = [{ label: 'الوقت', get: x => x.at }, { label: 'المستخدم', get: x => x.user }, { label: 'الإجراء', get: x => AL[x.action] || x.action }, { label: 'التفاصيل', get: x => x.details }];
+    modal({ title: 'سجل القرارات', wide: true,
+      body: `<div style="display:flex;gap:8px;margin-bottom:10px"><input class="input" id="al-q" placeholder="بحث" style="flex:1"><button class="btn sm" id="al-csv">${icon('dl')}CSV</button></div><div id="al-t" style="max-height:60vh;overflow:auto"></div>`,
+      onMount(el) {
+        const draw = () => { const q = $('#al-q', el).value.toLowerCase(); const list = r.entries.filter(x => !q || [x.user, AL[x.action] || x.action, x.details].join(' ').toLowerCase().includes(q)); $('#al-t', el).innerHTML = tableHTML(cols, list, { empty: 'لا شيء' }); return list; };
+        draw(); $('#al-q', el).oninput = draw; $('#al-csv', el).onclick = () => exportTable('سجل-القرارات', cols, draw());
+      } });
+  });
   $('#u-s').value = uState.status;
   const cols = [
     { label: 'الاسم', html: u => `<div style="display:flex;gap:10px;align-items:center"><span class="avatar" style="width:28px;height:28px;font-size:11px">${esc(initials(u.name))}</span><div><b style="font-weight:600">${esc(u.name)}</b><div class="muted" dir="ltr" style="font-size:11.5px;text-align:start">${u.login ? `<b style="color:var(--ink-2)">${esc(u.login)}</b> · ` : ''}${esc(u.email || u.username)}</div></div></div>` },

@@ -16,7 +16,7 @@
 
 const APP = {
   NAME: 'Nursing',
-  VERSION: '2026-10-18',   // يجب أن يطابق CLIENT_VERSION في index.html
+  VERSION: '2026-10-22',   // يجب أن يطابق CLIENT_VERSION في index.html
   TZ: 'Asia/Riyadh',
   SESSION_SECONDS: 6 * 60 * 60, // أقصى مدة يسمح بها CacheService
   HASH_ROUNDS: 250,
@@ -1454,7 +1454,8 @@ function apiQualityStats_(req, user) {
         openIssues: oi.length, highOpen: oi.filter(i => i.severity === 'high').length, overdueHigh: oi.filter(isOverdue_).length,
         lowNurses: ns.filter(n => n.rate != null && n.rate < 50).length };
     }),
-    digest: weekDigest_(nurses, rows_(S.REPORTS).filter(r => inScope(r.branch)), issues, to, lm, cfg),
+    // آخر أسبوع انتهت نافذته (الأسبوع الجاري ما زال مفتوحاً فنسبته ناقصة ولا تُقارن)
+    digest: weekDigest_(nurses, rows_(S.REPORTS).filter(r => inScope(r.branch)), issues, to >= lastClosedWeek_(cfg) ? lastClosedWeek_(cfg) : to, lm, cfg),
     kpi: {
       reports: reports.length,
       compliance: expectedTotal ? Math.round(submittedTotal / expectedTotal * 100) : null,
@@ -1575,7 +1576,10 @@ function apiUsersList_(req, user) {
                clinics: splitList_(u.clinics), status: u.status, state: u.role === 'nurse' ? st.state : u.status, leave: st.leave,
                start_date: dateStr_(parseDate_(u.start_date)) || '', last_login: u.last_login, must_change: u.must_change === 'yes' };
     });
-  return { users: list, clinics: clinics_(), roles: ROLES, branches: BRANCHES };
+  const cfg = settings_();
+  return { users: list, clinics: clinics_(), roles: ROLES, branches: BRANCHES,
+    paused: user.role === 'admin' ? String(cfg.SUBMISSIONS_PAUSED).toLowerCase() === 'yes' : undefined,
+    pauseMessage: user.role === 'admin' ? String(cfg.PAUSE_MESSAGE || '') : undefined };
 }
 
 function apiUserSave_(req, user) {
