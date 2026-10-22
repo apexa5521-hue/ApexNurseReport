@@ -271,6 +271,20 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
 .issue .meta b{color:var(--ink-2);font-weight:500}
 .issue .act{display:flex;gap:8px;margin-top:auto;padding-top:4px}
 .issue.sev-high{box-shadow:inset 3px 0 0 var(--crit),var(--sh-1)}
+.issue.faded{opacity:.62}
+.iss-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.iss-card{all:unset;cursor:pointer;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface);display:flex;flex-direction:column;gap:2px}
+.iss-card:focus-visible{outline:2px solid var(--accent)}
+.iss-card b{font:600 22px Inter,var(--font);color:var(--ink)}
+.iss-card span{font-size:12px;color:var(--ink-3)}
+.iss-card.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.iss-card.bad b{color:var(--crit)}
+.iss-group{margin:18px 0 8px;display:flex;align-items:center;gap:10px;font-weight:600}
+.iss-group .sub{font-weight:400;font-size:12.5px;color:var(--ink-3)}
+.review{font-size:12.5px}
+.ihist{padding-inline-start:18px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5}
+.ihist li{padding-inline-start:4px}
+.review.due{color:var(--crit);font-weight:600}
 [dir="rtl"] .issue.sev-high{box-shadow:inset -3px 0 0 var(--crit),var(--sh-1)}
 .repeat{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--ink);background:var(--serious-soft);padding:2px 8px;border-radius:99px}
 
@@ -2009,7 +2023,7 @@ function kpiCard(label, val, unit, sub, hero, i) {
 /* ══════════════════════════════════════════════════════════
    ISSUES — التموين / متابعة المشاكل
    ══════════════════════════════════════════════════════════ */
-const iState = { status: 'open', dept: '', branch: 'ALL', cat: 'all', q: '' };
+const iState = { status: 'open', dept: '', branch: 'ALL', cat: 'all', q: '', sev: 'all', group: 'clinic', flag: '' };
 const DEPT = { supply: 'التموين', quality: 'الجودة', hr: 'الموارد البشرية' };
 
 async function renderIssues(view) {
@@ -2037,8 +2051,11 @@ async function renderIssues(view) {
       ${!supply ? `<select class="input" id="i-d"><option value="all">كل الأقسام</option>${Object.keys(DEPT).map(k => `<option value="${k}">${DEPT[k]}</option>`).join('')}</select>` : ''}
       <select class="input" id="i-b"><option value="ALL">كل الفروع</option><option value="BURIDAH">بريدة</option><option value="ONIZAH">عنيزة</option></select>
       <select class="input" id="i-c"><option value="all">كل الأنواع</option>${Object.keys(d.categories).filter(c => iState.dept === 'all' || d.categories[c].dept === iState.dept).map(c => `<option value="${c}">${d.categories[c].label}</option>`).join('')}</select>
+      <select class="input" id="i-sev"><option value="all">كل الخطورات</option><option value="high">عالية</option><option value="medium">متوسطة</option><option value="low">منخفضة</option></select>
+      <select class="input" id="i-g"><option value="clinic">تجميع: العيادة</option><option value="category">تجميع: نوع المشكلة</option><option value="nurse">تجميع: الممرضة</option><option value="none">بدون تجميع</option></select>
     </div>
   </div>
+  <div class="iss-cards" id="iss-cards"></div>
   <div class="tabs" role="tablist">
     <button role="tab" data-s="open" aria-selected="${iState.status === 'open'}">مفتوحة<span class="count">${cnt(['open', 'in_progress'])}</span></button>
     <button role="tab" data-s="in_progress" aria-selected="${iState.status === 'in_progress'}">قيد المعالجة<span class="count">${cnt(['in_progress'])}</span></button>
@@ -2066,23 +2083,64 @@ async function renderIssues(view) {
     $('#s-csv').onclick = () => exportTable('قائمة-النواقص-' + ymd(new Date()), sCols, d.shortage);
   }
 
-  const draw = () => {
-    const q = iState.q.toLowerCase();
-    const list = d.issues.filter(i =>
-      (iState.branch === 'ALL' || i.branch === iState.branch) && (iState.cat === 'all' || i.category === iState.cat) &&
-      (!q || [i.clinic_name, i.item, i.nurse_name, i.description, i.categoryLabel].join(' ').toLowerCase().includes(q)));
-    $('#issue-list').innerHTML = list.length ? list.map((i, n) => `
-      <article class="card issue rise sev-${i.severity}" style="--i:${Math.min(n, 12)}">
+  const issueCard = (i, n) => `
+      <article class="card issue rise sev-${i.severity}${i.status === 'resolved' ? ' faded' : ''}" style="--i:${Math.min(n, 12)}">
         <div class="top">${sevPill(i.severity)}${statusPill(i.status)}<span class="tag">${esc(i.categoryLabel)}</span>${i.occurrences > 1 ? `<span class="repeat">${icon('alert')}تكرر ${i.occurrences} أسابيع</span>` : ''}</div>
         <h4>${esc(i.item || i.categoryLabel)}${i.qty ? ` <span class="muted num" style="font-weight:500">× ${esc(i.qty)}</span>` : ''}</h4>
         <p class="desc">${esc(i.description)}</p>
         <div class="meta"><span><b>${esc(i.clinic_name)}</b> · ${br(i.branch)}</span><span>${esc(i.nurse_name)}</span><span>منذ <b class="num">${i.ageDays}</b> يوم</span>${!supply ? `<span>${DEPT[i.department] || ''}</span>` : ''}</div>
+        ${i.review_date ? `<div class="review${i.reviewDue ? ' due' : ''}">${icon('clock')} موعد المراجعة: ${esc(fmtDate(i.review_date, { day: 'numeric', month: 'short' }))}${i.reviewDue ? ' · حان الآن' : ''}</div>` : ''}
         ${i.assigned_to ? `<div class="meta"><span>المسؤول: <b>${esc(i.assigned_to)}</b></span></div>` : ''}
         ${i.resolution ? `<div class="meta"><span>الإجراء: <b>${esc(i.resolution)}</b></span></div>` : ''}
         <div class="act">${i.status !== 'resolved' ? `
           ${i.status === 'open' ? `<button class="btn sm" data-start="${esc(i.issue_id)}">بدء المعالجة</button>` : ''}
-          <button class="btn sm primary" data-edit="${esc(i.issue_id)}">${icon('check')}إغلاق</button>` : `<button class="btn sm" data-edit="${esc(i.issue_id)}">تفاصيل</button>`}</div>
-      </article>`).join('') : `<div class="card empty" style="grid-column:1/-1"><b>لا توجد عناصر</b>${iState.status === 'resolved' ? 'لم يتم إغلاق أي مشكلة بعد' : 'كل شيء تحت السيطرة'}</div>`;
+          <button class="btn sm primary" data-edit="${esc(i.issue_id)}">${icon('check')}إغلاق</button>` : `<button class="btn sm" data-edit="${esc(i.issue_id)}">تفاصيل</button>`}
+          <button class="btn sm" data-hist="${esc(i.issue_id)}">السجل</button></div>
+      </article>`;
+
+  const groupKey = i => iState.group === 'clinic' ? i.clinic_name + ' — ' + br(i.branch)
+    : iState.group === 'category' ? i.categoryLabel : iState.group === 'nurse' ? (i.nurse_name || '—') : '';
+
+  const draw = () => {
+    const q = iState.q.toLowerCase();
+    const list = d.issues.filter(i =>
+      (iState.branch === 'ALL' || i.branch === iState.branch) && (iState.cat === 'all' || i.category === iState.cat) &&
+      (iState.sev === 'all' || i.severity === iState.sev) &&
+      (iState.flag !== 'due' || i.reviewDue) && (iState.flag !== 'repeat' || i.occurrences >= 3) &&
+      (!q || [i.clinic_name, i.item, i.nurse_name, i.description, i.categoryLabel].join(' ').toLowerCase().includes(q)));
+    // بطاقات الملخص تُحسب من القائمة الحالية (بعد الفلاتر)، وتتحول إلى فلاتر عند الضغط
+    const cards = [
+      { key: '', label: 'الكل', n: list.length },
+      { key: 'high', label: 'عالية الخطورة', n: list.filter(i => i.severity === 'high').length, bad: true },
+      { key: 'repeat', label: 'متكررة 3 أسابيع+', n: list.filter(i => i.occurrences >= 3).length },
+      { key: 'due', label: 'حان موعد مراجعتها', n: list.filter(i => i.reviewDue).length, bad: true },
+    ];
+    const active = iState.flag === '' ? '' : iState.flag;
+    $('#iss-cards').innerHTML = cards.map(c => `<button class="iss-card${c.bad && c.n ? ' bad' : ''}${c.key === active ? ' on' : ''}" data-flag="${c.key}"><b class="num">${c.n}</b><span>${esc(c.label)}</span></button>`).join('');
+    $$('#iss-cards [data-flag]').forEach(b => b.onclick = () => {
+      iState.flag = b.dataset.flag;
+      if (iState.flag === 'high') { iState.sev = 'high'; iState.flag = ''; $('#i-sev').value = 'high'; }
+      else if (iState.flag === '') { iState.sev = 'all'; $('#i-sev').value = 'all'; }
+      draw();
+    });
+
+    if (!list.length) {
+      $('#issue-list').innerHTML = `<div class="card empty" style="grid-column:1/-1"><b>لا توجد عناصر</b>${iState.status === 'resolved' ? 'لم يتم إغلاق أي مشكلة بعد' : 'كل شيء تحت السيطرة'}</div>`;
+    } else if (iState.group === 'none') {
+      $('#issue-list').innerHTML = list.map((i, n) => issueCard(i, n)).join('');
+    } else {
+      // تجميع: العنوان يعرض عدد المشاكل وأعلاها خطورة
+      const groups = {};
+      list.forEach(i => { const k = groupKey(i); (groups[k] = groups[k] || []).push(i); });
+      const order = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length || a.localeCompare(b));
+      const rank = { high: 3, medium: 2, low: 1 };
+      $('#issue-list').innerHTML = `<div style="grid-column:1/-1">${order.map(k => {
+        const g = groups[k], top = g.reduce((m, i) => rank[i.severity] > rank[m] ? i.severity : m, 'low');
+        return `<div class="iss-group">${esc(k)} <span class="pill ${SEV[top][0]}">${g.length} · أعلى خطورة: ${SEV[top][2]}</span></div>
+          <div class="issues" style="margin-bottom:6px">${g.map((i, n) => issueCard(i, n)).join('')}</div>`;
+      }).join('')}</div>`;
+    }
+
     $$('#issue-list [data-start]').forEach(b => b.onclick = async () => {
       busy(b, true);
       try { await api('issues.update', { issue_id: b.dataset.start, status: 'in_progress', assigned_to: state.user.name }); toast('تم تحويلها إلى قيد المعالجة'); renderIssues(view); }
@@ -2094,6 +2152,26 @@ async function renderIssues(view) {
   $('#i-q').oninput = e => { iState.q = e.target.value; draw(); };
   $('#i-b').onchange = e => { iState.branch = e.target.value; draw(); };
   $('#i-c').onchange = e => { iState.cat = e.target.value; draw(); };
+  $('#i-sev').value = iState.sev; $('#i-g').value = iState.group;
+  $('#i-sev').onchange = e => { iState.sev = e.target.value; draw(); };
+  $('#i-g').onchange = e => { iState.group = e.target.value; draw(); };
+  $$('#issue-list [data-hist]').forEach(b => b.onclick = () => issueHistoryDialog(d.issues.find(i => i.issue_id === b.dataset.hist)));
+}
+
+/** سجل تغييرات مشكلة واحدة: من غيّرها ومتى، وانتقال الحالة، والملاحظة */
+async function issueHistoryDialog(i) {
+  if (!i) return;
+  let h;
+  try { h = (await api('issues.history', { issue_id: i.issue_id })).history; }
+  catch (e) { return toast(e.message, 'err'); }
+  const label = { open: 'مفتوحة', in_progress: 'قيد المعالجة', resolved: 'تم الحل' };
+  modal({
+    title: 'سجل: ' + (i.item || i.categoryLabel),
+    body: h.length ? `<ol class="ihist">${h.map(x => `<li><b>${esc(x.at)}</b> · ${esc(x.by)}<br>${x.action === 'status'
+        ? `الحالة: ${esc(label[x.from] || x.from || '—')} ← ${esc(label[x.to] || x.to)}`
+        : esc(x.note || 'تغيير موعد المراجعة')}${x.action === 'status' && x.note ? `<div class="muted">${esc(x.note)}</div>` : ''}</li>`).join('')}</ol>`
+      : '<div class="empty"><b>لا يوجد سجل بعد</b>تظهر هنا التغييرات منذ تفعيل السجل</div>',
+  });
 }
 
 function issueDialog(i, done) {
@@ -2112,6 +2190,7 @@ function issueDialog(i, done) {
       <div style="margin-top:18px">
         <div class="field"><label for="d-as">المسؤول عن المعالجة</label><input class="input" id="d-as" value="${esc(i.assigned_to || state.user.name)}"></div>
         <div class="field"><label for="d-res">الإجراء المتخذ ${closed ? '' : '(مطلوب للإغلاق)'}</label><textarea class="input" id="d-res" placeholder="مثال: تم صرف 2 من المستودع بتاريخ …">${esc(i.resolution || '')}</textarea></div>
+        ${closed ? '' : `<div class="field"><label for="d-rv">موعد المراجعة (اختياري، يذكّرك النظام في يومه)</label><input class="input" type="date" id="d-rv" value="${esc(i.review_date || '')}"></div>`}
         <div id="d-err"></div>
       </div>`,
     foot: closed
@@ -2121,7 +2200,9 @@ function issueDialog(i, done) {
       $$('[data-st]', el).forEach(b => b.onclick = async () => {
         busy(b, true);
         try {
-          await api('issues.update', { issue_id: i.issue_id, status: b.dataset.st, assigned_to: $('#d-as', el).value, resolution: $('#d-res', el).value });
+          const rv = $('#d-rv', el);
+          await api('issues.update', Object.assign({ issue_id: i.issue_id, status: b.dataset.st, assigned_to: $('#d-as', el).value, resolution: $('#d-res', el).value },
+            rv && b.dataset.st !== 'resolved' ? { review_date: rv.value } : {}));
           close(); toast(b.dataset.st === 'resolved' ? 'تم إغلاق المشكلة' : 'تم الحفظ'); done && done();
         } catch (e) { busy(b, false); $('#d-err', el).innerHTML = `<div class="form-error">${esc(e.message)}</div>`; }
       });
