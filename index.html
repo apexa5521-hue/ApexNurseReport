@@ -366,6 +366,8 @@ table.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
 .chips label{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line-strong);border-radius:10px;font-size:12.5px;cursor:pointer;transition:all .15s}
 .chips input{accent-color:var(--accent)}
 .chips label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.chip{padding:6px 10px;border:1px solid var(--line-strong);border-radius:10px;font-size:12.5px;cursor:pointer;background:transparent;color:inherit;font:inherit;font-size:12.5px}
+.chip.on{border-color:var(--accent);background:var(--accent-soft)}
 .temp-pass{font:600 22px Inter;letter-spacing:.12em;background:var(--sunken);border:1px dashed var(--line-strong);border-radius:12px;padding:14px;text-align:center;direction:ltr}
 .notice{background:var(--warn-soft);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--ink)}
 
@@ -697,7 +699,7 @@ async function copyText(text) {
 
 /* ══════════ API ══════════ */
 /* نتائج صفحات القراءة تُحفظ دقيقتين في الذاكرة: التنقل بين الصفحات فوري، وأي تعديل يمسحها */
-const CLIENT_VERSION = '2026-10-22';   // يجب أن يطابق APP.VERSION في Code.gs
+const CLIENT_VERSION = '2026-10-24';   // يجب أن يطابق APP.VERSION في Code.gs
 const READ_ACTIONS = ['nurse.context', 'hr.overview', 'quality.stats', 'reports.list', 'issues.list', 'users.list', 'clinics.list'];
 const MEMO = new Map(), INFLIGHT = new Map();
 const MEMO_MS = 120000;
@@ -1616,34 +1618,56 @@ async function renderHR(view) {
   $$('#cards [data-issue]').forEach(b => b.onclick = () => issueDialog(d.cardIssues.find(i => i.issue_id === b.dataset.issue), () => renderHR(view)));
 }
 
-/** استثناء من المدير لأسبوع واحد: تمديد المهلة حتى تاريخ، أو إعفاء من الأسبوع */
-function exceptionDialog(r, week, done) {
-  const sun = addDays(week, 1), thu = addDays(week, 5);
+/** استثناء من المدير لأسبوع واحد: تمديد المهلة حتى تاريخ، أو إعفاء من الأسبوع (مثل: لم تمسك عيادة) */
+function exceptionDialog(r, week0, done) {
   const today = ymd(new Date());
-  const def = r.exception && r.exception.until ? r.exception.until : (today > sun && today <= thu ? addDays(today, 1) : addDays(week, 2));
+  const weeks = [];
+  for (let i = -8; i <= 4; i++) weeks.push(addDays(week0, i * 7));
+  const reasons = [['noclinic', 'لم تمسك عيادة هذا الأسبوع', 'exempt'], ['off', 'يوم أوف', ''], ['tech', 'مشكلة تقنية', 'extend']];
+  const cur = r.exception;
   modal({
     title: 'استثناء: ' + r.name,
-    body: `<p class="muted" style="font-size:12.5px;margin-top:0">أسبوع السبت <b>${esc(fmtDate(week, { day: 'numeric', month: 'long' }))}</b> فقط. لاختيار أسبوع آخر غيّر الأسبوع من أعلى الصفحة.</p>
+    body: `<div class="field"><label for="ex-w">الأسبوع</label>
+        <select class="input" id="ex-w">${weeks.map(w => `<option value="${w}" ${w === week0 ? 'selected' : ''}>أسبوع السبت ${esc(fmtDate(w, { day: 'numeric', month: 'long', year: 'numeric' }))}${w === week0 ? ' (المعروض)' : ''}</option>`).join('')}</select>
+        <div class="muted" style="font-size:12px;margin-top:4px">الاستثناء لهذا الأسبوع فقط. لأسبوع آخر احفظ استثناءً جديداً.</div></div>
+      <div class="field"><label>السبب</label>
+        <div class="chips" id="ex-chips">${reasons.map(x => `<button type="button" class="chip" data-rs="${x[0]}">${esc(x[1])}</button>`).join('')}</div>
+        <input class="input" id="ex-r" maxlength="200" style="margin-top:8px" placeholder="أو اكتب السبب" value="${esc(cur ? cur.reason || '' : '')}"></div>
       <div class="field"><label>النوع</label>
-        <label class="radio"><input type="radio" name="ex-t" value="extend" checked> تمديد المهلة: ما ترفعه حتى التاريخ المحدد يُحسب «في الوقت»، وتستطيع الرفع حتى لو أُغلقت النافذة</label>
-        <label class="radio"><input type="radio" name="ex-t" value="exempt" ${r.exception && r.exception.type === 'exempt' ? 'checked' : ''}> إعفاء من هذا الأسبوع: لا يُطلب منها تقرير ولا يُحسب عليها</label></div>
+        <label class="radio"><input type="radio" name="ex-t" value="exempt" ${cur && cur.type === 'exempt' ? 'checked' : ''}> إعفاء من الأسبوع: لا يُطلب منها تقرير ولا يُحسب عليها تقصير (مثلاً لم تمسك عيادة)</label>
+        <label class="radio"><input type="radio" name="ex-t" value="extend" ${cur && cur.type === 'exempt' ? '' : 'checked'}> تمديد المهلة: ما ترفعه حتى التاريخ المحدد يُحسب «في الوقت»، وتستطيع الرفع حتى لو أُغلقت النافذة</label></div>
       <div class="field" id="ex-u-f"><label for="ex-u">آخر يوم للمهلة (حتى نهاية اليوم)</label>
-        <input class="input" type="date" id="ex-u" min="${week}" max="${thu}" value="${def > thu ? thu : def}">
-        <div class="muted" style="font-size:12px;margin-top:4px">حتى الخميس ${esc(fmtDay(thu))} كحد أقصى، لأن الجمعة تفتح نافذة الأسبوع التالي.</div></div>
-      <div class="field"><label for="ex-r">السبب</label><input class="input" id="ex-r" maxlength="200" placeholder="مثلاً: مشكلة تقنية، يوم أوف" value="${esc(r.exception ? r.exception.reason || '' : '')}"></div>
+        <input class="input" type="date" id="ex-u">
+        <div class="muted" id="ex-u-h" style="font-size:12px;margin-top:4px"></div></div>
       <div id="ex-err"></div>`,
     foot: `<button class="btn" data-close>إلغاء</button><button class="btn primary" id="ex-save">${icon('check')}حفظ الاستثناء</button>`,
     onMount(el, close) {
+      const wk = () => $('#ex-w', el).value;
+      const syncDate = () => {
+        const w = wk(), sun = addDays(w, 1), thu = addDays(w, 5), inp = $('#ex-u', el);
+        const def = w === week0 && cur && cur.until ? cur.until : (today > sun && today <= thu ? addDays(today, 1) : addDays(w, 2));
+        inp.min = w; inp.max = thu; inp.value = def > thu ? thu : def;
+        $('#ex-u-h', el).textContent = 'حتى الخميس ' + fmtDay(thu) + ' كحد أقصى، لأن الجمعة تفتح نافذة الأسبوع التالي.';
+      };
       const sync = () => $('#ex-u-f', el).classList.toggle('hidden', $('input[name=ex-t]:checked', el).value !== 'extend');
-      $$('input[name=ex-t]', el).forEach(x => x.onchange = sync); sync();
+      $('#ex-w', el).onchange = syncDate;
+      $$('input[name=ex-t]', el).forEach(x => x.onchange = sync);
+      $$('[data-rs]', el).forEach(b => b.onclick = () => {
+        const x = reasons.find(y => y[0] === b.dataset.rs);
+        $('#ex-r', el).value = x[1];
+        $$('[data-rs]', el).forEach(c => c.classList.toggle('on', c === b));
+        if (x[2]) { $(`input[name=ex-t][value=${x[2]}]`, el).checked = true; sync(); }
+      });
+      syncDate(); sync();
       $('#ex-save', el).onclick = async () => {
-        const b = $('#ex-save', el), type = $('input[name=ex-t]:checked', el).value, until = $('#ex-u', el).value;
+        const b = $('#ex-save', el), type = $('input[name=ex-t]:checked', el).value, until = $('#ex-u', el).value, week = wk();
         if (type === 'extend' && !until) { $('#ex-err', el).innerHTML = '<div class="form-error">حدد آخر يوم للمهلة</div>'; return; }
         busy(b, true);
         try {
           const res = await api('exceptions.save', { username: r.username, week, type, until, reason: $('#ex-r', el).value });
           close();
-          toast(type === 'exempt' ? `${r.name}: معفاة من هذا الأسبوع` : `${r.name}: مهلة حتى ${fmtDay(until)}` + (res.fixed ? ` · صُحّح ${res.fixed} تقرير إلى «في الوقت»` : ''));
+          const wl = 'أسبوع ' + fmtDate(week, { day: 'numeric', month: 'short' });
+          toast(type === 'exempt' ? `${r.name}: معفاة من ${wl}` : `${r.name}: مهلة حتى ${fmtDay(until)}` + (res.fixed ? ` · صُحّح ${res.fixed} تقرير إلى «في الوقت»` : ''));
           done();
         } catch (e) { busy(b, false); $('#ex-err', el).innerHTML = `<div class="form-error">${esc(e.message)}</div>`; }
       };
