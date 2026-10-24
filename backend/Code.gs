@@ -94,7 +94,8 @@ const DEFAULT_CLINICS = (function () {
   // [clinic_id, name, branch, type, has_fridge, status] — الممرضة تختار من قائمة منسدلة بحسب فرعها.
   // ترتيب القائمة هو ترتيب الصفوف في ورقة Clinics (غيّره من الورقة مباشرة).
   const list = [];
-  for (let i = 1; i <= 13; i++) list.push(['BUR-C' + i, 'Dental Clinic ' + i, 'BURIDAH', 'dental', 'yes', 'active']);
+  for (let i = 1; i <= 12; i++) list.push(['BUR-C' + i, 'Dental Clinic ' + i, 'BURIDAH', 'dental', 'yes', 'active']);
+  list.push(['BUR-C13', 'Clinic 13 Derma', 'BURIDAH', 'derma', 'yes', 'active']);   // عيادة 13 في بريدة ديرما
   list.push(['BUR-HYDRAFACIAL', 'Derma Hydrafacial', 'BURIDAH', 'derma', 'no', 'active']);
   list.push(['BUR-CLARITY', 'Derma Clarity', 'BURIDAH', 'derma', 'no', 'active']);
   list.push(['BUR-GENTLE', 'Derma Gentle Pro', 'BURIDAH', 'derma', 'no', 'active']);
@@ -1666,6 +1667,28 @@ function apiClinicSave_(req, user) {
 
 /* ════════════════════════════ SETUP (شغّلها من المحرر) ════════════════════════════ */
 
+/** تصحيحات أسماء/أنواع العيادات على شيت قائم. الرمز يبقى كما هو فلا تنفصل التقارير القديمة عن عيادتها. */
+const CLINIC_RENAMES = [
+  { clinic_id: 'BUR-C13', name: 'Clinic 13 Derma', type: 'derma' },
+];
+
+/** شغّلها مرة واحدة: تطبّق CLINIC_RENAMES على ورقة Clinics وتحدّث اسم العيادة في التقارير والمشاكل السابقة. */
+function applyClinicRenames() {
+  const done = [];
+  CLINIC_RENAMES.forEach(fix => {
+    const c = rows_(S.CLINICS).find(x => x.clinic_id === fix.clinic_id);
+    if (!c) return;
+    if (c.name !== fix.name || c.type !== fix.type) setCells_(S.CLINICS, c._row, { name: fix.name, type: fix.type });
+    let n = 0;
+    [S.REPORTS, S.ISSUES].forEach(sheet => rows_(sheet).forEach(r => {
+      if (r.clinic_id === fix.clinic_id && r.clinic_name !== fix.name) { setCells_(sheet, r._row, { clinic_name: fix.name }); n++; }
+    }));
+    done.push(fix.clinic_id + ' ← ' + fix.name + ' (' + n + ' صف)');
+  });
+  try { SpreadsheetApp.getActive().toast(done.join('\n') || 'لا تغيير', APP.NAME, 8); } catch (e) {}
+  return done;
+}
+
 /**
  * شغّلها مرة واحدة: تنشئ الأوراق والإعدادات والعيادات وحسابات الإدارة.
  * كلمات المرور المؤقتة تظهر في ورقة Temp_Passwords — وزّعها ثم احذف الورقة.
@@ -1680,6 +1703,7 @@ function setup() {
   if (!rows_(S.CLINICS).length) {
     sh_(S.CLINICS).getRange(2, 1, DEFAULT_CLINICS.length, 6).setValues(DEFAULT_CLINICS);
   }
+  applyClinicRenames();
   const staff = [
     ['admin', 'مدير النظام', 'admin', 'ALL'],
     ['quality', 'إدارة الجودة', 'quality', 'ALL'],
