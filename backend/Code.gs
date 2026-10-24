@@ -16,7 +16,7 @@
 
 const APP = {
   NAME: 'Nursing',
-  VERSION: '2026-10-22',   // يجب أن يطابق CLIENT_VERSION في index.html
+  VERSION: '2026-10-24',   // يجب أن يطابق CLIENT_VERSION في index.html
   TZ: 'Asia/Riyadh',
   SESSION_SECONDS: 6 * 60 * 60, // أقصى مدة يسمح بها CacheService
   HASH_ROUNDS: 250,
@@ -192,12 +192,29 @@ function loginCandidates_(raw) {
   const id = String(raw || '').trim().toLowerCase(), idc = id.replace(/\s+/g, '');
   if (!id) return [];
   const eq = v => { const x = String(v || '').trim().toLowerCase(); return !!x && (x === id || x.replace(/\s+/g, '') === idc); };
-  return rows_(S.USERS).filter(x => x.role !== 'merged' && (eq(x.username) || eq(x.email) || eq(x.login)));
+  const users = rows_(S.USERS).filter(x => x.role !== 'merged');
+  const exact = users.filter(x => eq(x.username) || eq(x.email) || eq(x.login));
+  // الممرضة قد تكتب اسمها بدل اسم الدخول (Apple بدل Apple1): نضيف من يطابق اسمها، والرقم السري يحسم إن تشابهت الأسماء
+  return exact.concat(users.filter(x => x.role === 'nurse' && exact.indexOf(x) < 0 && eq(x.name)));
+}
+
+/** الأرقام السرية: الشيت يحذف الصفر في البداية (0565 ← 565)، فنقبل الصيغتين */
+function passVariants_(pw) {
+  const out = [pw];
+  if (/^\d+$/.test(pw)) {
+    const bare = pw.replace(/^0+/, '');
+    if (bare && bare !== pw) out.push(bare);
+    for (let p = bare; p.length < 4; ) { p = '0' + p; if (out.indexOf(p) < 0) out.push(p); }
+  }
+  return out;
+}
+function passOk_(u, pw) {
+  return !!(u && u.pass_hash && passVariants_(pw).some(v => hash_(v, u.salt) === u.pass_hash));
 }
 
 /** إن طابق أكثر من حساب (مثل حساب قديم مكرر) نختار الذي تصح معه كلمة المرور */
 function pickLoginUser_(cands, pw) {
-  return cands.find(x => x.status === 'active' && x.pass_hash && hash_(pw, x.salt) === x.pass_hash)
+  return cands.find(x => x.status === 'active' && passOk_(x, pw))
     || cands.find(x => x.status === 'active' && x.pass_hash) || cands[0] || null;
 }
 
@@ -214,7 +231,7 @@ function apiLogin_(req) {
   const fails = Number(cache.get(failKey) || 0);
   if (fails >= APP.MAX_LOGIN_FAILS) throw err_('تم إيقاف المحاولة مؤقتاً. حاول بعد ' + APP.LOCK_MINUTES + ' دقائق');
 
-  if (!u || u.status !== 'active' || hash_(pw, u.salt) !== u.pass_hash) {
+  if (!u || u.status !== 'active' || !passOk_(u, pw)) {
     cache.put(failKey, String(fails + 1), APP.LOCK_MINUTES * 60);
     throw err_('بيانات الدخول غير صحيحة');
   }
@@ -263,7 +280,7 @@ function apiChangePassword_(req, sessionUser) {
   const user = rows_(S.USERS).find(x => x.username === sessionUser.username);   // الصف الكامل (قد تكون الجلسة محفوظة مختصرة)
   const oldPw = String(req.oldPassword || '');
   const newPw = String(req.newPassword || '').trim();
-  if (hash_(oldPw, user.salt) !== user.pass_hash) throw err_('كلمة المرور الحالية غير صحيحة');
+  if (!passOk_(user, oldPw)) throw err_('كلمة المرور الحالية غير صحيحة');
   if (newPw.length < 6) throw err_('كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل');
   if (newPw === oldPw) throw err_('اختر كلمة مرور مختلفة عن الحالية');
   const salt = Utilities.getUuid();
@@ -1043,7 +1060,7 @@ function checkCredentials() {
       else msg = '✗ الحساب موجود (' + m.user.name + ' · ' + (m.user.email || m.user.username) + ') لكن لم يُطبَّق عليه الرقم بعد. شغّل applyCredentials وانظر عمود result لهذا الصف';
     }
     else if (u.status !== 'active') msg = '✗ الحساب (' + u.name + ') غير نشط/ترك العمل';
-    else if (!u.pass_hash || hash_(pw, u.salt) !== u.pass_hash) msg = '✗ الرقم السري لا يطابق حساب ' + u.name + '. شغّل applyCredentials مرة أخرى';
+    else if (!passOk_(u, pw)) msg = '✗ الرقم السري لا يطابق حساب ' + u.name + '. شغّل applyCredentials مرة أخرى';
     else if (Number(cache.get('fail_' + String(u.username).toLowerCase()) || 0) >= APP.MAX_LOGIN_FAILS) msg = '✗ مقفل مؤقتاً بعد محاولات خاطئة: شغّل clearLoginLocks';
     else msg = '✓ يدخل بـ «' + (u.login || id) + '» → ' + u.name + (cands.length > 1 ? ' (تنبيه: ' + cands.length + ' حسابات بنفس الاسم)' : '');
     if (msg[0] === '✓') good++; else bad++;
@@ -1092,7 +1109,15 @@ function processCredentials_(dryRun) {
 
     const taken = Object.assign(create ? loginsTaken_() : loginsTaken_(m.user.username), usedLogins);
     const login = loginNameFor_(m.user, taken, get('username'));
-    if (!login) return fail('اسم الدخول مكرر أو قصير (3 خانات على الأقل): اكتب اسماً آخر في عمود username');
+    if (!login) {
+      // نسمّي الحساب الذي يحجز الاسم: غالباً حساب قديم مكرر لنفس الممرضة يجب دمجه
+      const want = String(get('username') || '').trim().toLowerCase().replace(/\s+/g, '');
+      const holder = want && rows_(S.USERS).find(x => x.username !== m.user.username && x.role !== 'merged'
+        && [x.username, x.login, x.email].some(k => String(k || '').trim().toLowerCase().replace(/\s+/g, '') === want));
+      return fail(holder
+        ? 'اسم الدخول «' + get('username') + '» محجوز لحساب آخر: ' + holder.name + ' (' + (holder.email || holder.username) + (holder.status !== 'active' ? '، غير نشط' : '') + '). إن كانت نفس الممرضة ادمجهما من ورقة Merges (from: ' + holder.username + ' · into: ' + (m.user.email || m.user.username) + ') ثم أعد applyCredentials، وإلا اكتب اسماً آخر'
+        : 'اسم الدخول مكرر أو قصير (3 خانات على الأقل): اكتب اسماً آخر في عمود username');
+    }
     usedLogins[login] = 1; if (!create) usedAccounts[m.user.username] = i + 2;
 
     const wasInactive = !create && m.user.status !== 'active';
