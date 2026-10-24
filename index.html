@@ -796,7 +796,7 @@ function renderLogin(error) {
         ${window.APEX_DEMO ? `<div class="demo-box"><b>${state.lang === 'en' ? 'Demo — fictional data. Try as:' : 'نسخة تجريبية ببيانات وهمية. جرّب بصفة:'}</b>
           <div class="chips">${DEMO_ACCOUNTS.map(a => `<button type="button" class="btn sm" data-demo="${a.u}">${a.label}</button>`).join('')}</div></div>` : ''}
         ${!API() && !window.APEX_DEMO ? `<div class="form-error">${esc(t('noApi'))}</div>` : ''}
-        ${error ? `<div class="form-error">${esc(error)}</div>` : '<div id="le"></div>'}
+        <div id="le">${error ? `<div class="form-error">${esc(error)}</div>` : ''}</div>
             <p class="login-sig" dir="ltr">Built and developed by Mr.Ibrahim Alluhaydi.</p>
       </form>
     </section>
@@ -834,8 +834,9 @@ function renderLogin(error) {
       d.user.mustChange ? renderChangePassword() : boot();
     } catch (err) {
       busy(btn, false);
-      const box = $('#login-form .form-error:last-child') || $('#le');
-      box.outerHTML = `<div class="form-error">${esc(err.message)}</div>`;
+      const box = $('#le');
+      if (box) box.innerHTML = `<div class="form-error">${esc(err.message)}</div>`;
+      else alert(err.message);
     }
   };
   setTimeout(() => $('#lu') && $('#lu').focus(), 50);
