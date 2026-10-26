@@ -699,7 +699,7 @@ async function copyText(text) {
 
 /* ══════════ API ══════════ */
 /* نتائج صفحات القراءة تُحفظ دقيقتين في الذاكرة: التنقل بين الصفحات فوري، وأي تعديل يمسحها */
-const CLIENT_VERSION = '2026-10-24';   // يجب أن يطابق APP.VERSION في Code.gs
+const CLIENT_VERSION = '2026-10-26';   // يجب أن يطابق APP.VERSION في Code.gs
 const READ_ACTIONS = ['nurse.context', 'hr.overview', 'quality.stats', 'reports.list', 'issues.list', 'users.list', 'clinics.list'];
 const MEMO = new Map(), INFLIGHT = new Map();
 const MEMO_MS = 120000;
@@ -1474,7 +1474,7 @@ async function renderHR(view) {
       <div class="toolbar">
         <input class="input" id="r-q" placeholder="بحث بالاسم" value="${esc(hrState.q)}" style="min-width:150px">
         <select class="input" id="r-br"><option value="ALL">كل الفروع</option><option value="BURIDAH">بريدة</option><option value="ONIZAH">عنيزة</option></select>
-        <select class="input" id="r-span" aria-label="فترة الالتزام"><option value="all">الالتزام: كل المدة</option><option value="26">الالتزام: آخر 6 أشهر</option><option value="12">الالتزام: آخر 12 أسبوع</option></select>
+        <select class="input" id="r-span" aria-label="فترة الالتزام"><option value="1">الالتزام: هذا الأسبوع</option><option value="all">الالتزام: كل المدة</option><option value="26">الالتزام: آخر 6 أشهر</option><option value="12">الالتزام: آخر 12 أسبوع</option></select>
         <select class="input" id="r-f"><option value="everyone">كل الممرضات</option><option value="active">على رأس العمل</option><option value="all">العاملات والإجازات</option><option value="missing">غير الملتزمات</option><option value="leave">في إجازة</option><option value="inactive">تركن العمل</option></select>
         <button class="btn sm" id="r-csv">${icon('dl')}CSV</button>
       </div></div>
@@ -1559,7 +1559,8 @@ async function renderHR(view) {
   /* ───── جدول الحالة ───── */
   const isAdmin = state.user.role === 'admin';
   const fy = w => fmtDate(w, { day: 'numeric', month: 'short', year: 'numeric' });
-  const spanLabel = 'الالتزام' + (d.weeks.length ? ' (' + fy(d.weeks[0]) + ' – ' + fy(d.weeks[d.weeks.length - 1]) + ')' : '');
+  const sw = d.spanWeeks || d.weeks;
+  const spanLabel = 'الالتزام' + (sw.length === 1 ? ' (أسبوع ' + fy(sw[0]) + ')' : sw.length ? ' (' + fy(sw[0]) + ' – ' + fy(sw[sw.length - 1]) + ')' : '');
   const statusCell = r => `<select class="input status-select st-${r.state}" data-status="${esc(r.username)}" aria-label="حالة ${esc(r.name)}">
       ${['active', 'leave', 'inactive'].map(k => `<option value="${k}" ${r.state === k ? 'selected' : ''}>${STATE_LABEL[k]}</option>`).join('')}</select>
       ${r.leave ? `<div class="leave-note"><span class="num">${esc(fmtDay(r.leave.from))} → ${esc(fmtDay(r.leave.to))}</span><button class="linkbtn" data-leave-edit="${esc(r.username)}">تعديل / تمديد</button></div>` : ''}`;
@@ -1571,7 +1572,7 @@ async function renderHR(view) {
         + (isAdmin && r.state !== 'inactive' ? `<div style="margin-top:4px"><button class="btn sm" data-ex="${esc(r.username)}">${icon('clock')}${r.exception ? 'تعديل الاستثناء' : 'استثناء'}</button></div>` : ''),
       csv: r => (r.state === 'inactive' ? '' : t('st_' + r.thisWeek)) + (r.exception ? (r.exception.type === 'exempt' ? ' (معفاة)' : ' (مهلة حتى ' + r.exception.until + ')') : '') },
     { label: 'آخر 12 أسبوع', html: r => { const off = Math.max(0, r.cells.length - 12); return `<div class="heat">${r.cells.slice(off).map((c, i) => `<i class="${c}" title="${fmtShort(d.weeks[off + i])} — ${t('st_' + c)}"></i>`).join('')}</div>`; }, csv: r => r.cells.slice(-12).map(c => t('st_' + c)).join(' | ') },
-    { label: spanLabel, html: r => `<span class="num strong">${pct(r.compliance)}</span><div class="muted num" style="font-size:11.5px">${r.doneWeeks} من ${r.expectedWeeks} أسبوع</div>`, csv: r => pct(r.compliance) },
+    { label: spanLabel, html: r => `<span class="num strong">${pct(r.compliance)}</span><div class="muted num" style="font-size:11.5px">${r.expectedWeeks ? r.doneWeeks + ' من ' + r.expectedWeeks + ' أسبوع' : 'غير مطلوب'}</div>`, csv: r => pct(r.compliance) },
     { label: 'التقارير', html: r => `<span class="num">${r.reports}</span>`, csv: r => r.reports },
     { label: 'الحالة', html: statusCell, csv: r => STATE_LABEL[r.state] + (r.leave ? ` (${r.leave.from} → ${r.leave.to})` : '') },
   ];

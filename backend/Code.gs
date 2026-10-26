@@ -16,7 +16,7 @@
 
 const APP = {
   NAME: 'Nursing',
-  VERSION: '2026-10-24',   // يجب أن يطابق CLIENT_VERSION في index.html
+  VERSION: '2026-10-26',   // يجب أن يطابق CLIENT_VERSION في index.html
   TZ: 'Asia/Riyadh',
   SESSION_SECONDS: 6 * 60 * 60, // أقصى مدة يسمح بها CacheService
   HASH_ROUNDS: 250,
@@ -779,9 +779,22 @@ function buildRoster_(user, week, weeks, cfg) {
 function apiHrOverview_(req, user) {
   const cfg = settings_();
   const week = normalizeWeek_(req.week, cfg);
+  const one = String(req.weeks) === '1';   // «هذا الأسبوع»: الشريط يبقى 12 أسبوعاً والنسبة على الأسبوع المختار وحده
   const weeks = req.weeks === 'all' ? weeksBetween_(firstWeek_(user, week), week)
-    : weeksBack_(week, Math.min(52, Math.max(4, Number(req.weeks) || 12)));
+    : weeksBack_(week, one ? 12 : Math.min(52, Math.max(4, Number(req.weeks) || 12)));
   const roster = buildRoster_(user, week, weeks, cfg);
+  if (one) {
+    const mine = {};
+    rows_(S.REPORTS).forEach(r => { if (r.week_start === week) mine[r.username] = (mine[r.username] || 0) + 1; });
+    roster.forEach(r => {
+      const c = r.thisWeek, counted = c !== 'na' && c !== 'leave';
+      r.expectedWeeks = counted ? 1 : 0;
+      r.doneWeeks = counted && c !== 'missing' ? 1 : 0;
+      r.compliance = counted ? r.doneWeeks * 100 : null;
+      r.onTimeRate = counted ? (c === 'on_time' || c === 'early' ? 100 : 0) : null;
+      r.reports = mine[r.username] || 0;
+    });
+  }
   roster.forEach(r => { const ex = exceptionFor_(r.username, week); r.exception = ex ? { id: ex.ex_id, type: ex.type, until: ex.until, reason: ex.reason, by: ex.created_by } : null; });
   // أسابيع متتالية بلا تسليم حتى آخر أسبوع انتهت نافذته (شرط إشعار عدم الالتزام)
   const closedIdx = weeks.indexOf(lastClosedWeek_(cfg));
@@ -804,7 +817,7 @@ function apiHrOverview_(req, user) {
   const today = dateStr_(new Date());
   const remindable = isCurrent ? roster.filter(r => r.thisWeek === 'missing' && r.state === 'active' && emailOf_(r)).length : 0;
   return {
-    week: week, weeks: weeks, isCurrent: isCurrent,
+    week: week, weeks: weeks, spanWeeks: one ? [week] : weeks, isCurrent: isCurrent,
     summary: {
       expected: expected.length, committed: committed, missing: count('missing'),
       onTime: count('on_time') + count('early'), late: count('late') + count('very_late'),
