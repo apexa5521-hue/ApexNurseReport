@@ -16,7 +16,7 @@
 
 const APP = {
   NAME: 'Nursing',
-  VERSION: '2026-10-26',   // يجب أن يطابق CLIENT_VERSION في index.html
+  VERSION: '2026-10-27',   // يجب أن يطابق CLIENT_VERSION في index.html
   TZ: 'Asia/Riyadh',
   SESSION_SECONDS: 6 * 60 * 60, // أقصى مدة يسمح بها CacheService
   HASH_ROUNDS: 250,
@@ -68,7 +68,7 @@ const HEADERS = {
   Temp_Passwords: ['name', 'username', 'role', 'temp_password', 'created_at'],
   Exceptions: ['ex_id', 'username', 'week_start', 'type', 'until', 'reason', 'created_at', 'created_by', 'cancelled'],
   Notices: ['notice_id', 'username', 'nurse_name', 'branch', 'weeks', 'streak', 'compliance', 'issued_at', 'issued_by'],
-  Leaves: ['leave_id', 'username', 'from_date', 'to_date', 'cancelled', 'created_at', 'created_by'],
+  Leaves: ['leave_id', 'username', 'from_date', 'to_date', 'cancelled', 'created_at', 'created_by', 'reason'],
 };
 
 const DEFAULT_SETTINGS = [
@@ -176,6 +176,9 @@ const ACTIONS = {
   'users.save':     { roles: ['hr', 'admin'], fn: apiUserSave_ },
   'users.reset':    { roles: ['hr', 'admin'], fn: apiUserReset_ },
   'users.setStatus': { roles: ['hr', 'admin'], fn: apiUserSetStatus_ },
+  'nurse.history':  { roles: ['hr', 'quality', 'admin'], fn: apiNurseHistory_ },
+  'leaves.gap':     { roles: ['hr', 'admin'], fn: apiLeaveGap_ },
+  'leaves.cancel':  { roles: ['hr', 'admin'], fn: apiLeaveCancel_ },
   'exceptions.save':   { roles: ['admin'], fn: apiExceptionSave_ },
   'settings.pause':    { roles: ['admin'], fn: apiSettingsPause_ },
   'audit.list':        { roles: ['admin'], fn: apiAuditList_ },
@@ -1143,7 +1146,9 @@ function processCredentials_(dryRun) {
       const row2 = Object.assign(base, f);
       appendObjects_(S.USERS, [row2]); nurses.push(row2);
     } else {
+      const gap = wasInactive ? gapLeaveOnReactivate_(m.user, 'admin') : null;
       setCells_(S.USERS, m.user._row, Object.assign(f, wasInactive ? { status: 'active', end_date: '' } : {}));
+      if (gap) { ok++; say('تم: ' + label + ' · فترة التوقف ' + gap.from_date + ' → ' + gap.to_date + ' سُجّلت «خارج العمل» ولا تُحسب غياباً'); log_('admin', 'credentials_set', m.user.username + ' → ' + login); return; }
     }
     log_('admin', 'credentials_set', m.user.username + ' → ' + login);
     ok++; say('تم: ' + label);
@@ -1315,6 +1320,7 @@ function apiUserSetStatus_(req, user) {
         appendObjects_(S.LEAVES, [{ leave_id: 'L' + Utilities.formatDate(new Date(), APP.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 90 + 10),
           username: u.username, from_date: dateStr_(from), to_date: dateStr_(to), cancelled: '', created_at: nowStr_(), created_by: user.name }]);
       }
+      gapLeaveOnReactivate_(u, user.name);
       setCells_(S.USERS, u._row, { status: 'active', end_date: '' });
     } else if (st === 'inactive') {
       closeLeaves();
@@ -1322,6 +1328,7 @@ function apiUserSetStatus_(req, user) {
       setCells_(S.USERS, u._row, { status: 'inactive', end_date: dateStr_(addDays_(parseDate_(currentWeek_(settings_())), -1)) });
     } else {
       closeLeaves();
+      gapLeaveOnReactivate_(u, user.name);
       setCells_(S.USERS, u._row, { status: 'active', end_date: '' });
     }
     log_(user.username, 'status_' + st, u.username + (st === 'leave' ? ' ' + req.leave_from + '→' + req.leave_to : ''));
@@ -1331,6 +1338,119 @@ function apiUserSetStatus_(req, user) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/* ───────── فترة التوقف وسجل الممرضة (إثبات قبل أي إشعار) ───────── */
+
+const GAP_REASON = 'خارج العمل (فترة توقف قبل إعادة التفعيل)';
+
+/**
+ * عند إعادة تفعيل ممرضة متوقفة: الأسابيع بين آخر أسبوع مطلوب منها وبداية الأسبوع الجاري تُسجَّل «خارج العمل»،
+ * حتى لا يتحول التوقف إلى غياب بمجرد التفعيل. يُلغى من سجل الممرضة إن كانت تعمل فعلاً تلك الفترة.
+ */
+function gapLeaveOnReactivate_(u, by) {
+  if (!u || u.status === 'active') return null;
+  const cfg = settings_();
+  const end = u.end_date ? dateStr_(parseDate_(u.end_date)) : (lastWeekMap_()[u.username] || '');
+  if (!end) return null;
+  // أول أسبوع لم يعد مطلوباً منها = أول سبت بعد تاريخ التوقف (نفس قاعدة expectedOn_)
+  const e = parseDate_(end);
+  const from = dateStr_(addDays_(e, ((cfg.DEADLINE_WEEKDAY - e.getDay() + 7) % 7) || 7));
+  const to = dateStr_(addDays_(parseDate_(currentWeek_(cfg)), -1));
+  if (from > to) return null;
+  return addLeave_(u.username, from, to, by, GAP_REASON);
+}
+
+function addLeave_(username, from, to, by, reason) {
+  const row = { leave_id: 'L' + Utilities.formatDate(new Date(), APP.TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 90 + 10),
+    username: username, from_date: from, to_date: to, cancelled: '', created_at: nowStr_(), created_by: by || '', reason: reason || '' };
+  appendObjects_(S.LEAVES, [row]);
+  delete ROWS_CACHE_[S.LEAVES];
+  return row;
+}
+
+/** سجل الممرضة أسبوعاً بأسبوع: ماذا سلّمت ومتى وأين، أو لماذا لم يُطلب منها، مع فترات الغياب المتتالية */
+function apiNurseHistory_(req, user) {
+  const cfg = settings_();
+  const u = rows_(S.USERS).find(x => x.username === req.username && x.role === 'nurse');
+  if (!u) throw err_('الممرضة غير موجودة');
+  if (!branchAllowed_(user, u.branch)) throw err_('ليست لديك صلاحية على هذا الفرع', 'FORBIDDEN');
+  const mine = rows_(S.REPORTS).filter(r => r.username === u.username);
+  const leaves = leavesMap_()[u.username] || [];
+  const cur = currentWeek_(cfg), closed = lastClosedWeek_(cfg);
+  let first = mine.reduce((m, r) => r.week_start && (!m || r.week_start < m) ? r.week_start : m, '');
+  if (u.start_date) { const sw = weekOf_(dateStr_(parseDate_(u.start_date)), cfg); if (!first || sw < first) first = sw; }
+  const weeks = first ? weeksBetween_(first, cur) : [cur];
+  const exList = exceptions_().list.filter(x => x.username === u.username);
+  const rows = weeks.map(w => {
+    const rs = mine.filter(r => r.week_start === w).sort((a, b) => a.submitted_at < b.submitted_at ? -1 : 1);
+    const expected = expectedOn_(u, w, leaves, cfg);
+    let state = expected || rs.length ? bestTiming_(rs) : (onLeave_(leaves, w) ? 'leave' : 'na');
+    if (state === 'missing' && w > closed) state = 'open';   // النافذة لم تُغلق بعد
+    const lv = leaves.filter(l => l.from_date <= w && w <= l.to_date).slice(-1)[0];
+    const ex = exList.filter(x => x.week_start === w).slice(-1)[0];
+    let why = '';
+    if (state === 'na') {
+      if (ex && ex.type === 'exempt') why = 'معفاة: ' + (ex.reason || 'استثناء من المدير');
+      else if (u.start_date && w < weekOf_(dateStr_(parseDate_(u.start_date)), cfg)) why = 'قبل تاريخ بدء العمل';
+      else if (u.status !== 'active') why = 'متوقفة عن العمل';
+    }
+    return {
+      week: w, state: state, why: why,
+      reports: rs.map(r => ({ id: r.report_id, at: r.submitted_at, clinic: r.clinic_name, timing: r.timing,
+                              source: /^legacy:/.test(String(r.source || r.report_id)) || /form/i.test(String(r.source)) ? 'form' : 'app' })),
+      leave: lv ? { id: lv.leave_id, from: lv.from_date, to: lv.to_date, reason: lv.reason || 'إجازة', by: lv.created_by } : null,
+      exception: ex ? { type: ex.type, until: ex.until, reason: ex.reason } : null,
+    };
+  });
+  // فترات «لم تسلّم» المتتالية (بعد إغلاق النافذة)
+  const runs = [];
+  rows.forEach((r, i) => {
+    if (r.state !== 'missing') return;
+    const last = runs[runs.length - 1];
+    if (last && last.endIdx === i - 1) { last.to = r.week; last.endIdx = i; last.weeks++; }
+    else runs.push({ from: r.week, to: r.week, endIdx: i, weeks: 1 });
+  });
+  const counted = rows.filter(r => r.state !== 'na' && r.state !== 'leave' && r.state !== 'open');
+  const done = counted.filter(r => r.state !== 'missing');
+  return {
+    nurse: { username: u.username, name: u.name, email: u.email, branch: u.branch, status: u.status,
+             start_date: u.start_date || '', end_date: u.end_date || '' },
+    weeks: rows.reverse(),
+    runs: runs.map(x => ({ from: x.from, to: dateStr_(addDays_(parseDate_(x.to), 6)), lastWeek: x.to, weeks: x.weeks })).reverse(),
+    totals: { expected: counted.length, done: done.length, missing: counted.length - done.length, reports: mine.length,
+              compliance: counted.length ? Math.round(done.length / counted.length * 100) : null },
+    asOf: closed, generatedAt: nowStr_(),
+  };
+}
+
+/** تسجيل فترة سابقة «خارج العمل» (لم تكن تعمل فعلاً)، فلا تُحسب غياباً */
+function apiLeaveGap_(req, user) {
+  const u = rows_(S.USERS).find(x => x.username === req.username && x.role === 'nurse');
+  if (!u) throw err_('الممرضة غير موجودة');
+  if (!branchAllowed_(user, u.branch)) throw err_('ليست لديك صلاحية على هذا الفرع', 'FORBIDDEN');
+  const from = parseDate_(req.from), to = parseDate_(req.to);
+  if (!from || !to) throw err_('حدد بداية الفترة ونهايتها');
+  if (to < from) throw err_('نهاية الفترة قبل بدايتها');
+  if (daysBetween_(from, to) > 800) throw err_('الفترة طويلة جداً، تحقق من التواريخ');
+  const reason = clean_(req.reason, 200) || 'خارج العمل';
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const row = addLeave_(u.username, dateStr_(from), dateStr_(to), user.name, reason);
+    log_(user.username, 'leave_gap', u.username + ' ' + row.from_date + '→' + row.to_date + ' · ' + reason);
+    return { leave: row };
+  } finally { lock.releaseLock(); }
+}
+
+function apiLeaveCancel_(req, user) {
+  const l = rows_(S.LEAVES).find(x => x.leave_id === req.leave_id && x.cancelled !== 'yes');
+  if (!l) throw err_('الفترة غير موجودة');
+  const u = rows_(S.USERS).find(x => x.username === l.username);
+  if (u && !branchAllowed_(user, u.branch)) throw err_('ليست لديك صلاحية على هذا الفرع', 'FORBIDDEN');
+  setCell_(S.LEAVES, l._row, 'cancelled', 'yes');
+  log_(user.username, 'leave_cancel', l.username + ' ' + l.from_date + '→' + l.to_date);
+  return { ok: true };
 }
 
 /* ════════════════════════════ QUALITY / STATS ════════════════════════════ */

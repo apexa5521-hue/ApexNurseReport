@@ -699,7 +699,7 @@ async function copyText(text) {
 
 /* ══════════ API ══════════ */
 /* نتائج صفحات القراءة تُحفظ دقيقتين في الذاكرة: التنقل بين الصفحات فوري، وأي تعديل يمسحها */
-const CLIENT_VERSION = '2026-10-26';   // يجب أن يطابق APP.VERSION في Code.gs
+const CLIENT_VERSION = '2026-10-27';   // يجب أن يطابق APP.VERSION في Code.gs
 const READ_ACTIONS = ['nurse.context', 'hr.overview', 'quality.stats', 'reports.list', 'issues.list', 'users.list', 'clinics.list'];
 const MEMO = new Map(), INFLIGHT = new Map();
 const MEMO_MS = 120000;
@@ -1505,7 +1505,7 @@ async function renderHR(view) {
   };
   const bindNotices = scope => $$('[data-notice]', scope).forEach(b => b.onclick = async () => {
     const r = d.roster.find(x => x.username === b.dataset.notice);
-    if (!await confirmDialog(`سيُسجَّل إشعار عدم التزام لـ ${r.name} (لم تسلّم ${r.noticeStreak} أسابيع متتالية${r.notices ? `، ولديها ${r.notices} إشعار سابق` : ''}) ثم تُفتح الطباعة.`)) return;
+    if (!await confirmDialog(`سيُسجَّل إشعار عدم التزام لـ ${r.name} (لم تسلّم ${r.noticeStreak} أسابيع متتالية${r.notices ? `، ولديها ${r.notices} إشعار سابق` : ''}) ثم تُفتح الطباعة. تأكد قبلها من «السجل» أنها كانت على رأس العمل في تلك الأسابيع.`)) return;
     issueNotices([r.username], b, () => renderHR(view));
   });
   bindNotices(view);
@@ -1565,7 +1565,7 @@ async function renderHR(view) {
       ${['active', 'leave', 'inactive'].map(k => `<option value="${k}" ${r.state === k ? 'selected' : ''}>${STATE_LABEL[k]}</option>`).join('')}</select>
       ${r.leave ? `<div class="leave-note"><span class="num">${esc(fmtDay(r.leave.from))} → ${esc(fmtDay(r.leave.to))}</span><button class="linkbtn" data-leave-edit="${esc(r.username)}">تعديل / تمديد</button></div>` : ''}`;
   const cols = [
-    { label: 'الممرضة', html: r => `<div style="display:flex;align-items:center;gap:10px"><span class="avatar sm">${esc(initials(r.name))}</span><div><b style="font-weight:600">${esc(r.name)}</b><div class="muted" style="font-size:11.5px" dir="ltr">${esc(r.email || '')}</div>${r.notices ? `<span class="tag" style="margin-top:3px" title="آخر إشعار ${esc(fmtDay(r.lastNotice))}">${r.notices} إشعار عدم التزام</span>` : ''}</div>${r.noticeStreak >= 2 ? `<button class="btn sm" style="margin-inline-start:auto" data-notice="${esc(r.username)}" title="لم تسلّم ${r.noticeStreak} أسابيع متتالية">${icon('print')}إشعار</button>` : ''}</div>`, csv: r => r.name },
+    { label: 'الممرضة', html: r => `<div style="display:flex;align-items:center;gap:10px"><span class="avatar sm">${esc(initials(r.name))}</span><div><b style="font-weight:600">${esc(r.name)}</b><div class="muted" style="font-size:11.5px" dir="ltr">${esc(r.email || '')}</div>${r.notices ? `<span class="tag" style="margin-top:3px" title="آخر إشعار ${esc(fmtDay(r.lastNotice))}">${r.notices} إشعار عدم التزام</span>` : ''}<div><button class="linkbtn" data-hist="${esc(r.username)}" title="كل أسبوع: متى سلّمت وأين، أو لماذا لم يُطلب منها">${icon('clock')}السجل</button></div></div>${r.noticeStreak >= 2 ? `<button class="btn sm" style="margin-inline-start:auto" data-notice="${esc(r.username)}" title="لم تسلّم ${r.noticeStreak} أسابيع متتالية">${icon('print')}إشعار</button>` : ''}</div>`, csv: r => r.name },
     { label: 'الفرع', get: r => br(r.branch) },
     { label: 'هذا الأسبوع', html: r => (r.state === 'inactive' ? '<span class="muted">—</span>' : timingPill(r.thisWeek))
         + (r.exception ? `<div class="leave-note"><span class="tag" title="${esc(r.exception.reason || '')}${r.exception.by ? ' · ' + esc(r.exception.by) : ''}">${r.exception.type === 'exempt' ? 'معفاة هذا الأسبوع' : 'مهلة حتى ' + esc(fmtDay(r.exception.until))}</span>${isAdmin ? `<button class="linkbtn" data-ex-cancel="${esc(r.exception.id)}">إلغاء</button>` : ''}</div>` : '')
@@ -1588,6 +1588,7 @@ async function renderHR(view) {
     $('#roster').innerHTML = tableHTML(cols, filtered(), { empty: 'لا توجد نتائج' });
     bindNotices($('#roster'));
     bindEx($('#roster'));
+    $$('#roster [data-hist]').forEach(b => b.onclick = () => nurseHistoryDialog(b.dataset.hist, () => renderHR(view)));
     $$('#roster [data-status]').forEach(sel => sel.onchange = async () => {
       const r = d.roster.find(x => x.username === sel.dataset.status), v = sel.value;
       const revert = () => { sel.value = r.state; };
@@ -1673,6 +1674,75 @@ function exceptionDialog(r, week0, done) {
         } catch (e) { busy(b, false); $('#ex-err', el).innerHTML = `<div class="form-error">${esc(e.message)}</div>`; }
       };
     },
+  });
+}
+
+/** سجل الممرضة أسبوعاً بأسبوع: الإثبات قبل أي إشعار، وتصحيح فترات لم تكن فيها على رأس العمل */
+const HIST_STATE = { on_time: 'في الوقت', early: 'مبكر', late: 'متأخر', very_late: 'خارج النافذة', missing: 'لم تسلّم', open: 'النافذة مفتوحة', leave: 'إجازة / خارج العمل', na: 'غير مطلوب' };
+async function nurseHistoryDialog(username, onChange) {
+  let d;
+  try { d = await api('nurse.history', { username }); } catch (e) { return toast(e.message, 'err'); }
+  const canFix = ['hr', 'admin'].indexOf(state.user.role) >= 0;
+  const n = d.nurse, T = d.totals;
+  const src = s => s === 'form' ? 'نموذج Google' : 'المنصة';
+  const cell = w => {
+    if (w.reports.length) return w.reports.map(r => `<div><b class="num">${esc(fmtDT(r.at))}</b> · ${esc(r.clinic)} <span class="muted">· ${src(r.source)}</span></div>`).join('');
+    if (w.leave) return `<span class="muted">${esc(w.leave.reason)} (${esc(fmtDay(w.leave.from))} → ${esc(fmtDay(w.leave.to))})</span>${canFix ? ` <button class="linkbtn" data-lc="${esc(w.leave.id)}">إلغاء الفترة</button>` : ''}`;
+    if (w.why) return `<span class="muted">${esc(w.why)}</span>`;
+    if (w.state === 'missing') return '<span class="muted">لا يوجد أي تقرير منها لهذا الأسبوع، لا في المنصة ولا في نموذج Google</span>';
+    return '';
+  };
+  const pill = w => w.state === 'open' ? '<span class="pill">النافذة مفتوحة</span>' : timingPill(w.state === 'leave' ? 'leave' : w.state);
+  const runs = d.runs.filter(x => x.weeks >= 2);
+  modal({
+    title: 'سجل ' + n.name, wide: true,
+    body: `<div class="muted" style="font-size:12.5px;margin-top:-4px">${esc(br(n.branch))} · <span dir="ltr">${esc(n.email || n.username)}</span>${n.status !== 'active' ? ' · متوقفة عن العمل' : ''} · حتى آخر أسبوع مغلق ${esc(fmtDay(d.asOf))}</div>
+      <div class="mini" style="margin:12px 0">
+        <div><b class="num">${T.expected}</b><span>أسبوع مطلوب</span></div>
+        <div><b class="num">${T.done}</b><span>سلّمت</span></div>
+        <div><b class="num">${T.missing}</b><span>لم تسلّم</span></div>
+        <div><b class="num">${pct(T.compliance)}</b><span>الالتزام</span></div></div>
+      ${runs.length ? `<div class="notice" style="margin-bottom:12px"><b>فترات غياب متتالية</b>${canFix ? ' — إن لم تكن على رأس العمل فيها (سفر، انقطاع، لم تمسك عيادة) سجّلها «خارج العمل» فلا تُحسب عليها' : ''}
+        ${runs.map((x, i) => `<div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap"><span class="num">${esc(fmtDay(x.from))} → ${esc(fmtDay(x.to))}</span><span class="tag">${x.weeks} أسابيع</span>${canFix ? `<button class="btn sm" data-gap="${i}">سجّلها خارج العمل</button>` : ''}</div>`).join('')}</div>` : ''}
+      <div class="hist-t">${tableHTML([
+        { label: 'أسبوع السبت', html: w => `<span class="num">${esc(fmtDay(w.week))}</span>` },
+        { label: 'الحالة', html: pill },
+        { label: 'الإثبات', html: cell },
+      ], d.weeks, { empty: 'لا يوجد سجل' })}</div>`,
+    foot: `<button class="btn" data-close>إغلاق</button><button class="btn primary" id="h-print">${icon('print')}طباعة السجل</button>`,
+    onMount(el, close) {
+      const after = msg => { toast(msg); close(); if (onChange) onChange(); setTimeout(() => nurseHistoryDialog(username, onChange), 300); };
+      $$('[data-gap]', el).forEach(b => b.onclick = async () => {
+        const x = runs[+b.dataset.gap];
+        const reason = await promptReason(`تسجيل ${fmtDay(x.from)} → ${fmtDay(x.to)} (${x.weeks} أسابيع) «خارج العمل» لـ ${n.name}؟ لن تُحسب عليها هذه الأسابيع. اكتب السبب:`, 'لم تكن على رأس العمل');
+        if (reason == null) return;
+        busy(b, true);
+        try { await api('leaves.gap', { username, from: x.from, to: x.to, reason }); after('سُجّلت الفترة خارج العمل'); }
+        catch (e) { busy(b, false); toast(e.message, 'err'); }
+      });
+      $$('[data-lc]', el).forEach(b => b.onclick = async () => {
+        if (!await confirmDialog('إلغاء هذه الفترة؟ ستُحسب أسابيعها مطلوبة مرة أخرى.')) return;
+        try { await api('leaves.cancel', { leave_id: b.dataset.lc }); after('أُلغيت الفترة'); } catch (e) { toast(e.message, 'err'); }
+      });
+      $('#h-print', el).onclick = () => printHTML(prFrame({ ar: 'سجل التسليم الأسبوعي', en: 'Weekly Submission Record' }, [
+        ['الممرضة', 'Nurse', esc(n.name)], ['الفرع', 'Branch', esc(br(n.branch)) + ' / ' + esc(BR_EN[n.branch] || n.branch)],
+        ['حتى', 'As of', prDate(d.asOf)], ['تاريخ الطباعة', 'Printed', prDate(d.generatedAt)]],
+        `${prH(0, 'الملخص', 'Summary')}<p>مطلوب ${T.expected} أسبوع · سلّمت ${T.done} · لم تسلّم ${T.missing} · الالتزام ${pct(T.compliance)}</p>
+         ${prH(0, 'الأسابيع', 'Weeks')}${prTable([prTh('أسبوع السبت', 'Week'), prTh('الحالة', 'Status'), prTh('الإثبات', 'Evidence')],
+           d.weeks.map(w => `<tr><td class="n">${prDate(w.week)}</td><td>${esc(HIST_STATE[w.state] || w.state)}</td><td>${w.reports.length ? w.reports.map(r => esc(prDate(r.at) + ' ' + String(r.at).slice(11, 16) + ' · ' + r.clinic + ' · ' + src(r.source))).join('<br>') : w.leave ? esc(w.leave.reason) : esc(w.why || (w.state === 'missing' ? 'لا يوجد تقرير' : ''))}</td></tr>`))}`));
+    },
+  });
+}
+
+function promptReason(message, def) {
+  return new Promise(resolve => {
+    let answered = false;
+    modal({
+      title: 'تأكيد', body: `<p>${esc(message)}</p><input class="input" id="pr-r" maxlength="200" value="${esc(def || '')}">`,
+      foot: `<button class="btn" data-close>إلغاء</button><button class="btn primary" id="pr-ok">حفظ</button>`,
+      onMount(el, close) { $('#pr-ok', el).onclick = () => { answered = true; const v = $('#pr-r', el).value.trim(); close(); resolve(v || def || ''); }; },
+      onClose: () => { if (!answered) resolve(null); },
+    });
   });
 }
 
