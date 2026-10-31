@@ -699,7 +699,7 @@ async function copyText(text) {
 
 /* ══════════ API ══════════ */
 /* نتائج صفحات القراءة تُحفظ دقيقتين في الذاكرة: التنقل بين الصفحات فوري، وأي تعديل يمسحها */
-const CLIENT_VERSION = '2026-10-27';   // يجب أن يطابق APP.VERSION في Code.gs
+const CLIENT_VERSION = '2026-10-31';   // يجب أن يطابق APP.VERSION في Code.gs
 const READ_ACTIONS = ['nurse.context', 'hr.overview', 'quality.stats', 'reports.list', 'issues.list', 'users.list', 'clinics.list'];
 const MEMO = new Map(), INFLIGHT = new Map();
 const MEMO_MS = 120000;
@@ -920,6 +920,7 @@ const HOME = { nurse: 'nurse', hr: 'hr', quality: 'quality', supply: 'supply', a
 const allowedPages = u => Object.keys(PAGES).filter(k => PAGES[k].roles.includes(u.role));
 
 async function boot() {
+  nurseMakeup = '';
   if (!state.token) return renderLogin();
   let saved = null;
   try { saved = JSON.parse(store.get('apex.user') || 'null'); } catch (e) {}
@@ -1133,12 +1134,13 @@ function exportTable(name, cols, rows) {
 /* ══════════════════════════════════════════════════════════
    NURSE
    ══════════════════════════════════════════════════════════ */
+let nurseMakeup = '';   // أسبوع سابق تعوّضه الممرضة بمهلة من المدير
 async function renderNurse(view) {
   skeleton(view, [150, 200, 200, 200]);
   view.classList.add('n-wrap');
   let ctx;
-  try { ctx = await api('nurse.context'); }
-  catch (e) { return errorBlock(view, e, () => renderNurse(view)); }
+  try { ctx = nurseMakeup ? await api('nurse.context', { week: nurseMakeup }) : await api('nurse.context'); }
+  catch (e) { if (nurseMakeup) { nurseMakeup = ''; toast(e.message, 'err'); return renderNurse(view); } return errorBlock(view, e, () => renderNurse(view)); }
   if (!view.isConnected) return; // تم الانتقال لصفحة أخرى أثناء التحميل
 
   const pending = ctx.clinics.filter(c => !c.submitted);
@@ -1186,7 +1188,15 @@ async function renderNurse(view) {
     ${ctx.stats.leave ? `<div class="notice rise" style="margin-top:12px">${t('onLeaveNote')(fmtDay(ctx.stats.leave.from), fmtDay(ctx.stats.leave.to))}</div>` : ''}
     ${ctx.paused ? `<div class="notice rise" style="margin-top:12px;border-color:var(--crit)">${icon('alert')} ${esc(ctx.paused)}</div>` : ''}
     ${streakOk && !ctx.paused ? `<div class="notice rise" style="margin-top:12px">${icon('check')} ${state.lang === 'en' ? 'Thank you! You submitted on time three weeks in a row.' : 'شكراً لك! رفعتِ التقرير في الوقت ثلاثة أسابيع متتالية.'}</div>` : ''}
-    ${ctx.window.excusedUntil ? `<div class="notice rise" style="margin-top:12px">${icon('check')} ${esc(t('excusedNote')(fmtDate(ctx.window.excusedUntil, { weekday: 'long', day: 'numeric', month: 'long' })))}</div>` : ''}
+    ${ctx.makeupWeek ? `<div class="notice rise" style="margin-top:12px;border-color:var(--accent)">${icon('clock')} ${state.lang === 'en'
+        ? `Make-up report for the week of ${esc(fmtDate(ctx.makeupWeek, { day: 'numeric', month: 'long' }))} — counts as on time.`
+        : `تقرير تعويض لأسبوع ${esc(fmtDate(ctx.makeupWeek, { day: 'numeric', month: 'long' }))} — يُحسب في الوقت.`}
+        <button class="btn sm" id="mk-back" style="margin-inline-start:8px">${state.lang === 'en' ? 'Back to this week' : 'رجوع لهذا الأسبوع'}</button></div>`
+      : (ctx.makeup || []).map(m => `<div class="notice rise" style="margin-top:12px;border-color:var(--accent)">${icon('clock')} ${state.lang === 'en'
+        ? `You have an extension for the week of ${esc(fmtDate(m.week, { day: 'numeric', month: 'long' }))} until ${esc(fmtDate(m.until, { weekday: 'long', day: 'numeric', month: 'long' }))}.`
+        : `لديك مهلة لتقرير أسبوع ${esc(fmtDate(m.week, { day: 'numeric', month: 'long' }))} حتى ${esc(fmtDate(m.until, { weekday: 'long', day: 'numeric', month: 'long' }))}.`}
+        <button class="btn primary sm" data-mk="${esc(m.week)}" style="margin-inline-start:8px">${state.lang === 'en' ? 'Submit that week\'s report' : 'رفع تقرير ذلك الأسبوع'}</button></div>`).join('')}
+    ${ctx.window.excusedUntil && !ctx.makeupWeek ? `<div class="notice rise" style="margin-top:12px">${icon('check')} ${esc(t('excusedNote')(fmtDate(ctx.window.excusedUntil, { weekday: 'long', day: 'numeric', month: 'long' })))}</div>` : ''}
     ${ctx.window.exception && ctx.window.exception.type === 'exempt' ? `<div class="notice rise" style="margin-top:12px">${esc(t('exemptNote'))}</div>` : ''}
 
     ${pending.length && !closed ? `
@@ -1301,6 +1311,8 @@ async function renderNurse(view) {
 
   const hist = $('.hist', view);
   if (hist) hist.scrollLeft = document.dir === 'rtl' ? -hist.scrollWidth : hist.scrollWidth;
+  $$('[data-mk]', view).forEach(b => b.onclick = () => { nurseMakeup = b.dataset.mk; window.scrollTo({ top: 0 }); renderNurse(view); });
+  $('#mk-back') && ($('#mk-back').onclick = () => { nurseMakeup = ''; renderNurse(view); });
   if (!pending.length || closed) return;
   const form = $('#nform');
   const set = (k, v) => { f[k] = v; update(); };
@@ -1380,7 +1392,7 @@ async function renderNurse(view) {
       other_issue: $('#f-other').value, notes: $('#f-notes').value,
     };
     try {
-      const d = await api('nurse.submit', { report });
+      const d = await api('nurse.submit', nurseMakeup ? { report, week: nurseMakeup } : { report });
       showNurseDone(view, d, pending.length > 1);
     } catch (err) {
       busy(btn, false);
@@ -1402,7 +1414,7 @@ function showNurseDone(view, d, more) {
       <button class="btn lg" id="fin">${t('finish')}</button>
     </div></section>`;
   $('#again') && ($('#again').onclick = () => renderNurse(view));
-  $('#fin').onclick = () => renderNurse(view);
+  $('#fin').onclick = () => { nurseMakeup = ''; renderNurse(view); };
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -1646,10 +1658,13 @@ function exceptionDialog(r, week0, done) {
     onMount(el, close) {
       const wk = () => $('#ex-w', el).value;
       const syncDate = () => {
-        const w = wk(), sun = addDays(w, 1), thu = addDays(w, 5), inp = $('#ex-u', el);
-        const def = w === week0 && cur && cur.until ? cur.until : (today > sun && today <= thu ? addDays(today, 1) : addDays(w, 2));
-        inp.min = w; inp.max = thu; inp.value = def > thu ? thu : def;
-        $('#ex-u-h', el).textContent = 'حتى الخميس ' + fmtDay(thu) + ' كحد أقصى، لأن الجمعة تفتح نافذة الأسبوع التالي.';
+        const w = wk(), sun = addDays(w, 1), thu = addDays(w, 5), max = addDays(w, 34), inp = $('#ex-u', el);
+        const def = w === week0 && cur && cur.until ? cur.until : (today > thu ? addDays(today, 2) : today > sun ? addDays(today, 1) : addDays(w, 2));
+        inp.min = w; inp.max = max; inp.value = def > max ? max : def;
+        const hint = () => { $('#ex-u-h', el).textContent = inp.value > thu
+          ? 'بعد الخميس (تعويض): تجد في صفحتها زر «رفع تقرير أسبوع ' + fmtDay(w) + '» حتى هذا التاريخ، ويُحسب في الوقت.'
+          : 'حتى الخميس ' + fmtDay(thu) + ' ترفع بشكل عادي. لتاريخ بعده (تعويض) يظهر لها زر خاص في صفحتها.'; };
+        inp.oninput = hint; hint();
       };
       const sync = () => $('#ex-u-f', el).classList.toggle('hidden', $('input[name=ex-t]:checked', el).value !== 'extend');
       $('#ex-w', el).onchange = syncDate;
