@@ -16,7 +16,7 @@
 
 const APP = {
   NAME: 'Nursing',
-  VERSION: '2026-10-27',   // يجب أن يطابق CLIENT_VERSION في index.html
+  VERSION: '2026-10-31',   // يجب أن يطابق CLIENT_VERSION في index.html
   TZ: 'Asia/Riyadh',
   SESSION_SECONDS: 6 * 60 * 60, // أقصى مدة يسمح بها CacheService
   HASH_ROUNDS: 250,
@@ -372,10 +372,33 @@ const TIMING_RANK = { early: 4, on_time: 3, late: 2, very_late: 1, missing: 0 };
 
 /* ════════════════════════════ NURSE ════════════════════════════ */
 
+/**
+ * أسابيع سابقة لدى الممرضة فيها مهلة تعويض ما زالت سارية (مُنحت بعد إغلاق النافذة أو تمتد بعد الخميس):
+ * ترفع تقرير ذلك الأسبوع من صفحتها ويُحسب «في الوقت».
+ */
+function makeupWeeks_(username, cfg) {
+  const today = dateStr_(new Date());
+  const cur = classifySubmission_(new Date(), cfg).week;
+  const m = {};
+  exceptions_().list.forEach(x => {
+    if (x.username === username && x.type === 'extend' && x.until >= today && x.week_start < cur)
+      m[x.week_start] = { week: x.week_start, until: x.until, reason: x.reason || '' };
+  });
+  return Object.keys(m).sort().map(k => m[k]);
+}
+
+function makeupFor_(user, w, cfg) {
+  const week = normalizeWeek_(w, cfg);
+  const mk = makeupWeeks_(user.username, cfg).find(x => x.week === week);
+  if (!mk) throw err_('لا توجد مهلة سارية لأسبوع ' + week + '. اطلبي من المدير استثناءً');
+  return mk;
+}
+
 function apiNurseContext_(req, user) {
   const cfg = settings_();
   const week = currentWeek_(cfg);
-  const now = classifySubmission_(new Date(), cfg);
+  const mk = req.week ? makeupFor_(user, req.week, cfg) : null;
+  const now = mk ? { week: mk.week, timing: 'on_time' } : classifySubmission_(new Date(), cfg);
   const clinics = nurseClinics_(user);
   const reports = rows_(S.REPORTS);
   const mine = reports.filter(r => r.username === user.username);
@@ -395,7 +418,8 @@ function apiNurseContext_(req, user) {
   const openIssues = rows_(S.ISSUES)
     .filter(i => (i.status === 'open' || i.status === 'in_progress') && reportedBy_(i, user.username))
     .map(issueOut_);
-  const eff = effectiveWindow_(user.username, new Date(), cfg);
+  const eff = mk ? { week: mk.week, timing: 'on_time', closed: false, excused: true, until: mk.until, exception: { type: 'extend', until: mk.until, reason: mk.reason } }
+    : effectiveWindow_(user.username, new Date(), cfg);
   const closed = eff.closed;
   const nextSat = addDays_(parseDate_(now.week), 7);
 
@@ -425,6 +449,7 @@ function apiNurseContext_(req, user) {
     openIssues: openIssues,
     fridgeRange: [cfg.FRIDGE_MIN, cfg.FRIDGE_MAX],
     paused: String(cfg.SUBMISSIONS_PAUSED).toLowerCase() === 'yes' ? (cfg.PAUSE_MESSAGE || 'رفع التقارير متوقف مؤقتاً') : '',
+    makeup: makeupWeeks_(user.username, cfg), makeupWeek: mk ? mk.week : '',
   };
 }
 
@@ -441,7 +466,8 @@ function nurseClinics_(user) {
 function apiNurseSubmit_(req, user) {
   const cfg = settings_();
   if (String(cfg.SUBMISSIONS_PAUSED).toLowerCase() === 'yes') throw err_(cfg.PAUSE_MESSAGE || 'رفع التقارير متوقف مؤقتاً. حاولي لاحقاً.', 'PAUSED');
-  const win = effectiveWindow_(user.username, new Date(), cfg);
+  const mk = req.week ? makeupFor_(user, req.week, cfg) : null;
+  const win = mk ? { closed: false } : effectiveWindow_(user.username, new Date(), cfg);
   if (win.closed) {
     throw err_('نافذة التقديم لهذا الأسبوع مغلقة. التقديم السبت، ويُقبل الأحد كمتأخر. تفتح النافذة القادمة من الجمعة.', 'CLOSED');
   }
@@ -482,7 +508,7 @@ function apiNurseSubmit_(req, user) {
   lock.waitLock(20000);
   try {
     const when = new Date();
-    const cls = effectiveWindow_(user.username, when, cfg);
+    const cls = mk ? { week: mk.week, timing: 'on_time' } : effectiveWindow_(user.username, when, cfg);
     const dup = rows_(S.REPORTS).find(x => x.week_start === cls.week && x.clinic_id === clinic.clinic_id);
     if (dup) throw err_('تم رفع تقرير ' + clinic.name + ' لهذا الأسبوع مسبقاً');
 
@@ -656,9 +682,10 @@ function apiExceptionSave_(req, user) {
     const d = parseDate_(req.until);
     if (!d) throw err_('حدد آخر يوم للمهلة');
     until = dateStr_(d);
-    const last = dateStr_(addDays_(parseDate_(week), 5));   // حتى الخميس، قبل أن تفتح نافذة الأسبوع التالي
+    // بعد الخميس يصبح «تعويضاً»: تظهر لها في صفحتها رفع تقرير ذلك الأسبوع حتى التاريخ المحدد
+    const last = dateStr_(addDays_(parseDate_(week), 6 + 28));
     if (until < week) throw err_('تاريخ المهلة قبل سبت هذا الأسبوع');
-    if (until > last) throw err_('أقصى مهلة لهذا الأسبوع حتى الخميس ' + last + '. بعدها يبدأ الأسبوع التالي');
+    if (until > last) throw err_('أقصى مهلة أربعة أسابيع بعد نهاية الأسبوع (' + last + ')');
   }
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
@@ -686,7 +713,9 @@ function apiExceptionSave_(req, user) {
         const body = type === 'exempt'
           ? ['أُعفيتِ من تقرير العيادات لأسبوع السبت ' + week + '.', '', 'You are excused from the clinic report for the week of Saturday ' + week + '.']
           : ['مُنحتِ مهلة لتقرير العيادات لأسبوع السبت ' + week + ' حتى نهاية يوم ' + until + '، وما ترفعينه خلالها يُحسب في الوقت.',
-             '', 'You have an extension for the clinic report (week of Saturday ' + week + ') until the end of ' + until + '. Reports submitted until then count as on time.'];
+             'إن انتهى ذلك الأسبوع تجدين في صفحتك زر «رفع تقرير أسبوع ' + week + '».',
+             '', 'You have an extension for the clinic report (week of Saturday ' + week + ') until the end of ' + until + '. Reports submitted until then count as on time.',
+             'If that week has already passed, use the "Submit report for the week of ' + week + '" button on your page.'];
         if (url && type !== 'exempt') body.push('', url);
         MailApp.sendEmail({ to: to, subject: type === 'exempt' ? 'إعفاء من تقرير هذا الأسبوع | Excused this week' : 'مهلة لتقرير العيادات | Clinic report extension', body: body.join('\n'), name: APP.NAME });
         emailed = true;
