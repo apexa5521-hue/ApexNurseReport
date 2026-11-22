@@ -1891,15 +1891,20 @@ function buildClinicsReport(type, d, range, recs, branch) {
 
   // 2) الممرضات
   const nurses = full ? d.nurses : d.nurses.filter(x => x.rate != null && x.rate < 70).slice(0, 10);
-  S.push(prH(++n, full ? 'الممرضات' : 'الممرضات الأقل التزاماً', full ? 'Nurses' : 'Lowest compliance') + prTable(
+  // تقرير الإدارة العليا: الأسماء والفرع فقط، بدون أعمدة الأرقام
+  if (!full) S.push(prH(++n, 'الممرضات الأقل التزاماً', 'Lowest compliance') + prTable(
+    [prTh('#', '#', 'n'), prTh('الممرضة', 'Nurse'), prTh('الفرع', 'Branch')],
+    nurses.map((x, i) => `<tr><td class="n">${i + 1}</td><td><b>${esc(x.name)}</b></td><td>${esc(br(x.branch))}</td></tr>`),
+    'كل الممرضات التزامهن 70% أو أكثر · All nurses ≥ 70%'));
+  else S.push(prH(++n, 'الممرضات', 'Nurses') + prTable(
     [prTh('#', '#', 'n'), prTh('الممرضة', 'Nurse'), prTh('الفرع', 'Branch'), prTh('أسابيع مطلوبة', 'Expected', 'n'), prTh('سلّمت', 'Submitted', 'n'), prTh('الالتزام', 'Compliance'), prTh('في الوقت', 'On time', 'n'), prTh('التقارير', 'Reports', 'n')],
     nurses.map((x, i) => `<tr><td class="n">${i + 1}</td><td><b>${esc(x.name)}</b></td><td>${esc(br(x.branch))}</td><td class="n">${x.expected}</td><td class="n">${x.submitted}</td><td style="min-width:110px">${prBar(x.rate)}</td><td class="n">${pct(x.onTime)}</td><td class="n">${x.reports}</td></tr>`),
-    full ? 'لا توجد بيانات' : 'كل الممرضات التزامهن 70% أو أكثر · All nurses ≥ 70%'));
+    'لا توجد بيانات'));
 
-  // 3) العيادات والسلامة
+  // 3) العيادات والسلامة (لا تظهر في تقرير الإدارة العليا)
   const exp = d.expiry.filter(x => x.days <= (full ? 60 : 30));
   const clin = full ? d.clinicsScore : d.clinicsScore.filter(c => c.highOpen || c.steril || c.fridge || (c.coverage != null && c.coverage < 75)).slice(0, 8);
-  S.push(prH(++n, 'العيادات والسلامة', 'Clinics & Safety') + prTable(
+  if (full) S.push(prH(++n, 'العيادات والسلامة', 'Clinics & Safety') + prTable(
     [prTh('العيادة', 'Clinic'), prTh('التقارير', 'Reports', 'n'), prTh('التغطية', 'Coverage'), prTh('النظافة', 'Clean.', 'n'), prTh('التعقيم', 'Steril.', 'n'), prTh('الثلاجة', 'Fridge', 'n'), prTh('البطاقة', 'Card', 'n'), prTh('أدوات', 'Tools', 'n'), prTh('مفتوحة', 'Open', 'n')],
     clin.map(c => `<tr><td><b>${esc(c.name)}</b> <span class="muted">· ${esc(br(c.branch))}</span></td><td class="n">${c.reports}</td><td style="min-width:90px">${prBar(c.coverage, prTone(c.coverage, 90, 70))}</td><td class="n">${c.avgClean == null ? '—' : c.avgClean}</td>
       <td class="n">${c.steril || '—'}</td><td class="n">${c.fridge || '—'}</td><td class="n">${c.cards || '—'}</td><td class="n">${c.tools || '—'}</td><td class="n">${c.openIssues ? `<span class="tag ${c.highOpen ? 'bad' : 'warn'}">${c.openIssues}</span>` : '—'}</td></tr>`),
@@ -1953,7 +1958,7 @@ function openReportDialog(d, range, branchNow) {
       <div id="pr-err"></div>`,
     foot: `<button class="btn" data-close>إلغاء</button><button class="btn primary" id="pr-go">${icon('print')}طباعة</button>`,
     onMount(el, close) {
-      const desc = { exec: 'صفحة إلى صفحتين: الأرقام الرئيسية، أقل الممرضات التزاماً، العيادات التي تحتاج تدخلاً، التوصيات والتوقيع.',
+      const desc = { exec: 'صفحة إلى صفحتين: الأرقام الرئيسية، أسماء أقل الممرضات التزاماً، المشاكل والمتابعة، التوصيات والتوقيع.',
         quality: 'تفصيلي: كل الممرضات وكل العيادات، الصلاحيات، الثلاجات، المشاكل المتكررة، سجل المخالفات، التوصيات والتوقيع.',
         branch: 'تفصيلي لفرع واحد بأسماء ممرضاته وعياداته.' };
       const sync = () => { const t = $('#pr-type', el).value; $('#pr-desc', el).textContent = desc[t]; $('#pr-br-f', el).classList.toggle('hidden', t !== 'branch'); };
